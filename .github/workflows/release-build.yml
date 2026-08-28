@@ -1,0 +1,38 @@
+name: release build
+
+# Builds the app and attaches it to the release created by release-please.
+# Triggered by the tag, so a release can be rebuilt by re-cutting the tag.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Native parts
+        run: npm run build:native
+
+      - name: Application
+        env:
+          # On macOS an update only installs if the app is signed with a
+          # Developer ID certificate: Squirrel checks the signature. Without
+          # these secrets the build succeeds but will not update itself.
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build && npm run dist:mac -w @spyly/desktop -- --publish always

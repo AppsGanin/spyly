@@ -1,0 +1,28 @@
+{
+  "name": "@spyly/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
+    "pack": "electron-vite build && electron-builder --dir",
+    "dist": "electron-vite build && electron-builder",
+    "dist:mac": "electron-vite build && electron-builder --mac"
+  },
+  "dependencies": {
+    "@spyly/core": "*",
+    "electron-updater": "^6.8.9",
+    "geist": "^1.7.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sherpa-onnx-node": "^1.13.6",
+    "zod": "^4.4.3"
+  },
+  "description": "Рекордер созвонов с расшифровкой, разбивкой по участникам и экспортом в кодинг-агентов",
+  "author": "Spyly",
+  "license": "AGPL-3.0-or-later"
+}

@@ -1,0 +1,25 @@
+name: release-please
+
+# Prepares a release from ordinary commits: collects the changelog, bumps the
+# version and keeps a pull request open. Merging that pull request creates the
+# tag and a draft release on GitHub, which the built apps are then attached to.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

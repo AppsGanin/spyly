@@ -1,0 +1,388 @@
+/**
+ * Дизайн-токены Geist (Vercel).
+ *
+ * Значения сняты с живого vercel.com/geist для обеих тем, а не подобраны на глаз.
+ * Шрифты Geist Sans / Geist Mono лицензированы под SIL OFL и ставятся из npm-пакета
+ * `geist`; компонентная библиотека Vercel публично не издана, поэтому компоненты
+ * у нас свои — общий с Geist только визуальный язык.
+ *
+ * Смысл ступеней шкалы:
+ *   100–300  фоны (обычный / hover / active)
+ *   400–600  границы
+ *   700–800  контрастные заливки
+ *   900–1000 текст (вторичный / основной)
+ */
+
+:root {
+  color-scheme: dark;
+
+  --ds-amber-100: oklch(22.46% .0538 76.04);
+  --ds-amber-1000: oklch(96.7% .0418 84.59);
+  --ds-amber-200: oklch(24.95% .0642 64.78);
+  --ds-amber-300: oklch(32.34% .0837 63.83);
+  --ds-amber-400: oklch(35.53% .0903 66.2971);
+  --ds-amber-500: oklch(41.55% .1044 67.98);
+  --ds-amber-600: oklch(75.04% .1737 74.49);
+  --ds-amber-700: oklch(81.87% .1969 76.46);
+  --ds-amber-800: oklch(77.21% .1991 64.28);
+  --ds-amber-900: oklch(77.21% .1991 64.28);
+  --ds-background-100: hsla(0, 0%, 4%, 1);
+  --ds-background-200: hsla(0, 0%, 0%, 1);
+  --ds-blue-100: oklch(22.17% .069 259.89);
+  --ds-blue-1000: oklch(96.75% .0179 242.423);
+  --ds-blue-200: oklch(25.45% .0811 255.8);
+  --ds-blue-300: oklch(30.86% .1022 255.21);
+  --ds-blue-400: oklch(34.1% .121 254.74);
+  --ds-blue-500: oklch(38.5% .1403 254.4);
+  --ds-blue-600: oklch(64.94% .1982 251.813);
+  --ds-blue-700: oklch(57.61% .2321 258.23);
+  --ds-blue-800: oklch(51.51% .2307 257.85);
+  --ds-blue-900: oklch(71.7% .1648 250.794);
+  --ds-focus-color: oklch(71.7% .1648 250.794);
+  --ds-focus-ring: 0 0 0 2px hsla(0, 0%, 4%, 1), 0 0 0 4px oklch(71.7% .1648 250.794);
+  --ds-gray-100: hsla(0, 0%, 10%, 1);
+  --ds-gray-1000: hsla(0, 0%, 93%, 1);
+  --ds-gray-200: hsla(0, 0%, 12%, 1);
+  --ds-gray-300: hsla(0, 0%, 16%, 1);
+  --ds-gray-400: hsla(0, 0%, 18%, 1);
+  --ds-gray-500: hsla(0, 0%, 27%, 1);
+  --ds-gray-600: hsla(0, 0%, 53%, 1);
+  --ds-gray-700: hsla(0, 0%, 56%, 1);
+  --ds-gray-800: hsla(0, 0%, 49%, 1);
+  --ds-gray-900: hsla(0, 0%, 63%, 1);
+  --ds-gray-alpha-100: #ffffff0f;
+  --ds-gray-alpha-1000: #ffffffeb;
+  --ds-gray-alpha-200: #ffffff17;
+  --ds-gray-alpha-300: #ffffff21;
+  --ds-gray-alpha-400: #ffffff24;
+  --ds-gray-alpha-500: #ffffff3d;
+  --ds-gray-alpha-600: #ffffff82;
+  --ds-gray-alpha-700: #ffffff8a;
+  --ds-gray-alpha-800: #ffffff78;
+  --ds-gray-alpha-900: #ffffff9c;
+  --ds-green-100: oklch(23.09% .0716 149.68);
+  --ds-green-1000: oklch(96.76% .056 154.18);
+  --ds-green-200: oklch(27.12% .0895 150.09);
+  --ds-green-300: oklch(29.84% .096 149.25);
+  --ds-green-400: oklch(34.39% .1039 147.78);
+  --ds-green-500: oklch(44.19% .1484 147.2);
+  --ds-green-600: oklch(58.11% .1815 146.55);
+  --ds-green-700: oklch(64.58% .199 147.27);
+  --ds-green-800: oklch(57.81% .1776 147.5);
+  --ds-green-900: oklch(73.1% .2158 148.29);
+  --ds-pink-100: oklch(22.67% .0628 354.73);
+  --ds-pink-1000: oklch(95.74% .0326 350.08);
+  --ds-pink-200: oklch(26.2% .0859 356.68);
+  --ds-pink-300: oklch(31.15% .1067 355.93);
+  --ds-pink-400: oklch(32.13% .1174 356.71);
+  --ds-pink-500: oklch(37.01% .1453 358.39);
+  --ds-pink-600: oklch(50.33% .2089 4.33);
+  --ds-pink-700: oklch(63.52% .2346 1.01);
+  --ds-pink-800: oklch(59.51% .2429 4.21);
+  --ds-pink-900: oklch(69.36% .2223 3.91);
+  --ds-purple-100: oklch(22.34% .0779 316.87);
+  --ds-purple-1000: oklch(96.1% .0304 316.46);
+  --ds-purple-200: oklch(25.91% .0921 314.41);
+  --ds-purple-300: oklch(31.98% .1219 312.41);
+  --ds-purple-400: oklch(35.93% .1504 309.78);
+  --ds-purple-500: oklch(40.99% .1721 307.92);
+  --ds-purple-600: oklch(55.5% .2191 306.12);
+  --ds-purple-700: oklch(55.5% .2186 306.12);
+  --ds-purple-800: oklch(48.58% .2102 305.73);
+  --ds-purple-900: oklch(69.87% .2037 309.51);
+  --ds-red-100: oklch(22.1% .0657 15.11);
+  --ds-red-1000: oklch(95.6% .0293 6.61);
+  --ds-red-200: oklch(25.93% .0834 19.02);
+  --ds-red-300: oklch(31.47% .1105 20.96);
+  --ds-red-400: oklch(35.27% .1273 21.23);
+  --ds-red-500: oklch(40.68% .1479 23.16);
+  --ds-red-600: oklch(62.56% .2277 23.03);
+  --ds-red-700: oklch(62.56% .2234 23.03);
+  --ds-red-800: oklch(58.01% .227 25.12);
+  --ds-red-900: oklch(69.96% .2136 22.03);
+  --ds-shadow-border: 0 0 0 1px #ffffff25, 0 0 0 1px hsla(0, 0%, 0%, 1);
+  --ds-shadow-border-small: 0 0 0 1px #ffffff25, 0px 1px 2px #00000029, 0 0 0 1px hsla(0, 0%, 0%, 1);
+  --ds-shadow-medium: 0px 2px 2px #00000052, 0px 8px 8px -8px #00000029;
+  --ds-shadow-menu: 0 0 0 1px #ffffff25, 0px 1px 1px #00000005, 0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 0%, 1);
+  --ds-shadow-modal: 0 0 0 1px #ffffff25, 0px 1px 1px #00000005, 0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 0%, 1);
+  --ds-shadow-small: 0px 1px 2px #00000029;
+  --ds-shadow-tooltip: 0 0 0 1px #ffffff25, 0px 1px 1px #00000005, 0px 4px 8px #0000000a, 0 0 0 1px hsla(0, 0%, 0%, 1);
+  --ds-teal-100: oklch(22.1% .0544 178.74);
+  --ds-teal-1000: oklch(96.46% .056 180.29);
+  --ds-teal-200: oklch(25.06% .062 178.76);
+  --ds-teal-300: oklch(31.5% .0767 180.99);
+  --ds-teal-400: oklch(32.43% .0763 180.13);
+  --ds-teal-500: oklch(43.35% .1055 180.97);
+  --ds-teal-600: oklch(60.71% .1485 180.24);
+  --ds-teal-700: oklch(64.92% .1403 181.95);
+  --ds-teal-800: oklch(57.53% .1392 181.66);
+  --ds-teal-900: oklch(74.56% .1765 182.8);
+
+  /* ── материалы ─────────────────────────────────────────────── */
+  --radius-sm: 4px;   /* кнопки и мелкие контролы */
+  --radius: 6px;      /* базовый */
+  --radius-lg: 8px;   /* крупные карточки */
+  --radius-full: 999px;
+
+  --control-sm: 32px;
+  --control-md: 36px;
+  --control-lg: 40px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── типографика ───────────────────────────────────────────── */
+  --font-sans: "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 14px;   /* контролы и основной текст */
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+
+  --leading-tight: 16px;
+  --leading-base: 20px;
+  --leading-relaxed: 24px;
+  --leading-loose: 32px;
+
+  --tracking-tight: -0.02em;
+  --tracking-tighter: -0.04em;   /* заголовки */
+
+  /* ── движение ──────────────────────────────────────────────── */
+  --ease-swift: cubic-bezier(0.175, 0.885, 0.32, 1.1);
+  --duration-fast: 120ms;
+  --duration-popover: 200ms;
+  --duration-overlay: 300ms;
+
+  /* ── слои ──────────────────────────────────────────────────── */
+  --z-drawer: 200;
+  --z-modal: 300;
+  --z-menu: 2001;
+  --z-toast: 5000;
+  --z-tooltip: 99999;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --ds-amber-100: oklch(97.48% .0331 85.79);
+  --ds-amber-1000: oklch(30.83% .099 45.48);
+  --ds-amber-200: oklch(96.81% .0495 90.2423);
+  --ds-amber-300: oklch(95.93% .0636 90.52);
+  --ds-amber-400: oklch(91.02% .1322 88.25);
+  --ds-amber-500: oklch(86.55% .1583 79.63);
+  --ds-amber-600: oklch(80.25% .1953 73.59);
+  --ds-amber-700: oklch(81.87% .1969 76.46);
+  --ds-amber-800: oklch(77.21% .1991 64.28);
+  --ds-amber-900: oklch(52.79% .1496 54.65);
+  --ds-background-100: hsla(0, 0%, 100%, 1);
+  --ds-background-200: hsla(0, 0%, 98%, 1);
+  --ds-blue-100: oklch(97.32% .0141 251.56);
+  --ds-blue-1000: oklch(26.67% .1099 254.34);
+  --ds-blue-200: oklch(96.29% .0195 250.59);
+  --ds-blue-300: oklch(94.58% .0293 249.849);
+  --ds-blue-400: oklch(91.58% .0473 245.116);
+  --ds-blue-500: oklch(82.75% .0979 248.48);
+  --ds-blue-600: oklch(73.08% .1583 248.133);
+  --ds-blue-700: oklch(57.61% .2508 258.23);
+  --ds-blue-800: oklch(51.51% .2399 257.85);
+  --ds-blue-900: oklch(53.18% .2399 256.99);
+  --ds-focus-color: oklch(57.61% .2508 258.23);
+  --ds-focus-ring: 0 0 0 2px hsla(0, 0%, 100%, 1), 0 0 0 4px oklch(57.61% .2508 258.23);
+  --ds-gray-100: hsla(0, 0%, 95%, 1);
+  --ds-gray-1000: hsla(0, 0%, 9%, 1);
+  --ds-gray-200: hsla(0, 0%, 92%, 1);
+  --ds-gray-300: hsla(0, 0%, 90%, 1);
+  --ds-gray-400: hsla(0, 0%, 92%, 1);
+  --ds-gray-500: hsla(0, 0%, 79%, 1);
+  --ds-gray-600: hsla(0, 0%, 66%, 1);
+  --ds-gray-700: hsla(0, 0%, 56%, 1);
+  --ds-gray-800: hsla(0, 0%, 49%, 1);
+  --ds-gray-900: hsla(0, 0%, 30%, 1);
+  --ds-gray-alpha-100: #0000000d;
+  --ds-gray-alpha-1000: #000000e8;
+  --ds-gray-alpha-200: #00000014;
+  --ds-gray-alpha-300: #0000001a;
+  --ds-gray-alpha-400: #00000014;
+  --ds-gray-alpha-500: #00000036;
+  --ds-gray-alpha-600: #00000057;
+  --ds-gray-alpha-700: #00000070;
+  --ds-gray-alpha-800: #00000082;
+  --ds-gray-alpha-900: #000000b3;
+  --ds-green-100: oklch(97.59% .0289 145.42);
+  --ds-green-1000: oklch(29.15% .1197 147.38);
+  --ds-green-200: oklch(96.92% .037 147.15);
+  --ds-green-300: oklch(94.6% .0674 144.23);
+  --ds-green-400: oklch(91.49% .0976 146.24);
+  --ds-green-500: oklch(85.45% .1627 146.3);
+  --ds-green-600: oklch(80.25% .214 145.18);
+  --ds-green-700: oklch(64.58% .1746 147.27);
+  --ds-green-800: oklch(57.81% .1507 147.5);
+  --ds-green-900: oklch(51.75% .1453 147.65);
+  --ds-pink-100: oklch(95.69% .0359 344.622);
+  --ds-pink-1000: oklch(26% .0977 359);
+  --ds-pink-200: oklch(95.71% .0321 353.14);
+  --ds-pink-300: oklch(93.83% .0451 356.29);
+  --ds-pink-400: oklch(91.12% .0573 358.82);
+  --ds-pink-500: oklch(84.28% .0915 356.99);
+  --ds-pink-600: oklch(74.33% .1547 .24);
+  --ds-pink-700: oklch(63.52% .238 1.01);
+  --ds-pink-800: oklch(59.51% .2339 4.21);
+  --ds-pink-900: oklch(53.5% .2058 2.84);
+  --ds-purple-100: oklch(96.65% .0244 312.189);
+  --ds-purple-1000: oklch(23.96% .13 305.66);
+  --ds-purple-200: oklch(96.73% .0228 309.8);
+  --ds-purple-300: oklch(94.85% .0364 310.15);
+  --ds-purple-400: oklch(91.77% .0614 312.82);
+  --ds-purple-500: oklch(81.26% .1409 310.8);
+  --ds-purple-600: oklch(72.07% .2083 308.19);
+  --ds-purple-700: oklch(55.5% .3008 306.12);
+  --ds-purple-800: oklch(48.58% .2638 305.73);
+  --ds-purple-900: oklch(47.18% .2579 304);
+  --ds-red-100: oklch(96.5% .0223 13.09);
+  --ds-red-1000: oklch(24.8% .1041 18.86);
+  --ds-red-200: oklch(95.41% .0299 14.2526);
+  --ds-red-300: oklch(94.33% .0369 15.0115);
+  --ds-red-400: oklch(91.51% .0471 19.8);
+  --ds-red-500: oklch(84.47% .1018 17.71);
+  --ds-red-600: oklch(71.12% .1881 21.22);
+  --ds-red-700: oklch(62.56% .2524 23.03);
+  --ds-red-800: oklch(58.19% .2482 25.15);
+  --ds-red-900: oklch(54.99% .232 25.29);
+  --ds-shadow-border: 0 0 0 1px #00000014, 0 0 0 1px hsla(0, 0%, 98%, 1);
+  --ds-shadow-border-small: 0 0 0 1px #00000014, 0px 2px 2px #0000000a, 0 0 0 1px hsla(0, 0%, 98%, 1);
+  --ds-shadow-medium: 0px 2px 2px #0000000a, 0px 8px 8px -8px #0000000a;
+  --ds-shadow-menu: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 98%, 1);
+  --ds-shadow-modal: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 98%, 1);
+  --ds-shadow-small: 0px 2px 2px #0000000a;
+  --ds-shadow-tooltip: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 4px 8px #0000000a, 0 0 0 1px hsla(0, 0%, 98%, 1);
+  --ds-teal-100: oklch(97.72% .0359 186.7);
+  --ds-teal-1000: oklch(32.11% .0788 179.82);
+  --ds-teal-200: oklch(97.06% .0347 180.66);
+  --ds-teal-300: oklch(94.92% .0478 182.07);
+  --ds-teal-400: oklch(92.76% .0718 183.78);
+  --ds-teal-500: oklch(86.88% .1344 182.42);
+  --ds-teal-600: oklch(81.5% .161 178.96);
+  --ds-teal-700: oklch(64.92% .1572 181.95);
+  --ds-teal-800: oklch(57.53% .1392 181.66);
+  --ds-teal-900: oklch(52.08% .1251 182.93);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    color-scheme: light;
+
+    --ds-amber-100: oklch(97.48% .0331 85.79);
+    --ds-amber-1000: oklch(30.83% .099 45.48);
+    --ds-amber-200: oklch(96.81% .0495 90.2423);
+    --ds-amber-300: oklch(95.93% .0636 90.52);
+    --ds-amber-400: oklch(91.02% .1322 88.25);
+    --ds-amber-500: oklch(86.55% .1583 79.63);
+    --ds-amber-600: oklch(80.25% .1953 73.59);
+    --ds-amber-700: oklch(81.87% .1969 76.46);
+    --ds-amber-800: oklch(77.21% .1991 64.28);
+    --ds-amber-900: oklch(52.79% .1496 54.65);
+    --ds-background-100: hsla(0, 0%, 100%, 1);
+    --ds-background-200: hsla(0, 0%, 98%, 1);
+    --ds-blue-100: oklch(97.32% .0141 251.56);
+    --ds-blue-1000: oklch(26.67% .1099 254.34);
+    --ds-blue-200: oklch(96.29% .0195 250.59);
+    --ds-blue-300: oklch(94.58% .0293 249.849);
+    --ds-blue-400: oklch(91.58% .0473 245.116);
+    --ds-blue-500: oklch(82.75% .0979 248.48);
+    --ds-blue-600: oklch(73.08% .1583 248.133);
+    --ds-blue-700: oklch(57.61% .2508 258.23);
+    --ds-blue-800: oklch(51.51% .2399 257.85);
+    --ds-blue-900: oklch(53.18% .2399 256.99);
+    --ds-focus-color: oklch(57.61% .2508 258.23);
+    --ds-focus-ring: 0 0 0 2px hsla(0, 0%, 100%, 1), 0 0 0 4px oklch(57.61% .2508 258.23);
+    --ds-gray-100: hsla(0, 0%, 95%, 1);
+    --ds-gray-1000: hsla(0, 0%, 9%, 1);
+    --ds-gray-200: hsla(0, 0%, 92%, 1);
+    --ds-gray-300: hsla(0, 0%, 90%, 1);
+    --ds-gray-400: hsla(0, 0%, 92%, 1);
+    --ds-gray-500: hsla(0, 0%, 79%, 1);
+    --ds-gray-600: hsla(0, 0%, 66%, 1);
+    --ds-gray-700: hsla(0, 0%, 56%, 1);
+    --ds-gray-800: hsla(0, 0%, 49%, 1);
+    --ds-gray-900: hsla(0, 0%, 30%, 1);
+    --ds-gray-alpha-100: #0000000d;
+    --ds-gray-alpha-1000: #000000e8;
+    --ds-gray-alpha-200: #00000014;
+    --ds-gray-alpha-300: #0000001a;
+    --ds-gray-alpha-400: #00000014;
+    --ds-gray-alpha-500: #00000036;
+    --ds-gray-alpha-600: #00000057;
+    --ds-gray-alpha-700: #00000070;
+    --ds-gray-alpha-800: #00000082;
+    --ds-gray-alpha-900: #000000b3;
+    --ds-green-100: oklch(97.59% .0289 145.42);
+    --ds-green-1000: oklch(29.15% .1197 147.38);
+    --ds-green-200: oklch(96.92% .037 147.15);
+    --ds-green-300: oklch(94.6% .0674 144.23);
+    --ds-green-400: oklch(91.49% .0976 146.24);
+    --ds-green-500: oklch(85.45% .1627 146.3);
+    --ds-green-600: oklch(80.25% .214 145.18);
+    --ds-green-700: oklch(64.58% .1746 147.27);
+    --ds-green-800: oklch(57.81% .1507 147.5);
+    --ds-green-900: oklch(51.75% .1453 147.65);
+    --ds-pink-100: oklch(95.69% .0359 344.622);
+    --ds-pink-1000: oklch(26% .0977 359);
+    --ds-pink-200: oklch(95.71% .0321 353.14);
+    --ds-pink-300: oklch(93.83% .0451 356.29);
+    --ds-pink-400: oklch(91.12% .0573 358.82);
+    --ds-pink-500: oklch(84.28% .0915 356.99);
+    --ds-pink-600: oklch(74.33% .1547 .24);
+    --ds-pink-700: oklch(63.52% .238 1.01);
+    --ds-pink-800: oklch(59.51% .2339 4.21);
+    --ds-pink-900: oklch(53.5% .2058 2.84);
+    --ds-purple-100: oklch(96.65% .0244 312.189);
+    --ds-purple-1000: oklch(23.96% .13 305.66);
+    --ds-purple-200: oklch(96.73% .0228 309.8);
+    --ds-purple-300: oklch(94.85% .0364 310.15);
+    --ds-purple-400: oklch(91.77% .0614 312.82);
+    --ds-purple-500: oklch(81.26% .1409 310.8);
+    --ds-purple-600: oklch(72.07% .2083 308.19);
+    --ds-purple-700: oklch(55.5% .3008 306.12);
+    --ds-purple-800: oklch(48.58% .2638 305.73);
+    --ds-purple-900: oklch(47.18% .2579 304);
+    --ds-red-100: oklch(96.5% .0223 13.09);
+    --ds-red-1000: oklch(24.8% .1041 18.86);
+    --ds-red-200: oklch(95.41% .0299 14.2526);
+    --ds-red-300: oklch(94.33% .0369 15.0115);
+    --ds-red-400: oklch(91.51% .0471 19.8);
+    --ds-red-500: oklch(84.47% .1018 17.71);
+    --ds-red-600: oklch(71.12% .1881 21.22);
+    --ds-red-700: oklch(62.56% .2524 23.03);
+    --ds-red-800: oklch(58.19% .2482 25.15);
+    --ds-red-900: oklch(54.99% .232 25.29);
+    --ds-shadow-border: 0 0 0 1px #00000014, 0 0 0 1px hsla(0, 0%, 98%, 1);
+    --ds-shadow-border-small: 0 0 0 1px #00000014, 0px 2px 2px #0000000a, 0 0 0 1px hsla(0, 0%, 98%, 1);
+    --ds-shadow-medium: 0px 2px 2px #0000000a, 0px 8px 8px -8px #0000000a;
+    --ds-shadow-menu: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 4px 8px -4px #0000000a, 0px 16px 24px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 98%, 1);
+    --ds-shadow-modal: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f, 0 0 0 1px hsla(0, 0%, 98%, 1);
+    --ds-shadow-small: 0px 2px 2px #0000000a;
+    --ds-shadow-tooltip: 0 0 0 1px #00000014, 0px 1px 1px #00000005, 0px 4px 8px #0000000a, 0 0 0 1px hsla(0, 0%, 98%, 1);
+    --ds-teal-100: oklch(97.72% .0359 186.7);
+    --ds-teal-1000: oklch(32.11% .0788 179.82);
+    --ds-teal-200: oklch(97.06% .0347 180.66);
+    --ds-teal-300: oklch(94.92% .0478 182.07);
+    --ds-teal-400: oklch(92.76% .0718 183.78);
+    --ds-teal-500: oklch(86.88% .1344 182.42);
+    --ds-teal-600: oklch(81.5% .161 178.96);
+    --ds-teal-700: oklch(64.92% .1572 181.95);
+    --ds-teal-800: oklch(57.53% .1392 181.66);
+    --ds-teal-900: oklch(52.08% .1251 182.93);
+  }
+}

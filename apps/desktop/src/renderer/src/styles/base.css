@@ -1,0 +1,267 @@
+/* Основа: сброс, типографика, примитивы Geist.
+   Границы рисуются тенью, а не border — так элементы не прыгают на пиксель,
+   когда рамка появляется, и это фирменная черта самой системы. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--ds-gray-1000);
+  background: var(--ds-background-100);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+::selection {
+  background: var(--ds-blue-400);
+  color: var(--ds-gray-1000);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: var(--tracking-tighter);
+  line-height: 1.25;
+}
+
+h1 { font-size: var(--text-xl); }
+h2 { font-size: var(--text-lg); }
+h3 { font-size: var(--text-md); }
+h4 { font-size: var(--text-base); letter-spacing: var(--tracking-tight); }
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--ds-blue-900);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+code,
+kbd,
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* ── полосы прокрутки ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--ds-gray-alpha-400);
+  border-radius: var(--radius-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ds-gray-alpha-500); background-clip: content-box; }
+
+/* ── кнопки ───────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--ds-gray-100);
+  color: var(--ds-gray-1000);
+  box-shadow: var(--ds-shadow-border);
+  font-size: var(--text-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-swift),
+              color var(--duration-fast) var(--ease-swift),
+              opacity var(--duration-fast) var(--ease-swift);
+}
+.btn:hover:not(:disabled) { background: var(--ds-gray-200); }
+.btn:active:not(:disabled) { background: var(--ds-gray-300); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn--primary {
+  background: var(--ds-gray-1000);
+  color: var(--ds-background-100);
+  box-shadow: none;
+}
+.btn--primary:hover:not(:disabled) { background: var(--ds-gray-900); }
+.btn--primary:active:not(:disabled) { background: var(--ds-gray-800); }
+
+.btn--danger {
+  background: var(--ds-red-800);
+  color: #fff;
+  box-shadow: none;
+}
+.btn--danger:hover:not(:disabled) { background: var(--ds-red-700); }
+
+.btn--ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--ds-gray-900);
+}
+.btn--ghost:hover:not(:disabled) { background: var(--ds-gray-alpha-200); color: var(--ds-gray-1000); }
+
+.btn--sm { height: var(--control-sm); padding: 0 var(--space-2); font-size: var(--text-sm); }
+.btn--lg { height: var(--control-lg); padding: 0 var(--space-5); }
+.btn--icon { width: var(--control-sm); height: var(--control-sm); padding: 0; }
+.btn--block { width: 100%; }
+
+/* ── поля ─────────────────────────────────────────────────────── */
+.input,
+.select,
+.textarea {
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--ds-background-100);
+  color: var(--ds-gray-1000);
+  box-shadow: var(--ds-shadow-border);
+  transition: box-shadow var(--duration-fast) var(--ease-swift);
+}
+.input::placeholder,
+.textarea::placeholder { color: var(--ds-gray-700); }
+.input:hover,
+.select:hover,
+.textarea:hover { box-shadow: 0 0 0 1px var(--ds-gray-500); }
+
+.textarea {
+  height: auto;
+  min-height: 76px;
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading-relaxed);
+  resize: vertical;
+}
+
+.select {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23888' stroke-width='1.5'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-2) center;
+  cursor: pointer;
+}
+
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.field__label { font-size: var(--text-sm); color: var(--ds-gray-900); font-weight: 500; }
+.field__hint { font-size: var(--text-sm); color: var(--ds-gray-700); line-height: var(--leading-tight); }
+
+/* ── карточки и панели ────────────────────────────────────────── */
+.card {
+  background: var(--ds-background-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--ds-shadow-border);
+}
+.card__header {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.card__body { padding: 0 var(--space-5) var(--space-5); }
+.card--inset { background: var(--ds-background-200); }
+
+.divider { height: 1px; background: var(--ds-gray-alpha-300); border: none; }
+
+/* ── бейджи ───────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: var(--ds-gray-100);
+  color: var(--ds-gray-900);
+  box-shadow: var(--ds-shadow-border);
+  white-space: nowrap;
+}
+.badge--blue { background: var(--ds-blue-100); color: var(--ds-blue-900); box-shadow: none; }
+.badge--green { background: var(--ds-green-100); color: var(--ds-green-900); box-shadow: none; }
+.badge--amber { background: var(--ds-amber-100); color: var(--ds-amber-900); box-shadow: none; }
+.badge--red { background: var(--ds-red-100); color: var(--ds-red-900); box-shadow: none; }
+.badge--purple { background: var(--ds-purple-100); color: var(--ds-purple-900); box-shadow: none; }
+.badge--teal { background: var(--ds-teal-100); color: var(--ds-teal-900); box-shadow: none; }
+.badge--pink { background: var(--ds-pink-100); color: var(--ds-pink-900); box-shadow: none; }
+
+/* ── вспомогательное ──────────────────────────────────────────── */
+.muted { color: var(--ds-gray-900); }
+.dim { color: var(--ds-gray-700); }
+.row { display: flex; align-items: center; gap: var(--space-2); }
+.col { display: flex; flex-direction: column; }
+.grow { flex: 1; min-width: 0; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+.spin {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--ds-gray-alpha-400);
+  border-top-color: var(--ds-gray-900);
+  animation: spin 700ms linear infinite;
+  flex: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Ссылка-кнопка внутри подсказок. */
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ds-blue-900);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Тег как кнопка — для быстрого выбора имени. */
+button.chip { cursor: pointer; font: inherit; }
+button.chip:hover { background: var(--ds-gray-200); }

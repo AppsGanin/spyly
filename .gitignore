@@ -1,0 +1,14 @@
+node_modules/
+dist/
+out/
+release/
+*.log
+.DS_Store
+.vite/
+coverage/
+
+# native builds
+# whisper.cpp is cloned by build/setup-whisper.mjs at a pinned commit: it is a
+# separate project with its own history and licence.
+native/whisper/
+native/macos-audio/.build/

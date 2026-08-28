@@ -1,0 +1,205 @@
+import { describe, expect, it } from 'vitest'
+import { keepOwnVoice, levelAt, micIsOnlyEcho, micIsOwnVoice, trimEchoedStart, type LevelWindow } from '../src/echo.js'
+import type { Utterance, Word } from '../src/types.js'
+
+/**
+ * Числа взяты с настоящей записи, где человек молчал, а микрофон писал только
+ * динамики: отношение громкостей держалось около 0.20 и почти не колебалось.
+ */
+const windows = (values: number[]): LevelWindow[] =>
+  values.map((rms, i) => ({ start: i * 0.25, end: (i + 1) * 0.25, rms }))
+
+describe('своя речь или эхо динамиков', () => {
+  it('эхо динамиков своей речью не считает', () => {
+    expect(micIsOwnVoice(0.016, 0.081)).toBe(false)
+  })
+
+  it('живую речь пропускает', () => {
+    // Человек говорит поверх тихого собеседника.
+    expect(micIsOwnVoice(0.12, 0.02)).toBe(true)
+  })
+
+  it('в тишине системной дорожки считает речь своей', () => {
+    // Сравнивать не с чем — значит, говорили в микрофон.
+    expect(micIsOwnVoice(0.03, 0.001)).toBe(true)
+  })
+
+  it('видит дорожку, в которой одно эхо', () => {
+    const mic = windows(Array.from({ length: 40 }, () => 0.016))
+    const system = windows(Array.from({ length: 40 }, () => 0.081))
+    expect(micIsOnlyEcho(mic, system)).toBe(true)
+  })
+
+  it('дорожку с настоящей речью эхом не признаёт', () => {
+    const mic = windows([...Array.from({ length: 30 }, () => 0.016), ...Array.from({ length: 10 }, () => 0.15)])
+    const system = windows(Array.from({ length: 40 }, () => 0.081))
+    expect(micIsOnlyEcho(mic, system)).toBe(false)
+  })
+
+  it('молчащую дорожку считает пустой', () => {
+    expect(micIsOnlyEcho(windows([0.001, 0.002]), windows([0.08, 0.08]))).toBe(true)
+  })
+
+  it('громкость на отрезке усредняет только по нему', () => {
+    const levels = windows([0.1, 0.2, 0.9, 0.9])
+    expect(levelAt(levels, 0, 0.5)).toBeCloseTo(0.15)
+  })
+})
+
+/**
+ * Последнее слово собеседника приклеивается к началу своей реплики: куски
+ * двух дорожек нарезаются по-разному. На настоящей записи «…но тогда я,
+ * конечно, готов» превратилось в «готов прикольно прикольно…» от вашего имени.
+ */
+describe('чужой хвост в начале реплики', () => {
+  const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
+
+  const mine: Utterance = {
+    id: 'u1',
+    speakerId: 'mic:0',
+    track: 'mic',
+    start: 106.9,
+    end: 110,
+    text: 'готов прикольно прикольно да',
+    words: [word('готов', 106.9), word('прикольно', 107.4), word('прикольно', 108), word('да', 108.6)],
+    provisional: false
+  }
+  const remote = { text: 'Поэтому имеет смысл читать комментарии, но тогда я, конечно, готов.', end: 106.5 }
+
+  // Приклеенное слово тихое — микрофон слышал динамики; своя речь громкая.
+  const levels = {
+    mic: (from: number) => (from < 107.3 ? 0.016 : 0.12),
+    system: () => 0.08
+  }
+
+  it('срезает приклеившееся слово', () => {
+    const result = trimEchoedStart(mine, remote, levels)
+    expect(result.text).toBe('прикольно прикольно да')
+    expect(result.start).toBeCloseTo(107.4)
+  })
+
+  it('своё слово не трогает, даже если оно совпало с чужим', () => {
+    // Человек и правда может повторить чужое слово — но громко, своим голосом.
+    const loud = { mic: () => 0.12, system: () => 0.08 }
+    expect(trimEchoedStart(mine, remote, loud).text).toBe(mine.text)
+  })
+
+  it('без соседней чужой реплики ничего не меняет', () => {
+    expect(trimEchoedStart(mine, null, levels).text).toBe(mine.text)
+  })
+
+  it('давнюю чужую реплику к стыку не приплетает', () => {
+    const old = { ...remote, end: 90 }
+    expect(trimEchoedStart(mine, old, levels).text).toBe(mine.text)
+  })
+
+  it('всю реплику не съедает', () => {
+    const echoOnly: Utterance = { ...mine, text: 'готов', words: [word('готов', 106.9)] }
+    expect(trimEchoedStart(echoOnly, remote, levels).text).toBe('готов')
+  })
+})
+
+/**
+ * Времена слов распознавание расставляет приблизительно, и приклеившееся слово
+ * нередко оказывается там, где обе дорожки молчат. На настоящей записи «готов»
+ * стояло на 106.9 с, где микрофон давал 0.001, а система — ноль.
+ */
+describe('слово на тишине', () => {
+  const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
+  const mine: Utterance = {
+    id: 'u1',
+    speakerId: 'mic:0',
+    track: 'mic',
+    start: 106.9,
+    end: 112,
+    text: 'готов прикольно прикольно',
+    words: [word('готов', 106.9), word('прикольно', 107.8), word('прикольно', 109.7)],
+    provisional: false
+  }
+  const remote = { text: 'но тогда я, конечно, готов.', end: 106.0 }
+
+  it('срезает слово, под которым тишина на обеих дорожках', () => {
+    const levels = {
+      mic: (from: number) => (from < 107.5 ? 0.001 : 0.019),
+      system: () => 0
+    }
+    expect(trimEchoedStart(mine, remote, levels).text).toBe('прикольно прикольно')
+  })
+
+  it('громкое слово оставляет, даже если система молчит', () => {
+    // Человек и правда сказал «готов» в тишине — это его слово.
+    const levels = { mic: () => 0.05, system: () => 0 }
+    expect(trimEchoedStart(mine, remote, levels).text).toBe(mine.text)
+  })
+})
+
+/**
+ * Реплика микрофона нередко склеена из двух половин: сначала эхо собеседника,
+ * следом собственная речь. На настоящей записи такая реплика дала среднее
+ * отношение 0.52 и была отброшена целиком — вместе со словами «я не знаю, что
+ * он означает», сказанными при полной тишине в динамиках.
+ */
+describe('своя речь внутри реплики с эхом', () => {
+  const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
+  const utterance = (words: Word[]): Utterance => ({
+    id: 'u1',
+    speakerId: 'mic:0',
+    track: 'mic',
+    start: words[0]!.start,
+    end: words[words.length - 1]!.end,
+    text: words.map((w) => w.text).join(' '),
+    words,
+    provisional: false
+  })
+
+  // До 110 с говорит собеседник, после — тишина в динамиках и речь человека.
+  const levels = {
+    mic: () => 0.02,
+    system: (from: number) => (from < 109.5 ? 0.1 : 0)
+  }
+
+  it('оставляет ту половину, где динамики молчат', () => {
+    const result = keepOwnVoice(
+      utterance([
+        word('принцип', 108.3),
+        word('что', 108.8),
+        word('он', 109.2),
+        word('означает', 110.5),
+        word('и', 111.0),
+        word('я', 111.5),
+        word('не', 112.0),
+        word('знаю', 112.5)
+      ]),
+      levels
+    )
+    expect(result?.text).toBe('означает и я не знаю')
+    expect(result?.start).toBeCloseTo(110.5)
+  })
+
+  it('сплошное эхо не оставляет ничего', () => {
+    const result = keepOwnVoice(
+      utterance([word('чужие', 100), word('слова', 100.5), word('целиком', 101)]),
+      { mic: () => 0.02, system: () => 0.1 }
+    )
+    expect(result).toBeNull()
+  })
+
+  it('свою речь целиком не трогает', () => {
+    const own = utterance([word('привет', 0), word('всем', 0.5), word('как', 1), word('дела', 1.5)])
+    expect(keepOwnVoice(own, { mic: () => 0.05, system: () => 0 })).toBe(own)
+  })
+
+  it('огрызок в полсекунды посреди чужой речи не показывает', () => {
+    const result = keepOwnVoice(
+      utterance([
+        word('чужое', 98.0),
+        word('да', 98.1),
+        word('все', 98.3),
+        word('нас', 98.5),
+        word('снова', 99.0)
+      ]),
+      { mic: () => 0.02, system: (from: number) => (from > 98.05 && from < 98.9 ? 0 : 0.1) }
+    )
+    expect(result).toBeNull()
+  })
+})

@@ -1,0 +1,101 @@
+appId: com.spyly.app
+electronVersion: '44.0.0'
+afterPack: ../../build/after-pack.cjs
+productName: Spyly
+copyright: Spyly
+
+directories:
+  output: ../../release
+  buildResources: ../../build
+
+# Отсюда приложение узнаёт, где искать обновления.
+publish:
+  provider: github
+  owner: AppsGanin
+  repo: spyly
+
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+
+# Нативные части кладём в Resources/bin: и хелпер захвата, и whisper с его
+# библиотеками, и MCP-сервер, который подключают к кодинг-агентам.
+extraResources:
+  - from: ../../native/macos-audio/.build/release/spyly-audiotap
+    to: bin/spyly-audiotap
+  - from: ../../native/whisper/build/bin/whisper-cli
+    to: bin/whisper-cli
+  - from: ../../native/whisper/build/bin/whisper-server
+    to: bin/whisper-server
+  - from: ../../native/whisper/build/bin/parakeet-cli
+    to: bin/parakeet-cli
+  - from: ../../packages/mcp-server/dist/bundle.mjs
+    to: mcp-server/bundle.mjs
+  - from: ../../build/spyly-mcp
+    to: bin/spyly-mcp
+  - from: resources
+    to: tray
+    filter: ['tray*.png']
+
+asarUnpack:
+  # Нативный аддон нельзя грузить из архива asar.
+  - '**/node_modules/sherpa-onnx-node/**'
+  - '**/*.node'
+
+mac:
+  icon: ../../build/icon.icns
+  category: public.app-category.productivity
+  # Только arm64: нативные части (Swift-хелпер и whisper.cpp) собираются под
+  # архитектуру машины сборки, и x64-сборка с arm64-бинарниками внутри просто
+  # не запустится. Для Intel нужен отдельный прогон build:native на x64.
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: ../../build/entitlements.mac.plist
+  entitlementsInherit: ../../build/entitlements.mac.plist
+  extendInfo:
+    NSMicrophoneUsageDescription: >-
+      Spyly записывает ваш голос во время созвона, чтобы расшифровать разговор.
+    NSAudioCaptureUsageDescription: >-
+      Spyly записывает звук созвона, чтобы расшифровать голоса собеседников.
+    NSCalendarsUsageDescription: >-
+      Spyly берёт из календаря название встречи и список участников, чтобы
+      запись сразу получила осмысленное имя.
+    NSCalendarsFullAccessUsageDescription: >-
+      Spyly читает события календаря, чтобы подставить название встречи и
+      участников. Ничего не изменяет и наружу не отправляет.
+    NSCameraUsageDescription: Spyly не использует камеру.
+    LSUIElement: false
+
+dmg:
+  title: Spyly
+  contents:
+    - x: 140
+      y: 190
+      type: file
+    - x: 400
+      y: 190
+      type: link
+      path: /Applications
+
+win:
+  icon: ../../build/icon.png
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+linux:
+  icon: ../../build/icon.png
+  category: Office
+  target:
+    - AppImage
+    - deb

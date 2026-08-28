@@ -1,0 +1,27 @@
+name: build
+
+# Runs on every pull request: types and unit tests. The native parts (the Swift
+# helper and whisper.cpp) are not built here — they need macOS and about twenty
+# minutes, and they affect neither the types nor the unit tests.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The CLI typechecks against the built output of mcp-server, so building
+      # comes before the typecheck.
+      - run: npm run build -w @spyly/core
+      - run: npm run build -w @spyly/mcp-server
+      - run: npm run build -w @spyly/cli
+      - run: npm run typecheck
+      - run: npm test

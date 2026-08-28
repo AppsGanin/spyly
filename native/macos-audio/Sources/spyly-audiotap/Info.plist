@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Описание встраивается прямо в бинарник.
+
+  Хелпер — не приложение, а отдельный исполняемый файл, и без своего Info.plist
+  система не показывает по нему запрос доступа: EventKit просто отвечает
+  отказом, не спросив человека. Тексты должны быть здесь, а не только в
+  Info.plist приложения.
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>dev.spyly.audiotap</string>
+  <key>CFBundleName</key>
+  <string>Spyly</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>Spyly подставит в запись название встречи и список участников из календаря.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>Spyly подставит в запись название встречи и список участников из календаря.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Spyly записывает ваш голос, чтобы расшифровать разговор.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Spyly записывает звук приложений, чтобы расшифровать собеседников.</string>
+</dict>
+</plist>
