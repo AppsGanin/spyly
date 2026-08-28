@@ -1,7 +1,7 @@
 {
   "name": "spyly",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Records your calls, transcribes them speaker by speaker, and hands the conversation to your coding agent. Runs locally.",
   "workspaces": [
     "apps/*",
