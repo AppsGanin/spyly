@@ -43,15 +43,29 @@ jobs:
       - name: Native parts
         run: npm run build:native
 
+      # The certificate variables are exported only when the secrets exist.
+      # Passing them through `env:` sets them to an empty string when a secret
+      # is missing, and electron-builder reads an empty CSC_LINK as a path,
+      # resolves it to the working directory and fails with "not a file".
       - name: Application
         env:
-          # On macOS an update only installs if the app is signed with a
-          # Developer ID certificate: Squirrel checks the signature. Without
-          # these secrets the build succeeds but will not update itself.
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          MAC_APPLE_ID: ${{ secrets.APPLE_ID }}
+          MAC_APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          MAC_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build && npm run dist:mac -w @spyly/desktop -- --publish always
+        run: |
+          if [ -n "$MAC_CERT_P12" ]; then
+            export CSC_LINK="$MAC_CERT_P12"
+            export CSC_KEY_PASSWORD="$MAC_CERT_PASSWORD"
+            export APPLE_ID="$MAC_APPLE_ID"
+            export APPLE_APP_SPECIFIC_PASSWORD="$MAC_APPLE_APP_PASSWORD"
+            export APPLE_TEAM_ID="$MAC_APPLE_TEAM_ID"
+          else
+            # Nothing to sign with, and no keychain identity on a runner either.
+            export CSC_IDENTITY_AUTO_DISCOVERY=false
+            echo "::warning::No Developer ID certificate. The build is signed ad-hoc, runs once the user allows it, and cannot update itself."
+          fi
+          npm run build
+          npm run dist:mac -w @spyly/desktop -- --publish always

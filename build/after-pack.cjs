@@ -3,12 +3,12 @@ const { existsSync, readdirSync, statSync } = require('node:fs')
 const path = require('node:path')
 
 /**
- * Подпись собранного приложения.
+ * Signs the packaged application.
  *
- * Без действительной подписи с запечатанным Info.plist macOS не выдаёт
- * разрешение на запись системного звука: проверка CoreAudio-тапа падает
- * молча, и приложение получает живой, но пустой поток. Поэтому подписываем
- * всегда — хотя бы ad-hoc, если нет сертификата разработчика.
+ * Without a valid signature over a sealed Info.plist, macOS refuses the system
+ * audio permission: the CoreAudio tap probe fails silently and the app gets a
+ * live but empty stream. So it is always signed — ad-hoc when no Developer ID
+ * certificate is available.
  */
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return
@@ -26,12 +26,12 @@ exports.default = async function afterPack(context) {
       execFileSync('codesign', args, { stdio: ['ignore', 'ignore', 'pipe'] })
     } catch (error) {
       const detail = error.stderr ? error.stderr.toString().trim() : error.message
-      throw new Error(`не удалось подписать ${path.basename(target)}: ${detail}`)
+      throw new Error(`could not sign ${path.basename(target)}: ${detail}`)
     }
   }
 
-  // Вложенные бинарники подписываются раньше внешнего бандла, иначе подпись
-  // приложения окажется недействительной.
+  // Nested binaries are signed before the outer bundle, otherwise the
+  // application signature comes out invalid.
   const binDir = path.join(appPath, 'Contents', 'Resources', 'bin')
   if (existsSync(binDir)) {
     for (const name of readdirSync(binDir)) {
@@ -47,8 +47,8 @@ exports.default = async function afterPack(context) {
     }
   }
 
-  // Внешний бандл подписываем с --deep: вложенные подписи после правки
-  // ресурсов перестают сходиться, и без него codesign отказывается работать.
+  // The outer bundle is signed with --deep: after the resources are touched
+  // the nested signatures no longer agree, and codesign refuses without it.
   sign(appPath, true, true)
-  console.log(`  • подписано ad-hoc  app=${path.basename(appPath)}`)
+  console.log(`  • signed  identity=${identity === '-' ? 'ad-hoc' : identity}  app=${path.basename(appPath)}`)
 }
