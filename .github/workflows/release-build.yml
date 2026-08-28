@@ -1,11 +1,26 @@
 name: release build
 
 # Builds the app and attaches it to the release created by release-please.
-# Triggered by the tag, so a release can be rebuilt by re-cutting the tag.
+#
+# Called by the release-please workflow rather than started by the tag alone:
+# a tag pushed with GITHUB_TOKEN never starts another workflow run, so an
+# `on: push` trigger by itself would sit silent forever. The push trigger is
+# kept for tags pushed by hand, and the dispatch one for rebuilding a release.
 on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to build, for example v1.0.0
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to build, for example v1.0.0
+        type: string
+        required: true
   push:
     tags: ['v*']
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,7 +29,11 @@ jobs:
   macos:
     runs-on: macos-14
     steps:
+      # Empty on a tag push, where checkout defaults to the tag that started it.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22

@@ -5,7 +5,7 @@
   "separate-pull-requests": false,
   "packages": {
     ".": {
-      "package-name": "spyly",
+      "package-name": "",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
         "apps/desktop/package.json"
