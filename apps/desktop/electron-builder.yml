@@ -13,6 +13,9 @@ publish:
   provider: github
   owner: AppsGanin
   repo: spyly
+  # release-please publishes the release before the build starts, and
+  # electron-builder refuses to upload into it while it expects a draft.
+  releaseType: release
 
 files:
   - out/**/*
