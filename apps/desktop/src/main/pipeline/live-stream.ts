@@ -4,27 +4,27 @@ import path from 'node:path'
 import { modelsDir } from './models.js'
 
 /**
- * Живая расшифровка потоковой моделью.
+ * Live transcription with a streaming model.
  *
- * Нарезка на куски по паузам даёт текст с опозданием на всю фразу: пока
- * человек говорит, показывать нечего, а на монологе ожидание доходит до
- * десятка секунд. Потоковая модель устроена иначе — она принимает звук
- * непрерывно и после каждых 320 мс уточняет уже сказанное, поэтому слова
- * появляются почти сразу и дописываются по ходу речи.
+ * Cutting into chunks at pauses gives text a whole phrase late: while a person
+ * speaks there is nothing to show, and on a monologue the wait reaches ten
+ * seconds. A streaming model works differently, taking audio continuously and
+ * refining what has been said every 320 ms, so words appear almost at once and
+ * are extended as speech goes on.
  *
- * Точность здесь второстепенна: это черновик, который после остановки записи
- * целиком заменяется полным проходом Whisper по файлу.
+ * Accuracy is secondary here: this is a draft, replaced in full after the
+ * recording stops by a complete Whisper pass over the file.
  */
 
 const MODEL_DIR = 'sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11'
 const SAMPLE_RATE = 16000
 
-/** Шаг модели: короче считать нечего, длиннее — растёт задержка. */
+/** The model's step: shorter and there is nothing to compute, longer and latency grows. */
 const STEP_SAMPLES = Math.round(SAMPLE_RATE * 0.32)
 
-/** Столько тишины подряд считается концом фразы. */
+/** This much silence in a row counts as the end of a phrase. */
 const TRAILING_SILENCE_SEC = 0.8
-/** Даже без паузы фразу пора закрывать: иначе она растёт без конца. */
+/** Even without a pause a phrase has to be closed, or it grows without end. */
 const MAX_UTTERANCE_SEC = 25
 
 interface OnlineStreamHandle {
@@ -42,9 +42,9 @@ interface OnlineEngine {
 }
 
 export interface LiveUpdate {
-  /** Текст фразы целиком с её начала. */
+  /** The whole text of the phrase from its start. */
   text: string
-  /** Фраза закончена — дальше текст меняться не будет. */
+  /** The phrase is finished; the text will not change any more. */
   final: boolean
   start: number
   end: number
@@ -82,8 +82,9 @@ function getEngine(): OnlineEngine {
       provider: 'cpu',
       debug: false
     },
-    // Конец фразы движок определяет сам — по тишине и по длине. Своя нарезка
-    // здесь только мешала бы: модель видит границы точнее, чем порог энергии.
+    // The engine decides where a phrase ends itself, by silence and by length.
+    // Cutting it up ourselves would only get in the way: the model sees the
+    // boundaries better than an energy threshold does.
     enableEndpoint: true,
     rule1MinTrailingSilence: 2.4,
     rule2MinTrailingSilence: TRAILING_SILENCE_SEC,
@@ -93,27 +94,27 @@ function getEngine(): OnlineEngine {
 }
 
 /**
- * Прогреть модель заранее.
+ * Warm the model up in advance.
  *
- * Загрузка занимает секунды, и без прогрева они пришлись бы на первые слова
- * разговора — ровно на то место, где текст нужнее всего.
+ * Loading takes seconds, and without warming up they would land on the first
+ * words of a conversation, exactly where the text is needed most.
  */
 export function warmLiveModel(): void {
   if (!isLiveModelReady()) return
   getEngine()
 }
 
-/** Освободить модель: между записями держать её в памяти незачем. */
+/** Release the model: no reason to hold it in memory between recordings. */
 export function releaseLiveModel(): void {
   engine = null
 }
 
 /**
- * Поток одной дорожки.
+ * The stream for one track.
  *
- * Отдаёт обновление на каждый принятый кусок: текущий текст фразы и признак
- * того, что фраза закончилась. Пока фраза не закончена, текст может меняться —
- * модель уточняет начало, услышав продолжение.
+ * Emits an update for every chunk taken in: the current text of the phrase and
+ * whether the phrase has ended. Until it has, the text can change, as the model
+ * refines the beginning once it hears what follows.
  */
 export class LiveTranscriber {
   private stream: OnlineStreamHandle
@@ -121,9 +122,9 @@ export class LiveTranscriber {
   private fedSamples = 0
   private segmentStart = 0
   private lastText = ''
-  /** Сколько символов текущего результата уже отдано законченными фразами. */
+  /** How many characters of the current result have already gone out as finished phrases. */
   private released = 0
-  /** Звук приходит кадрами по 32 мс — модель считает шагами по 320 мс. */
+  /** Audio arrives in 32 ms frames; the model computes in steps of 320 ms. */
   private waiting: Float32Array[] = []
   private waitingLength = 0
 
@@ -133,9 +134,9 @@ export class LiveTranscriber {
   }
 
   push(samples: Float32Array): LiveUpdate | null {
-    // Гонять распознавание на каждый кадр незачем: своего результата раньше
-    // конца шага оно не даст, а разбор ответа и проверка конца фразы стоят
-    // заметно дороже самого счёта.
+    // Running recognition on every frame is pointless: it gives no result of its
+    // own before the end of a step, while parsing the answer and checking for the
+    // end of a phrase cost noticeably more than the computation itself.
     this.waiting.push(new Float32Array(samples))
     this.waitingLength += samples.length
     if (this.waitingLength < STEP_SAMPLES) return null
@@ -161,8 +162,8 @@ export class LiveTranscriber {
 
     const whole = (this.recognizer.getResult(this.stream).text ?? '').trim()
     const ended = this.recognizer.isEndpoint(this.stream)
-    // Уже отданные предложения из текущего результата вычитаем: модель всегда
-    // возвращает фразу целиком с её начала.
+    // Sentences already handed out are subtracted from the current result: the
+    // model always returns the phrase whole, from its start.
     const text = whole.slice(this.released).trim()
 
 
@@ -177,18 +178,18 @@ export class LiveTranscriber {
       return { text: finished, final: true, start, end: now }
     }
 
-    // Пустой результат в начале фразы — это ещё тишина, а не речь.
+    // An empty result at the start of a phrase is still silence, not speech.
     if (!text) {
       this.segmentStart = at
       return null
     }
 
-    // Договорённое предложение отпускаем отдельной строкой: без этого монолог
-    // рос бы одним абзацем на десятки секунд, который неудобно читать.
+    // A finished sentence is released on its own line: without that a monologue
+    // would grow into one paragraph tens of seconds long, awkward to read.
     const ready = releaseSentence(whole, this.released)
     if (ready) {
-      // Время границы — по доле символов: точнее модель не скажет, а для
-      // черновика этого достаточно.
+      // The boundary time comes from the share of characters: the model will not say
+      // it more precisely, and for a draft this is enough.
       const boundary =
         this.segmentStart + ((now - this.segmentStart) * ready.sentence.length) / text.length
       this.released = ready.released
@@ -204,16 +205,16 @@ export class LiveTranscriber {
   }
 
   /**
-   * Закрыть поток и забрать остаток.
+   * Close the stream and take the remainder.
    *
-   * Обновлений может быть два: последняя договорённая фраза из недослушанного
-   * хвоста и то, что осталось после неё. Одним значением тут не обойтись —
-   * раньше результат дослушивания отбрасывался, и последние слова пропадали.
+   * There can be two updates: the last finished phrase out of the tail not yet
+   * heard, and whatever is left after it. One value will not do here; the result
+   * of that final listen used to be discarded, and the last words went missing.
    */
   finish(): LiveUpdate[] {
     const out: LiveUpdate[] = []
 
-    // Недобранный до шага хвост — это последние слова: их терять нельзя.
+    // A tail that did not reach a full step is the last words: they must not be lost.
     if (this.waitingLength > 0) {
       const batch = new Float32Array(this.waitingLength)
       let offset = 0
@@ -224,16 +225,16 @@ export class LiveTranscriber {
       this.waiting = []
       this.waitingLength = 0
       const update = this.feed(batch)
-      // Незаконченное обновление перекроется остатком ниже, а законченное —
-      // это отдельная фраза, и её надо отдать.
+      // An unfinished update will be covered by the remainder below, while a
+      // finished one is a phrase of its own and has to be handed out.
       if (update?.final) out.push(update)
     }
 
     this.stream.inputFinished()
     while (this.recognizer.isReady(this.stream)) this.recognizer.decode(this.stream)
     const whole = (this.recognizer.getResult(this.stream).text ?? '').trim()
-    // Отданные фразы вычитаем: без этого хвост повторял всё, что уже показано
-    // с начала отрезка.
+    // Phrases handed out are subtracted: without that the tail repeated everything
+    // already shown since the start of the stretch.
     const text = whole.slice(this.released).trim()
     if (text) {
       out.push({ text, final: true, start: this.segmentStart, end: this.fedSamples / SAMPLE_RATE })

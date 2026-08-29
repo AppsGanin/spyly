@@ -24,9 +24,10 @@ import { runSelfTest, selfTestArgs } from './selftest.js'
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 /**
- * Необработанная ошибка в главном процессе по умолчанию роняет приложение
- * целиком — вместе с идущей записью. Ронять запись из-за сбоя, например, в
- * скачивании модели нельзя, поэтому логируем и живём дальше.
+ * An unhandled error in the main process brings the whole application down by
+ * default, along with the recording in progress. Losing a recording over a
+ * failure in, say, a model download is not acceptable, so it is logged and we
+ * carry on.
  */
 process.on('uncaughtException', (error) => {
   process.stderr.write(`[необработанная ошибка] ${error.stack ?? error.message}\n`)
@@ -38,67 +39,70 @@ process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[необработанный отказ] ${text}\n`)
 })
 
-// Имя задаётся до первого обращения к getPath: иначе в разработке папка данных
-// называется по-другому, чем в собранном приложении, и модели «теряются».
+// The name is set before the first getPath call: otherwise the data folder is
+// named differently in development than in the packaged app, and models get "lost".
 app.setName('Spyly')
 
-// Флаги захвата системного звука ставятся до готовности приложения — позже
-// они уже не действуют.
+// The system audio capture flags are set before the app is ready; any later
+// and they no longer take effect.
 if (process.platform === 'linux') {
-  // Без него Chromium на Linux отдаёт поток без звука: петля через
-  // PulseAudio/PipeWire по умолчанию выключена.
+  // Without it Chromium on Linux hands over a stream with no audio: the loopback
+  // through PulseAudio/PipeWire is off by default.
   app.commandLine.appendSwitch('enable-features', 'PulseaudioLoopbackForScreenShare')
 } else if (process.platform === 'darwin') {
-  // На macOS 15+ петля закрыта отдельным флагом. Мы ей всё равно не
-  // пользуемся — звук берёт свой хелпер, — но без флага Chromium иногда
-  // подвешивает сам запрос на выбор источника.
+  // On macOS 15+ the loopback is behind a separate flag. We do not use it
+  // anyway, the audio is taken by our own helper, but without the flag Chromium
+  // sometimes hangs the source picker request itself.
   app.commandLine.appendSwitch('enable-features', 'MacSckSystemAudioLoopbackOverride')
 }
 
 let mainWindow: BrowserWindow | null = null
-/** Приложение действительно закрывают, а не просто прячут окно. */
+/** The application really is being quit, rather than the window just being hidden. */
 let quitting = false
 
 export function getMainWindow(): BrowserWindow | null {
-  // Уничтоженное окно — это отсутствующее окно: возвращать его значит
-  // подставлять каждого вызывающего под проверку, о которой легко забыть.
+  // A destroyed window is an absent window: returning it means putting every
+  // caller in front of a check that is easy to forget.
   return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null
 }
 
 /**
- * Событие в renderer.
+ * An event to the renderer.
  *
- * Проверки `isDestroyed()` мало: окно можно закрыть во время записи, и кадр
- * успевает исчезнуть между проверкой и отправкой. Запись при этом продолжается
- * и не должна падать из-за того, что её некому показывать.
+ * An `isDestroyed()` check is not enough: the window can be closed while
+ * recording, and the frame manages to vanish between the check and the send.
+ * The recording carries on regardless and must not fail because there is
+ * nobody to show it to.
  */
 export function send(channel: string, payload: unknown): void {
-  // Плавающая панель получает те же события: она показывает то же состояние
-  // записи, что и главное окно.
+  // The floating panel gets the same events: it shows the same recording state
+  // as the main window.
   for (const window of [mainWindow, overlayWindow()]) {
     if (!window || window.isDestroyed()) continue
     try {
       window.webContents.send(channel, payload)
     } catch {
-      // Кадр уже уничтожен — терять тут нечего.
+      // The frame is already destroyed, so there is nothing to lose here.
     }
   }
 }
 
-/** Панель поднимается на время записи и убирается вместе с ней. */
+/** The panel comes up for the duration of a recording and goes away with it. */
 export function setOverlayVisible(visible: boolean): void {
   if (visible) showOverlay(dirname)
   else hideOverlay()
 }
 
 /**
- * Ответ на запрос системного звука из renderer.
+ * The answer to a system audio request from the renderer.
  *
- * Chromium спрашивает, что именно захватывать. Показывать человеку ещё один
- * системный диалог не нужно — источник он уже выбрал в нашем окне, поэтому
- * отдаём весь экран и просим только звук: видео мы тут же выключаем.
+ * Chromium asks what exactly to capture. Showing the user yet another system
+ * dialog is unnecessary, they have already picked the source in our own
+ * window, so we hand over the whole screen and ask for audio only: the video
+ * is switched off straight away.
  *
- * На macOS этот путь не используется вовсе — там звук берёт нативный хелпер.
+ * On macOS this path is not used at all; there the audio comes from the native
+ * helper.
  */
 function registerDisplayMediaHandler(): void {
   if (process.platform === 'darwin') return
@@ -110,28 +114,28 @@ function registerDisplayMediaHandler(): void {
         .then((sources) => {
           const screen = sources[0]
           if (!screen) {
-            // Пустой ответ — это отказ; renderer увидит ошибку и покажет её.
+            // An empty answer is a refusal; the renderer will see the error and show it.
             callback({})
             return
           }
           callback({ video: screen, audio: 'loopback' })
         })
         .catch((error: unknown) => {
-          // Не ответить нельзя: без вызова callback запрос звука в renderer
-          // повиснет навсегда, и запись будет вечно «начинается».
+          // Not answering is not an option: without the callback the audio request in
+          // the renderer hangs forever, and the recording is eternally "starting".
           process.stderr.write(`[источники экрана недоступны] ${String(error)}\n`)
           callback({})
         })
     },
-    // Свой собственный звук в запись попадать не должен: иначе прослушивание
-    // прошлой записи попадёт в новую.
+    // Our own audio must not end up in a recording: otherwise listening back to
+    // an old recording lands in the new one.
     { useSystemPicker: false }
   )
 }
 
 function createWindow(): void {
-  // Проверочным прогонам нужно открывать окно заданного размера, чтобы
-  // ловить проблемы вёрстки на узких экранах.
+  // Test runs need to open a window of a given size, to catch layout problems
+  // on narrow screens.
   const forced = /^(\d+)x(\d+)$/.exec(process.env.SPYLY_WIN_SIZE ?? '')
 
   mainWindow = new BrowserWindow({
@@ -153,8 +157,9 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => mainWindow?.show())
 
-  // На Windows и Linux звук берёт само окно, и его закрытие оборвало бы
-  // запись на середине. Прячем вместо закрытия и говорим об этом.
+  // On Windows and Linux the audio is taken by the window itself, and closing
+  // it would cut a recording off halfway. So it is hidden rather than closed,
+  // and we say so.
   mainWindow.on('close', (event) => {
     if (!usesRendererCapture() || !isRecordingNow() || quitting) return
     event.preventDefault()
@@ -168,7 +173,7 @@ function createWindow(): void {
     }
   })
 
-  // Ошибки renderer иначе не видны: DevTools в проверочных прогонах не открыть.
+  // Renderer errors are invisible otherwise: DevTools cannot be opened during a test run.
   mainWindow.webContents.on('console-message', (event) => {
     if (event.level === 'error' || event.level === 'warning') {
       process.stderr.write(`[renderer:${event.level}] ${event.message}\n`)
@@ -181,9 +186,9 @@ function createWindow(): void {
     process.stderr.write(`[загрузка не удалась] ${code} ${description}\n`)
   })
 
-  // Снимок окна для автоматической проверки внешнего вида.
-  // Ошибки в окне иначе видно только в открытых инструментах разработчика:
-  // в проверочных прогонах их некому открыть.
+  // A screenshot of the window for automated appearance checks.
+  // Errors in the window are otherwise only visible with the developer tools
+  // open, and during a test run there is nobody to open them.
   if (process.env.SPYLY_CONSOLE) {
     mainWindow.webContents.on('console-message', (_event, level, message, line, source) => {
       if (level < 2) return
@@ -195,10 +200,10 @@ function createWindow(): void {
   if (shotPath) {
     mainWindow.webContents.once('did-finish-load', () => {
       setTimeout(async () => {
-        // Снимок с раскрытым меню или диалогом: иначе всплывающие части
-        // интерфейса нечем проверить, кроме как руками.
-        // Нажатие клавиш вида «meta+z»: иначе горячие клавиши нечем проверить,
-        // кроме как руками.
+        // A screenshot with a menu or dialog open: otherwise the pop-up parts of the
+        // interface can only be checked by hand.
+        // Key presses of the "meta+z" kind: otherwise the shortcuts can only be
+        // checked by hand.
         const keys = process.env.SPYLY_SCREENSHOT_KEY
         if (keys) {
           const parts = keys.toLowerCase().split('+')
@@ -214,8 +219,8 @@ function createWindow(): void {
           await new Promise((r) => setTimeout(r, 800))
         }
 
-        // Несколько нажатий подряд разделяются « ; »: до нужного места в
-        // интерфейсе редко удаётся добраться одним кликом.
+        // Several presses in a row are separated by " ; ": the place in the interface
+        // you need is rarely one click away.
         for (const one of (process.env.SPYLY_SCREENSHOT_CLICK ?? '').split(';')) {
           const click = one.trim()
           if (!click) continue
@@ -237,7 +242,7 @@ function createWindow(): void {
         await writeFile(shotPath, image.toPNG())
         process.stderr.write(`[снимок сохранён] ${shotPath}\n`)
 
-        // Плавающая панель живёт в своём окне, и в кадр главного не попадает.
+        // The floating panel lives in its own window and does not appear in a shot of the main one.
         const panel = overlayWindow()
         if (panel) {
           const shot = await panel.webContents.capturePage()
@@ -250,13 +255,13 @@ function createWindow(): void {
     })
   }
 
-  // Внешние ссылки уходят в браузер: внутри приложения им делать нечего.
+  // External links go to the browser: they have no business inside the application.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
   })
 
-  // Проверочным прогонам нужно открыть конкретный экран без кликов.
+  // Test runs need to open a particular screen without any clicking.
   if (process.env.SPYLY_START_VIEW) {
     mainWindow.webContents.on('did-finish-load', () => {
       const [kind, tab] = (process.env.SPYLY_START_VIEW ?? '').split(':')
@@ -282,11 +287,12 @@ export function showMainWindow(): void {
 }
 
 /**
- * Свой протокол для прослушивания записей.
+ * Our own protocol for listening back to recordings.
  *
- * Тег <audio> с `file://` в Electron не играет: renderer живёт на другом
- * источнике, и медиа с файловой схемы блокируется. Через собственную схему
- * запись отдаётся как обычный HTTP-ресурс, включая перемотку по Range.
+ * An <audio> tag with `file://` does not play in Electron: the renderer lives
+ * on a different origin, and media on the file scheme is blocked. Through our
+ * own scheme a recording is served like an ordinary HTTP resource, seeking
+ * over Range included.
  */
 protocol.registerSchemesAsPrivileged([
   { scheme: 'spyly-audio', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, bypassCSP: false } }
@@ -301,8 +307,8 @@ function registerAudioProtocol(): void {
       return new Response(t('неизвестная дорожка'), { status: 404 })
     }
 
-    // Путь собираем сами из идентификатора: принимать произвольный путь из
-    // renderer нельзя, иначе это дыра на чтение любого файла.
+    // The path is assembled from the identifier ourselves: taking an arbitrary
+    // path from the renderer is not allowed, or it becomes a hole for reading any file.
     const file = audioFile(id, track as 'mic' | 'system' | 'mix')
     if (track === 'mix' && !existsSync(file)) {
       try {
@@ -316,8 +322,8 @@ function registerAudioProtocol(): void {
     const size = statSync(file).size
     const range = request.headers.get('range')
 
-    // Без Content-Length и поддержки Range тег <audio> не узнаёт длительность
-    // и показывает Infinity, а перемотка не работает вовсе.
+    // Without Content-Length and Range support the <audio> tag never learns the
+    // duration and shows Infinity, and seeking does not work at all.
     if (range) {
       const match = /bytes=(\d*)-(\d*)/.exec(range)
       const start = match?.[1] ? Number(match[1]) : 0
@@ -348,10 +354,10 @@ function registerAudioProtocol(): void {
   })
 }
 
-// Второй экземпляр приложения писал бы поверх той же папки и дрался за
-// аудиоустройство, поэтому его сразу разворачиваем в уже открытое окно.
-// Проверочные прогоны из этого правила выведены: иначе они молча выходят,
-// пока у пользователя открыто обычное окно.
+// A second instance of the application would write over the same folder and
+// fight for the audio device, so it is turned straight back into the window
+// already open. Test runs are exempt from this rule: otherwise they quietly
+// exit while the user has an ordinary window open.
 const isCheckRun =
   process.argv.includes('--selftest') ||
   Boolean(process.env.SPYLY_SCREENSHOT) ||
@@ -371,12 +377,12 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
   app.on('second-instance', showMainWindow)
 
   void app.whenReady().then(async () => {
-    // Серверы расшифровки от прошлых запусков держат модель в оперативной
-    // памяти — по полтора гигабайта каждый. Если приложение сняли или оно
-    // упало, они остаются жить, и через несколько запусков машина начинает
-    // задыхаться, а живая расшифровка перестаёт успевать.
-    // Обновления из релизов: тихо проверяем, ставим только с согласия и
-    // никогда во время записи.
+    // Transcription servers from earlier runs hold a model in memory, a gigabyte
+    // and a half each. If the application was killed or crashed they stay alive,
+    // and after a few launches the machine starts to choke while live
+    // transcription can no longer keep up.
+    // Updates from releases: checked quietly, installed only with consent and
+    // never during a recording.
     startUpdates(isRecordingNow)
 
     void killOrphanServers().then((killed) => {
@@ -384,11 +390,11 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     })
 
     const settings = await loadSettings()
-    // Главный процесс тоже говорит с человеком: уведомления, меню в трее,
-    // сообщения об ошибках. Язык задаётся до того, как что-то из этого появится.
+    // The main process talks to people too: notifications, the tray menu, error
+    // messages. The language is set before any of that appears.
     setLang(settings.uiLang)
 
-    // Сквозная проверка идёт без окна: она про звук и конвейер, не про интерфейс.
+    // The end-to-end check runs without a window: it is about audio and the pipeline, not the interface.
     const selfTest = selfTestArgs()
     if (selfTest) {
       if (settings.storageDir) setStorageRoot(settings.storageDir)
@@ -400,7 +406,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Насколько голос в записи похож на сохранённый слепок.
+    // How close a voice in a recording is to a stored voice print.
     if (process.env.SPYLY_CHECK_VOICE) {
       const { listVoices } = await import('./store/voices.js')
       const { readMeeting } = await import('./store/meetings.js')
@@ -429,8 +435,8 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
           }
         }
       }
-            // Насколько кластеры похожи друг на друга: так видно, не разбило ли
-      // разделение одного человека на нескольких.
+            // How close the clusters are to each other: this shows whether separation
+            // split one person into several.
       const own: { id: string; embedding: number[] }[] = []
       for (const track of new Set((meeting?.speakers ?? []).map((sp) => sp.track))) {
         const file = audioFile(process.env.SPYLY_CHECK_VOICE, track)
@@ -454,10 +460,10 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Разовый прогон расшифровки конкретной моделью на конкретном файле.
-    // Живая расшифровка: прогнать файл как поток и посмотреть, через сколько
-    // после сказанного появляется текст и что именно появляется.
-    // Сколько стоят список и поиск, когда записей становится много.
+    // A one-off transcription run with a particular model on a particular file.
+    // Live transcription: run a file as a stream and see how long after something
+    // is said the text appears, and what exactly appears.
+    // What the list and the search cost once there are many recordings.
     if (process.env.SPYLY_BENCH) {
       const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises')
       const { tmpdir } = await import('node:os')
@@ -485,7 +491,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
             stages: { recording: 'done', transcribing: 'done' }
           })
         )
-        // Получасовой разговор — около 400 реплик.
+        // A half-hour conversation is around 400 utterances.
         const utterances = Array.from({ length: 400 }, (_, u) => ({
           id: `u${u}`,
           speakerId: 'system:0',
@@ -585,12 +591,12 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Полная переобработка одной записи — чтобы проверить конвейер целиком.
+    // A full reprocessing of one recording, to check the pipeline end to end.
     if (process.env.SPYLY_REPROCESS) {
       const { processMeeting } = await import('./pipeline/run.js')
       const { readMeeting } = await import('./store/meetings.js')
-      // По умолчанию с самого начала, но проверять конспект или разделение
-      // по голосам отдельно куда быстрее, чем каждый раз ждать расшифровку.
+      // From the very beginning by default, but checking the summary or the voice
+      // separation on its own is far quicker than waiting for transcription every time.
       const from = (process.env.SPYLY_REPROCESS_FROM ?? 'transcribing') as
         | 'transcribing'
         | 'diarizing'
@@ -610,8 +616,8 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Как меняется голос по ходу дорожки: окна по десять секунд и попарная
-    // похожесть. Отвечает на вопрос «это один человек или разные».
+    // How a voice changes over the course of a track: ten-second windows and
+    // pairwise similarity. Answers the question "is this one person or several".
     if (process.env.SPYLY_DIAG_VOICEMAP) {
       const { embedSpeaker, readWave } = await import('./providers/diarization/sherpa.js')
       const { cosineSimilarity } = await import('@spyly/core')
@@ -638,7 +644,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Что именно возвращает разделение по голосам: отрезки с временами.
+    // What voice separation actually returns: segments with times.
     if (process.env.SPYLY_DIAG_DIAR) {
       const { sherpa, segmentationModelPath, embeddingModelPath } = await import(
         './providers/diarization/sherpa.js'
@@ -667,7 +673,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Разовый замер разделения по голосам на конкретном файле.
+    // A one-off measurement of voice separation on a particular file.
     if (process.env.SPYLY_CHECK_DIARIZE) {
       const { getDiarizationProvider } = await import('./providers/registry.js')
       const provider = getDiarizationProvider('sherpa-onnx')
@@ -689,8 +695,8 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // Проверочный прогон доступа к календарю: своё окно показывает система, и
-    // из голой командной строки оно не появляется — нужен запуск приложения.
+    // A test run of calendar access: the system shows its own dialog, and from a
+    // bare command line it never appears, so the application has to be launched.
     if (process.env.SPYLY_CHECK_CALENDAR) {
       const { requestCalendarAccess, calendarGranted } = await import('./detect/calendar.js')
       const granted = await requestCalendarAccess()
@@ -709,23 +715,23 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     createWindow()
     createTray()
 
-    // Записи, прерванные падением, чинятся до того, как пользователь их увидит.
+    // Recordings interrupted by a crash are repaired before the user sees them.
     await recoverOrphanedRecordings()
 
-    // Конспект может поменять и агент через MCP — приложение должно это
-    // заметить, а не показывать вчерашнее.
+    // A summary can also be changed by an agent over MCP, and the app should
+    // notice that rather than show yesterday's version.
     watchMeetings((id) => send('meetings:changed', { id }))
 
-    // Сроки задач: напоминаем сами, иначе за списком надо ходить.
+    // Task deadlines: we remind, otherwise the list has to be visited.
     startReminders()
 
-    // Поиск команд поднимает оболочку входа — это полсекунды. Делаем это
-    // заранее и в фоне, чтобы вкладка «Агенты» открывалась уже заполненной.
+    // Looking for commands starts a login shell, which is half a second. Done
+    // ahead of time in the background, so the Agents tab opens already filled in.
     void findBinary('claude').catch(() => undefined)
 
 
-    // Проверочный прогон: начать запись сразу, чтобы можно было снять
-    // состояние интерфейса во время записи.
+    // Test run: start recording straight away, so the state of the interface
+    // during a recording can be captured.
     if (process.env.SPYLY_AUTORECORD) {
       const { autoStartForCheck } = await import('./ipc/handlers.js')
       setTimeout(() => void autoStartForCheck(), 1200)
@@ -745,13 +751,13 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     stopWatchingMeetings()
     stopReminders()
     hideOverlay()
-    // Сервер расшифровки держит модель в памяти: без этого он переживает
-    // приложение и остаётся висеть до перезагрузки.
+    // The transcription server holds a model in memory: without this it outlives
+    // the application and hangs around until a reboot.
     stopWhisperServer()
   })
 
   app.on('window-all-closed', () => {
-    // На macOS приложение живёт в трее: закрытое окно не должно останавливать запись.
+    // On macOS the app lives in the tray: a closed window must not stop a recording.
     if (process.platform !== 'darwin') app.quit()
   })
 

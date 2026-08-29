@@ -27,18 +27,19 @@ function passes(meeting: MeetingMeta, filter: Filter): boolean {
   if (filter === 'today') return at >= todayStart
   if (filter === 'week') return at >= todayStart - 6 * DAY
   if (filter === 'unprocessed') {
-    // «Не обработана» — это и несобранный конспект, и упавшая расшифровка:
-    // с точки зрения человека и то и другое означает «ещё не готово».
+    // "Not processed" covers both a summary that was never made and a failed
+    // transcription: from a person's point of view both mean "not ready yet".
     return meeting.stages.summarizing !== 'done' || meeting.stages.transcribing === 'failed'
   }
   return true
 }
 
 /**
- * Боковая панель: записи и переходы.
+ * The sidebar: recordings and navigation.
  *
- * Список и навигация разделены визуально — иначе «Задачи» и «Настройки»
- * выглядят такими же строками, как записи, и структура экрана читается неверно.
+ * The list and the navigation are separated visually, or "Tasks" and
+ * "Settings" look like the same kind of row as a recording and the structure of
+ * the screen reads wrongly.
  */
 export function Sidebar() {
   const { meetings, view, setView, recording, progress, notify, levels } = useStore()
@@ -51,7 +52,7 @@ export function Sidebar() {
 
   const isRecording = recording.status === 'recording' || recording.status === 'paused'
 
-  // Команды приходят из общего слоя клавиш: он один на всё окно.
+  // The commands come from the shared shortcut layer: there is one for the whole window.
   useEffect(() => {
     const focusSearch = () => searchRef.current?.focus()
     const startRecording = () => setStartOpen(true)
@@ -64,12 +65,13 @@ export function Sidebar() {
   }, [])
 
   /**
-   * Поиск с задержкой и защитой от устаревшего ответа.
+   * Search with a delay and a guard against a stale answer.
    *
-   * Раньше запрос уходил на каждое нажатие клавиши, а поиск читает расшифровки
-   * всех записей: на тысяче это почти полсекунды работы главного процесса —
-   * того самого, который принимает звук во время записи. Вдобавок ответы могли
-   * прийти не в том порядке, и результат по «б» перекрывал результат по «био».
+   * The request used to go out on every keystroke, and search reads the
+   * transcripts of every recording: on a thousand that is nearly half a second of
+   * the main process, the very one taking in audio while recording. On top of
+   * that the answers could arrive out of order, and the result for "b" covered
+   * the result for "bio".
    */
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchToken = useRef(0)
@@ -92,7 +94,7 @@ export function Sidebar() {
       void api
         .call('meetings:search', value)
         .then((found) => {
-          // Пока ждали, человек мог напечатать дальше: тот ответ уже не нужен.
+          // While we were waiting the person may have typed on: that answer is no longer needed.
           if (token !== searchToken.current) return
           setResults(found)
           setSearching(false)
@@ -105,8 +107,7 @@ export function Sidebar() {
 
   const [tag, setTag] = useState<string | null>(null)
 
-  // Теги показываем только те, что реально используются: пустой список
-  // фильтров хуже, чем его отсутствие.
+  // Only tags actually in use are shown: an empty list of filters is worse than none.
   const tags = useMemo(() => {
     const counts = new Map<string, number>()
     for (const meeting of meetings) {
@@ -300,12 +301,12 @@ function MeetingItem({
   recordingNow: boolean
   onClick: () => void
 }) {
-  // Конспект необязателен: без него запись не «сломана», и пугать не надо.
+  // A summary is optional: without one a recording is not "broken", and there is no need to alarm.
   const broken = meeting.stages.transcribing === 'failed' || meeting.stages.diarizing === 'failed'
   const noSummary = !broken && meeting.stages.summarizing === 'failed'
 
-  // Состояние показывает точка, а не подпись: словами оно занимало целую
-  // строку под каждой записью, и список читался вдвое медленнее.
+  // The state is shown by a dot rather than a caption: in words it took a whole
+  // line under every recording, and the list read twice as slowly.
   const state = recordingNow
     ? { modifier: 'item__dot--recording', label: t('идёт запись') }
     : busy

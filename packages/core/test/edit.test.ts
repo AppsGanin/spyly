@@ -55,8 +55,8 @@ describe('splitUtterance', () => {
     expect(splitUtterance(make(), 999)).toBeNull()
   })
 
-  // Разделив реплику дважды, легко получить два одинаковых идентификатора —
-  // и дальше правка попадала бы не в ту реплику.
+  // Splitting an utterance twice easily gives two identical identifiers, and
+  // after that an edit would land on the wrong utterance.
   it('второе деление не повторяет уже занятый идентификатор', () => {
     const base = make({ text: 'один два три четыре' })
     const [head, tail] = splitUtterance(base, 9, new Set([base.id]))!
@@ -84,7 +84,7 @@ describe('mergeUtterances', () => {
     expect(merged.text).toBe('первая вторая')
     expect(merged.start).toBe(10)
     expect(merged.end).toBe(15)
-    // Говорящий остаётся от первой: склеивают, когда вторую приписали не тому.
+    // The speaker stays from the first: joining happens when the second was attributed to the wrong person.
     expect(merged.speakerId).toBe('remote:0')
   })
 
@@ -117,8 +117,8 @@ describe('уверенность', () => {
   })
 
   it('на шумной записи подчёркивает только худшее, а не всё подряд', () => {
-    // Тут модель не уверена нигде: фиксированный порог 0.6 подчеркнул бы
-    // почти весь текст и стал бы бесполезен.
+    // Here the model is unsure everywhere: a fixed threshold of 0.6 would underline
+    // almost the whole text and become useless.
     const words = Array.from({ length: 40 }, (_, i) => ({
       text: `с${i}`,
       start: i,

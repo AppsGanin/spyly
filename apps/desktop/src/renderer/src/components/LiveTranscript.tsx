@@ -3,17 +3,18 @@ import { t, timecode } from '@spyly/core'
 import type { LiveUtterance } from '@shared/ipc'
 
 /**
- * Черновая расшифровка по ходу разговора.
+ * The draft transcript as the conversation goes.
  *
- * Показывается курсивом и без имён участников: кто говорит, станет понятно
- * только после финального прохода, а врать в реальном времени хуже, чем
- * честно сказать «вы» и «собеседник».
+ * Shown in italics and without participant names: who is speaking only becomes
+ * clear after the final pass, and lying in real time is worse than honestly
+ * saying "you" and "the other side".
  */
 export function LiveTranscript({ utterances }: { utterances: LiveUtterance[] }) {
   const bottom = useRef<HTMLDivElement>(null)
 
-  // Ведём не по числу реплик, а по тексту последней: фраза дописывается на
-  // месте, и её конец уезжает за нижний край, не меняя длины списка.
+  // Followed by the text of the last utterance rather than the number of them: a
+  // phrase is extended in place, and its end slides past the bottom edge without
+  // the length of the list changing.
   const tail = utterances[utterances.length - 1]?.text ?? ''
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })

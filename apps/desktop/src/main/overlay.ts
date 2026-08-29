@@ -2,11 +2,11 @@ import path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
 
 /**
- * Окно плавающей панели.
+ * The floating panel window.
  *
- * Живёт только во время записи. Frameless, поверх всех окон и на всех рабочих
- * столах: иначе, переключившись на браузер с созвоном, человек панель потеряет
- * — а нужна она именно там.
+ * It only lives while recording. Frameless, above every window and on every
+ * desktop: otherwise, switching to the browser with the call in it, a person
+ * would lose the panel, and that is exactly where it is needed.
  */
 let overlay: BrowserWindow | null = null
 
@@ -23,8 +23,8 @@ export function showOverlay(dirname: string): void {
   overlay = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
-    // Правый верхний угол: там меньше всего мешает и совпадает с привычным
-    // местом индикатора записи в системе.
+    // Top right corner: it is least in the way there, and it matches the usual
+    // place for a recording indicator in the system.
     x: workArea.x + workArea.width - WIDTH - 20,
     y: workArea.y + 20,
     frame: false,
@@ -37,8 +37,8 @@ export function showOverlay(dirname: string): void {
     skipTaskbar: true,
     hasShadow: false,
     show: false,
-    // Не крадём фокус: панель появляется поверх созвона, и увести фокус из
-    // него в момент начала разговора — худшее, что можно сделать.
+    // We do not steal focus: the panel appears over a call, and pulling focus out
+    // of it at the moment a conversation starts is the worst thing to do.
     focusable: false,
     webPreferences: {
       preload: path.join(dirname, '../preload/index.mjs'),
@@ -66,7 +66,7 @@ export function hideOverlay(): void {
   overlay = null
 }
 
-/** Панель — такой же получатель событий, как главное окно. */
+/** The panel receives events just like the main window. */
 export function overlayWindow(): BrowserWindow | null {
   return overlay && !overlay.isDestroyed() ? overlay : null
 }

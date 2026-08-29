@@ -190,8 +190,8 @@ describe('suppressEcho', () => {
   })
 
   it('ловит эхо, даже когда дорожки нарезаны на реплики по-разному', () => {
-    // Микрофон разбил фразу надвое и сдвинул её по времени — так и выглядит
-    // реальное расхождение между дорожками.
+    // The microphone broke the phrase in two and shifted it in time, which is what
+    // a real divergence between the tracks looks like.
     const mic = [
       utter('m1', 'mic', 5.0, 9.5, 'Хорошо, тогда я займусь интерфейсом'),
       utter('m2', 'mic', 10.0, 12.0, 'и поправлю отчеты')
@@ -259,7 +259,7 @@ describe('suppressEcho: короткие реплики', () => {
   })
 
   it('оставляет короткое подтверждение посреди чужой фразы', () => {
-    // «да» звучит на третьей секунде — это ответ, а не эхо начала.
+    // The "yes" sounds at the third second, so it is an answer rather than an echo of the start.
     const mic = [utter('m1', 'mic', 3.0, 3.4, 'да')]
     const sys = [utter('s1', 'system', 0.0, 6.0, 'нам нужно переделать расчёт да и отчёты тоже')]
     expect(suppressEcho(mic, sys)).toHaveLength(1)
@@ -319,8 +319,8 @@ describe('speakingShares', () => {
   })
 })
 
-// Один человек может говорить без пауз минутами: реплика вырастала в стену
-// текста на полторы минуты, которую нельзя ни прочитать, ни процитировать.
+// One person can speak without pauses for minutes: an utterance grew into a
+// wall of text a minute and a half long that can neither be read nor quoted.
 describe('длинные реплики', () => {
   const speech = (seconds: number, sentenceEvery: number): Word[] => {
     const words: Word[] = []
@@ -339,7 +339,7 @@ describe('длинные реплики', () => {
       { idPrefix: 'u' }
     )
     expect(result.length).toBeGreaterThan(1)
-    // Каждая реплика, кроме последней, заканчивается точкой.
+    // Every utterance but the last ends with a full stop.
     for (const u of result.slice(0, -1)) {
       expect(u.text.trim().endsWith('.'), u.text.slice(-30)).toBe(true)
     }
@@ -356,11 +356,11 @@ describe('длинные реплики', () => {
 })
 
 /**
- * Пересборка не с самого начала.
+ * Rebuilding from somewhere other than the start.
  *
- * Здесь была потеря данных: обработка, запущенная «с разделения по голосам»,
- * собирала расшифровку из пустого списка и стирала её целиком — по той самой
- * кнопке, которую предлагает вопрос «сколько человек говорило».
+ * There was data loss here: processing started "from voice separation"
+ * assembled the transcript out of an empty list and erased it entirely, on
+ * exactly the button offered by the question "how many people were speaking".
  */
 describe('расшифровка обратно в результат распознавания', () => {
   const utterance = (
@@ -433,10 +433,10 @@ describe('расшифровка обратно в результат распо
 })
 
 /**
- * Распознавание растягивает последние слова отрезка до его конца. На настоящей
- * записи «перед» и «тем» получили по 3.5 секунды и накрыли собой десять секунд
- * тишины: между словами не оставалось пауз, реплика склеивалась через молчание
- * и забирала себе чужое время в статистике говорения.
+ * Recognition stretches the last words of a stretch out to its end. On a real
+ * recording two short words got 3.5 seconds each and covered ten seconds of
+ * silence: no pauses were left between words, the utterance was glued together
+ * across the silence and took someone else's time in the speaking statistics.
  */
 describe('растянутые слова', () => {
   const asr = (words: Word[]): AsrResult => ({
@@ -450,7 +450,7 @@ describe('растянутые слова', () => {
       asr([
         w('до', 60, 60.5),
         w('тишины', 60.5, 61),
-        // Слово, растянутое распознавателем на всю паузу.
+        // A word the recogniser stretched over the whole pause.
         w('перед', 61, 71),
         w('после', 71, 71.5),
         w('тишины', 71.5, 72)
@@ -470,7 +470,7 @@ describe('растянутые слова', () => {
   })
 
   it('реплику без разметки по словам не режет', () => {
-    // Там одно «слово» на весь отрезок, и его длительность осмысленна.
+    // There is one "word" for the whole stretch, and its duration is meaningful.
     const result = assignSpeakers(
       { track: 'system', language: 'ru', segments: [{ text: 'длинная реплика целиком', start: 0, end: 30, words: [] }] },
       []
@@ -481,9 +481,9 @@ describe('растянутые слова', () => {
 })
 
 /**
- * Разделение по голосам иногда дробит речь одного человека на несколько
- * кластеров. На настоящей записи один собеседник оказался «Участником 1» и
- * «Участником 2», и его доля в разговоре разделилась пополам.
+ * Voice separation sometimes breaks one person's speech into several clusters.
+ * On a real recording one participant came out as both "Speaker 1" and
+ * "Speaker 2", and their share of the conversation was halved.
  */
 describe('сведение участников', () => {
   const meeting = (): Meeting =>

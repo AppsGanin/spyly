@@ -37,7 +37,7 @@ export function audioFile(id: string, track: 'mic' | 'system' | 'mix'): string {
   return path.join(meetingDir(id), 'audio', `${track}.wav`)
 }
 
-/** Транслитерация для имени папки: кириллица в путях работает, но мешает в терминале. */
+/** Transliteration for the folder name: Cyrillic works in paths but gets in the way in a terminal. */
 const TRANSLIT: Record<string, string> = {
   а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y',
   к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f',
@@ -55,7 +55,7 @@ export function slugify(input: string): string {
   return out.replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || 'sozvon'
 }
 
-/** `2026-08-27--sozvon-po-billingu--a1b2` — сортируется по дате и читается глазами. */
+/** `2026-08-27--billing-call--a1b2` sorts by date and reads at a glance. */
 export function makeMeetingId(title: string, when: Date): string {
   const date = when.toISOString().slice(0, 10)
   const suffix = Math.random().toString(36).slice(2, 6)

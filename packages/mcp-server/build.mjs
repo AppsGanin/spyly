@@ -1,10 +1,10 @@
 import { build } from 'esbuild'
 
 /**
- * Сборка сервера в один файл.
+ * Building the server into a single file.
  *
- * В упакованном приложении нет node_modules, поэтому зависимости —
- * и @spyly/core, и MCP SDK — вшиваются внутрь.
+ * A packaged application has no node_modules, so the dependencies, both
+ * @spyly/core and the MCP SDK, are bundled inside.
  */
 await build({
   entryPoints: ['src/index.ts'],
@@ -14,9 +14,9 @@ await build({
   format: 'esm',
   outfile: 'dist/bundle.mjs',
   banner: {
-    // MCP SDK местами использует CommonJS-совместимые пути.
+    // The MCP SDK uses CommonJS-compatible paths in places.
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);"
   },
   logLevel: 'warning'
 })
-console.log('mcp-server собран в dist/bundle.mjs')
+console.log('mcp-server built into dist/bundle.mjs')

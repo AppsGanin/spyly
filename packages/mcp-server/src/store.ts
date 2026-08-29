@@ -12,10 +12,10 @@ import {
 } from '@spyly/core'
 
 /**
- * Чтение хранилища Spyly напрямую с диска.
+ * Reading the Spyly store straight off the disk.
  *
- * Сервер намеренно не ходит в приложение: встречи должны быть доступны агенту
- * и когда Spyly закрыт.
+ * The server deliberately does not go through the application: meetings have to
+ * be available to an agent when Spyly is closed too.
  */
 export function storageRoot(): string {
   return process.env.SPYLY_DIR || path.join(os.homedir(), 'Spyly')
@@ -52,7 +52,7 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
     try {
       extra = JSON.parse(await readFile(file, 'utf8')) as typeof extra
     } catch {
-      // Битая расшифровка не должна прятать саму встречу от агента.
+      // A damaged transcript must not hide the meeting itself from an agent.
     }
   }
   const parsed = Meeting.safeParse({ ...meta, ...extra })
@@ -66,18 +66,18 @@ export async function listMeetings(limit = 50): Promise<MeetingMeta[]> {
     const meta = await readMeta(id)
     if (meta) all.push(meta)
   }
-  // Имя папки начинается с даты, но внутри одного дня порядок в нём случайный:
-  // сортировать нужно по фактическому времени начала.
+  // A folder name starts with the date, but within one day the order in it is
+  // arbitrary: sorting has to be by the actual start time.
   all.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
   return all.slice(0, limit)
 }
 
 /**
- * Все записи разом, от новых к старым.
+ * Every recording at once, newest first.
  *
- * Фильтры работают поверх готового списка: записей у человека сотни, а не
- * миллионы, и держать ради них индекс — лишняя сущность, которая может
- * разойтись с файлами.
+ * The filters work over the finished list: a person has hundreds of recordings,
+ * not millions, and keeping an index for them is an extra thing that can fall
+ * out of step with the files.
  */
 export async function allMeetings(): Promise<Meeting[]> {
   const ids = await listMeetingIds()
@@ -129,11 +129,11 @@ export interface LiveLine {
 }
 
 /**
- * Черновик идущего разговора.
+ * The draft of a conversation in progress.
  *
- * Пока запись не остановлена, полной расшифровки ещё нет — есть только куски,
- * которые приложение распознаёт на лету и дописывает в файл. Агенту этого
- * достаточно, чтобы отвечать на «о чём сейчас говорят».
+ * Until a recording is stopped there is no full transcript yet, only the pieces
+ * the application recognises on the fly and appends to a file. That is enough
+ * for an agent to answer "what are they talking about right now".
  */
 export async function readLive(id: string): Promise<LiveLine[]> {
   const file = path.join(meetingsDir(), id, 'live.jsonl')
@@ -149,7 +149,7 @@ export async function readLive(id: string): Promise<LiveLine[]> {
   }
 }
 
-/** Идёт ли запись прямо сейчас: у неё нет времени окончания. */
+/** Whether a recording is running right now: it has no end time. */
 export async function activeMeeting(): Promise<MeetingMeta | null> {
   for (const id of (await listMeetingIds()).slice(0, 5)) {
     const meta = await readMeta(id)
@@ -159,11 +159,12 @@ export async function activeMeeting(): Promise<MeetingMeta | null> {
 }
 
 /**
- * Запись изменений обратно в хранилище.
+ * Writing changes back into the store.
  *
- * Агенту разрешено немного: дописать задачу, отметить её сделанной, поправить
- * конспект, повесить тег. Ни звук, ни реплики он трогать не может — расшифровка
- * это протокол разговора, и переписывать сказанное задним числом нельзя.
+ * An agent is allowed a little: append a task, mark one done, correct the
+ * summary, add a tag. It can touch neither the audio nor the utterances, as a
+ * transcript is the record of a conversation and rewriting what was said after
+ * the fact is not allowed.
  */
 export async function updateMeeting(
   id: string,

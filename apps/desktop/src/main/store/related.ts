@@ -4,25 +4,26 @@ import { listMeetings, readMeeting } from './meetings.js'
 import { meetingFile } from './paths.js'
 
 /**
- * Поиск похожих записей с запоминанием разобранных слов.
+ * Finding similar recordings, remembering the words already parsed.
  *
- * Наивно это стоит дорого: страница записи открывается часто, а чтобы найти
- * похожие, надо прочитать расшифровки всех соседей. За месяц работы архив
- * вырастает до сотен мегабайт, и окно замирало бы на каждом открытии.
+ * Done naively this is expensive: the recording page is opened often, and
+ * finding similar ones means reading the transcripts of every neighbour. Over
+ * a month of use the archive grows to hundreds of megabytes, and the window
+ * would freeze on every open.
  *
- * Слова записи меняются только вместе с файлом расшифровки, поэтому храним их
- * с отметкой времени файла и перечитываем только изменившиеся.
+ * A recording's words only change together with its transcript file, so they
+ * are stored with the file's timestamp and only the changed ones are read again.
  */
 interface Cached {
   mtimeMs: number
   meeting: Meeting
-  /** Разобранные слова — самая дорогая часть сравнения. */
+  /** The parsed words, the most expensive part of the comparison. */
   terms: Map<string, string>
 }
 
 const cache = new Map<string, Cached>()
 
-/** Сколько записей назад смотрим: дальше в прошлое связи почти всегда ложные. */
+/** How many recordings back we look: further into the past the links are nearly always false. */
 const LOOKBACK = 50
 
 function mtimeOf(id: string): number {
@@ -67,7 +68,7 @@ export async function findRelated(id: string): Promise<Related[]> {
   })
 }
 
-/** Запись удалили или изменили — забываем её. */
+/** The recording was deleted or changed, so we forget it. */
 export function forgetRelated(id: string): void {
   cache.delete(id)
 }

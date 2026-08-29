@@ -3,12 +3,12 @@ import { Notification } from 'electron'
 import { listApps, micStatus } from '../audio/native.js'
 
 /**
- * Замечает начало созвона.
+ * Notices a call starting.
  *
- * Главный признак — микрофон занят другим приложением: только он ловит
- * браузерные созвоны (Meet, Телемост в Chrome), где имя процесса ничего не
- * говорит. Список приложений идёт вторым признаком, потому что на macOS
- * Bluetooth-гарнитуры стабильно сообщают, что не используются.
+ * The main sign is another application holding the microphone: only that
+ * catches browser calls (Meet, Telemost in Chrome), where the process name
+ * says nothing. The application list comes second, because on macOS Bluetooth
+ * headsets reliably report that they are not in use.
  */
 
 const CALL_APPS = [
@@ -30,9 +30,9 @@ const CALL_APPS = [
 ]
 
 const POLL_MS = 5000
-/** Столько подряд опросов должны говорить «созвон», прежде чем поверим. */
+/** This many polls in a row have to say "a call" before we believe it. */
 const CONFIRMATIONS = 2
-/** После отказа не пристаём заново хотя бы столько времени. */
+/** After a refusal, do not ask again for at least this long. */
 const SNOOZE_MS = 10 * 60 * 1000
 
 export interface CallDetectorOptions {
@@ -63,8 +63,8 @@ async function probe(options: CallDetectorOptions): Promise<void> {
     return
   }
 
-  // Пытаемся назвать приложение: сначала по тому, кто держит микрофон,
-  // потом по тому, кто сейчас звучит.
+  // Try to name the application: first by who holds the microphone, then by who
+  // is currently making sound.
   let app = status.apps.find(looksLikeCallApp) ?? status.apps[0] ?? ''
   if (!app) {
     const playing = await listApps()
@@ -78,7 +78,7 @@ async function probe(options: CallDetectorOptions): Promise<void> {
   const auto = options.mode() === 'auto'
   const label = app ?? ''
   if (!auto) {
-    // Одно уведомление на приложение: повторные только раздражают.
+    // One notification per application: repeats only annoy.
     if (lastNotifiedApp === label && Date.now() < snoozedUntil) return
     lastNotifiedApp = label
     snoozedUntil = Date.now() + SNOOZE_MS
@@ -108,7 +108,7 @@ export function stopCallDetector(): void {
   hits = 0
 }
 
-/** «Не сейчас» — не спрашивать какое-то время. */
+/** "Not now" means not asking again for a while. */
 export function snoozeDetection(minutes = 10): void {
   snoozedUntil = Date.now() + minutes * 60_000
 }

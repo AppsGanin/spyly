@@ -1,11 +1,12 @@
 /**
- * Английский перевод интерфейса.
+ * The English translation of the interface.
  *
- * Ключ — русская строка из кода: так видно, что именно переводится, и
- * пропущенный перевод показывает русский текст, а не имя ключа.
+ * The key is the Russian string from the code: that way it is clear what is
+ * being translated, and a missing translation shows the Russian text rather
+ * than the name of a key.
  *
- * Подстановки в фигурных скобках должны совпадать с исходной строкой, но
- * могут стоять в другом порядке — в английском он часто другой.
+ * Substitutions in curly braces have to match the source string, but may stand
+ * in a different order, as English often puts them differently.
  */
 export const EN: Record<string, string> = {
   ' · просрочено: {overdue}': ' · overdue: {overdue}',

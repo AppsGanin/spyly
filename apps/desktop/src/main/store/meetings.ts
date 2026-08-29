@@ -12,10 +12,10 @@ import { t,
 import { audioFile, ensureMeetingDirs, meetingDir, meetingFile, meetingsDir } from './paths.js'
 
 /**
- * Файлы — источник правды, никакой базы поверх них.
+ * Files are the source of truth, with no database on top of them.
  *
- * Папку со встречей можно скопировать, положить в облако или отдать агенту
- * напрямую; приложение всегда сможет её перечитать.
+ * A meeting folder can be copied, put in the cloud or handed to an agent
+ * directly; the application will always be able to read it back.
  */
 
 interface TranscriptFile {
@@ -48,8 +48,9 @@ export async function readMeta(id: string): Promise<MeetingMeta | null> {
 
 export async function writeMeta(meta: MeetingMeta): Promise<void> {
   await ensureMeetingDirs(meta.id)
-  // Прогоняем через схему: иначе случайно переданная целая встреча утащит в
-  // meta.json ещё одну копию расшифровки, а это мегабайты на длинной записи.
+  // Run through the schema: otherwise a whole meeting passed in by accident
+  // drags another copy of the transcript into meta.json, and that is megabytes
+  // on a long recording.
   const clean = MeetingMeta.parse(meta)
   await writeFile(meetingFile(meta.id, 'meta.json'), JSON.stringify(clean, null, 2), 'utf8')
 }
@@ -73,7 +74,7 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
   return parsed.success ? parsed.data : null
 }
 
-/** Сохранить встречу целиком: JSON — канон, markdown — производные для людей и агентов. */
+/** Save a meeting whole: JSON is canonical, markdown is derived for people and agents. */
 export async function writeMeeting(meeting: Meeting): Promise<void> {
   await ensureMeetingDirs(meeting.id)
   const { speakers, utterances, summary, ...meta } = meeting
@@ -90,11 +91,12 @@ export async function writeMeeting(meeting: Meeting): Promise<void> {
 }
 
 /**
- * Папки, где звук есть, а meta.json нечитаем.
+ * Folders where the audio is present but meta.json cannot be read.
  *
- * Без этого запись просто исчезает из списка: файл повреждён — значит, для
- * приложения её нет. Для человека же на диске лежит его разговор, и молча
- * прятать его нельзя.
+ * Without this a recording simply disappears from the list: the file is
+ * damaged, so as far as the application is concerned it does not exist. For a
+ * person, though, their conversation is right there on disk, and hiding it
+ * silently will not do.
  */
 export async function findBrokenMeetings(): Promise<string[]> {
   const out: string[] = []
@@ -107,12 +109,12 @@ export async function findBrokenMeetings(): Promise<string[]> {
 }
 
 /**
- * Правка записи целиком, по одной за раз.
+ * Editing a recording whole, one edit at a time.
  *
- * Читать, менять и писать без замка нельзя: конспект правит человек, задачи
- * дописывает агент через MCP, а конвейер в это же время сохраняет результат
- * этапа. Без очереди две правки, начатые одновременно, дают ту, что закончилась
- * позже, — вторая пропадает молча.
+ * Reading, changing and writing without a lock will not do: a person edits the
+ * summary, an agent appends tasks over MCP, and at the same time the pipeline
+ * saves the result of a stage. Without a queue two edits started together
+ * leave the one that finished later, and the other vanishes silently.
  */
 const locks = new Map<string, Promise<unknown>>()
 
@@ -125,8 +127,8 @@ export async function updateMeeting(id: string, change: (meeting: Meeting) => Me
     await writeMeeting(updated)
     return updated
   })
-  // Хвост очереди не должен рваться из-за одной неудачной правки: следующая
-  // в очереди обязана дождаться своего хода в любом случае.
+  // The tail of the queue must not break over one failed edit: the next one in
+  // line has to get its turn regardless.
   locks.set(id, next.catch(() => undefined))
   return next
 }
@@ -135,8 +137,8 @@ export async function listMeetings(): Promise<MeetingMeta[]> {
   const ids = await listMeetingIds()
   const metas = await Promise.all(ids.map(readMeta))
   const list = metas.filter((m): m is MeetingMeta => m !== null)
-  // Имя папки начинается с даты, но внутри одного дня порядок в нём случайный:
-  // сортировать нужно по фактическому времени начала.
+  // A folder name starts with the date, but within one day the order in it is
+  // arbitrary: sorting has to be by the actual start time.
   list.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))
   return list
 }
@@ -151,10 +153,11 @@ export function hasAudio(id: string, track: 'mic' | 'system' | 'mix'): boolean {
 }
 
 /**
- * Простой полнотекстовый поиск прямо по файлам.
+ * Plain full-text search straight over the files.
  *
- * Базу поверх этого имеет смысл заводить, когда встреч станут тысячи; пока
- * чтение сотни JSON быстрее, чем любая синхронизация индекса с файлами.
+ * A database on top of this starts to make sense once there are thousands of
+ * meetings; for now reading a hundred JSON files is faster than any
+ * synchronisation of an index with the files.
  */
 export async function searchMeetings(query: string): Promise<{ meeting: MeetingMeta; snippet: string }[]> {
   const needle = query.trim().toLowerCase()
@@ -181,7 +184,7 @@ export async function searchMeetings(query: string): Promise<{ meeting: MeetingM
   return results
 }
 
-/** Встречи, оставшиеся в статусе «идёт запись» после падения приложения. */
+/** Meetings left in the "recording" state after the application crashed. */
 export async function findOrphanedRecordings(): Promise<MeetingMeta[]> {
   const metas = await listMeetings()
   return metas.filter((m) => m.stages.recording === 'running')

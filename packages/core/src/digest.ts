@@ -2,24 +2,24 @@ import { dueState, parseDue } from './due.js'
 import type { ActionItem, Meeting } from './types.js'
 
 /**
- * Итоги за период.
+ * A digest for a period.
  *
- * Записей за неделю набирается десяток, и разобрать их по одной некогда.
- * Дайджест отвечает на три вопроса: на что ушло время, о чём договорились,
- * что осталось висеть. Считается из данных, без обращения к модели — иначе он
- * не работал бы у тех, у кого агент не подключён.
+ * A week brings a dozen recordings, and there is no time to go through them one
+ * by one. The digest answers three questions: where the time went, what was
+ * agreed, and what is still outstanding. It is computed from the data, with no
+ * model involved, or it would not work for anyone without an agent connected.
  */
 export interface Digest {
   from: string
   to: string
   meetings: number
   seconds: number
-  /** Люди и сколько раз с ними говорили. */
+  /** People, and how many times you spoke with them. */
   people: { name: string; meetings: number }[]
   decisions: { text: string; meetingId: string; meetingTitle: string }[]
   open: (ActionItem & { meetingId: string; meetingTitle: string; overdue: boolean })[]
   done: number
-  /** Записи без конспекта — их стоит добить. */
+  /** Recordings with no summary: worth finishing off. */
   unprocessed: { id: string; title: string }[]
   tags: { name: string; meetings: number }[]
 }
@@ -46,8 +46,8 @@ export function buildDigest(meetings: readonly Meeting[], from: Date, to: Date, 
   for (const meeting of inRange) {
     seconds += meeting.durationSec
 
-    // Одного человека в одной записи считаем один раз: иначе болтливый
-    // участник выглядел бы как несколько разных.
+    // One person in one recording is counted once: otherwise a talkative
+    // participant would look like several different people.
     const seen = new Set<string>()
     for (const speaker of meeting.speakers) {
       if (!speaker.name || speaker.isMe || seen.has(speaker.name)) continue
@@ -93,7 +93,7 @@ export function buildDigest(meetings: readonly Meeting[], from: Date, to: Date, 
       .map(([name, count]) => ({ name, meetings: count }))
       .sort((a, b) => b.meetings - a.meetings),
     decisions,
-    // Просроченное наверх: именно оно и есть повод открыть дайджест.
+    // Overdue on top: that is the very reason to open a digest.
     open: open.sort((a, b) => Number(b.overdue) - Number(a.overdue)),
     done,
     unprocessed,
@@ -103,7 +103,7 @@ export function buildDigest(meetings: readonly Meeting[], from: Date, to: Date, 
   }
 }
 
-/** Границы периода «последние N дней, включая сегодня». */
+/** The bounds of the period "the last N days, today included". */
 export function lastDays(days: number, now = new Date()): { from: Date; to: Date } {
   const to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
   const from = new Date(to.getTime() - (days - 1) * 86_400_000)

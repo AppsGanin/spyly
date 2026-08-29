@@ -13,10 +13,10 @@ import { t,
 import { IconMore, IconUsers, IconVoiceMatch } from '../lib/icons'
 import { EmptyState, IconButton, Menu } from '../ui'
 
-/** Кто говорит: фильтр по расшифровке, а не по звуку. */
+/** Who is speaking: a filter over the transcript, not over the audio. */
 export type SpeakerFilter = 'all' | 'me' | 'others'
 
-/** Подсветка найденного: без неё в длинной расшифровке совпадение не видно. */
+/** Highlighting a match: without it a hit is invisible in a long transcript. */
 function highlight(text: string, needle: string, activeAt: number | null): ReactNode {
   if (!needle) return text
   const parts: ReactNode[] = []
@@ -39,20 +39,19 @@ function highlight(text: string, needle: string, activeAt: number | null): React
 }
 
 /**
- * Текст с отметками там, где модель сомневалась.
+ * Text marked where the model was unsure.
  *
- * Правка расшифровки — самая частая ручная работа, и глазами искать, что
- * именно распозналось неверно, дольше, чем исправить. Whisper отдаёт
- * уверенность по каждому слову, так что подчеркнуть сомнительное ничего не
- * стоит.
+ * Editing the transcript is the most common manual work, and hunting by eye
+ * for what was recognised wrongly takes longer than fixing it. Whisper returns
+ * a confidence for every word, so underlining the doubtful ones costs nothing.
  */
 function withDoubts(utterance: Utterance, threshold: number): ReactNode {
   const doubts = doubtfulWords(utterance, threshold)
   if (doubts.size === 0) return utterance.text
 
-  // Текст реплики — это склейка её слов через пробел; если это перестало быть
-  // так (например, после ручной правки), подсветку не рисуем, чтобы не
-  // подчеркнуть не те места.
+  // The text of an utterance is its words joined by spaces; if that has stopped
+  // being true (after a manual edit, for instance), no highlighting is drawn, so
+  // as not to underline the wrong places.
   const joined = utterance.words.map((w) => w.text).join(' ')
   if (joined !== utterance.text) return utterance.text
 
@@ -64,7 +63,7 @@ function withDoubts(utterance: Utterance, threshold: number): ReactNode {
   ))
 }
 
-/** Смещение курсора в символах от начала элемента — нужно для «разделить здесь». */
+/** The caret offset in characters from the start of the element, needed for "split here". */
 function caretOffset(root: HTMLElement): number | null {
   const selection = window.getSelection()
   if (!selection || selection.rangeCount === 0) return null
@@ -99,15 +98,15 @@ export function Transcript({
 }: {
   meeting: Meeting
   currentTime: number
-  /** Вести список за воспроизведением. Выключается, как только листают руками. */
+  /** Follow the list along with playback. Switched off as soon as someone scrolls by hand. */
   follow?: boolean
   onFollowChange?: (follow: boolean) => void
-  /** Что ищем: совпадения подсвечиваются, но реплики не прячутся. */
+  /** What is being searched for: matches are highlighted, but utterances are not hidden. */
   query?: string
-  /** Порядковый номер совпадения, к которому надо подъехать. */
+  /** The index of the match to scroll to. */
   matchIndex?: number
   speakerFilter?: SpeakerFilter
-  /** Отметки, поставленные во время записи. */
+  /** Marks placed during the recording. */
   marks?: Mark[]
   actions: TranscriptActions
 }) {
@@ -116,8 +115,9 @@ export function Transcript({
   const caretRef = useRef<{ id: string; at: number } | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
-  // Порог считаем от записи целиком, а не от отдельной реплики: иначе в тихой
-  // реплике подчеркнётся всё, а в громкой — ничего.
+  // The threshold is measured over the whole recording rather than a single
+  // utterance: otherwise everything in a quiet utterance gets underlined and
+  // nothing in a loud one.
   const threshold = useMemo(() => doubtThreshold(meeting), [meeting.utterances])
 
   const speakers = useMemo(() => new Map(meeting.speakers.map((s) => [s.id, s])), [meeting.speakers])
@@ -127,22 +127,23 @@ export function Transcript({
     return map
   }, [meeting.speakers])
 
-  // Звучащая реплика; по её смене — и только по ней — список подъезжает.
+  // The utterance being played; the list scrolls on its change, and only on that.
   const activeId = useMemo(
     () => meeting.utterances.find((u) => currentTime >= u.start && currentTime <= u.end)?.id ?? null,
     [meeting.utterances, currentTime]
   )
 
-  // Ведём список за звуком, но только пока человек сам не начал листать:
-  // перехватывать прокрутку под руками — худшее, что может делать такой список.
+  // The list follows the audio, but only until a person starts scrolling
+  // themselves: taking the scroll out of their hands is the worst thing such a
+  // list can do.
   useEffect(() => {
     if (!follow || !activeId) return
     activeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [follow, activeId])
 
-  // Каждая отметка относится ровно к одной реплике — той, внутри которой она
-  // стоит, а при попадании в паузу к ближайшей. Иначе одна отметка красит
-  // сразу несколько реплик, и смысл «вот это важно» теряется.
+  // Every mark belongs to exactly one utterance, the one it sits inside, or the
+  // nearest one when it lands in a pause. Otherwise a single mark colours several
+  // utterances at once and the point of "this bit matters" is lost.
   const markedIds = useMemo(() => {
     const ids = new Set<string>()
     for (const mark of marks) {
@@ -159,8 +160,8 @@ export function Transcript({
 
   const needle = query.trim().toLowerCase()
 
-  // Совпадения нумеруем сквозной нумерацией по всей расшифровке: «3 из 12»
-  // имеет смысл только тогда, когда счёт идёт от начала разговора.
+  // Matches are numbered continuously across the whole transcript: "3 of 12"
+  // only makes sense when counted from the start of the conversation.
   const matches = useMemo(() => {
     if (!needle) return []
     const out: { id: string; at: number }[] = []
@@ -179,17 +180,17 @@ export function Transcript({
 
   const current = matches[matchIndex] ?? null
 
-  // К текущему совпадению подъезжаем и перематываем звук: искать в записи
-  // обычно нужно, чтобы это место переслушать.
+  // We scroll to the current match and seek the audio to it: searching a
+  // recording is usually about listening to that spot again.
   useEffect(() => {
     if (!current) return
     matchRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [current?.id, current?.at])
 
-  // Никого не узнали по голосу — тогда «свои» это микрофонная дорожка: за
-  // компьютером сидит тот, чей микрофон. Раньше здесь стоял `??`, но `isMe`
-  // по умолчанию `false`, а не `undefined`, и запасной вариант не срабатывал:
-  // фильтр «Только мои» показывал пустоту даже там, где человек говорил.
+  // Nobody was recognised by voice, so "mine" is the microphone track: whoever's
+  // microphone it is, they are the one at the computer. This used to be `??`, but
+  // `isMe` defaults to `false` rather than `undefined`, so the fallback never
+  // fired: the "Only mine" filter showed nothing even where the person had spoken.
   const anyoneIsMe = useMemo(() => meeting.speakers.some((s) => s.isMe), [meeting.speakers])
 
   const shown = useMemo(() => {
@@ -229,8 +230,8 @@ export function Transcript({
         const accent = accents.get(utterance.speakerId) ?? 'blue'
         const marked = markedIds.has(utterance.id)
         const isCurrentMatch = current?.id === utterance.id
-        // Пока идёт поиск, текст не редактируем: подсветка живёт разметкой,
-        // и правка перемешала бы её с содержимым.
+        // While a search is running the text is not editable: highlighting lives in
+        // the markup, and an edit would mix it into the content.
         const editable = !needle
 
         return (
@@ -344,7 +345,7 @@ export function Transcript({
   )
 }
 
-/** Сколько раз запрос встречается в расшифровке — для счётчика над списком. */
+/** How many times the query occurs in the transcript, for the counter above the list. */
 export function countMatches(meeting: Meeting, query: string): number {
   const needle = query.trim().toLowerCase()
   if (!needle) return 0

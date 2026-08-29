@@ -28,16 +28,16 @@ enum TapError: Error, CustomStringConvertible {
     }
 }
 
-/// Что именно писать: весь системный звук или звук конкретных приложений.
+/// What exactly to record: all system audio, or the audio of particular applications.
 enum TapScope {
     case global(excludePIDs: [pid_t])
     case processes([pid_t])
 }
 
-/// Захват системного звука через CoreAudio process tap.
+/// System audio capture through a CoreAudio process tap.
 ///
-/// Chromium на macOS 26 этот путь не осиливает (его probe разрешений падает
-/// молча), поэтому tap создаётся и обслуживается здесь напрямую.
+/// Chromium cannot manage this path on macOS 26 (its permission probe fails
+/// silently), so the tap is created and serviced here directly.
 final class TapCapture {
     private var tapID = AudioObjectID(kAudioObjectUnknown)
     private var aggregateID = AudioObjectID(kAudioObjectUnknown)
@@ -65,8 +65,8 @@ final class TapCapture {
             guard !objects.isEmpty else { throw TapError.noSuchProcess }
             description = CATapDescription(stereoMixdownOfProcesses: objects)
         }
-        // Приватный tap не появляется в общесистемном списке устройств,
-        // а unmuted значит, что пользователь продолжает слышать звук как обычно.
+        // A private tap does not appear in the system-wide device list, and
+        // unmuted means the user goes on hearing the audio as usual.
         description.isPrivate = true
         description.muteBehavior = .unmuted
 
@@ -137,8 +137,9 @@ final class TapCapture {
             dst[i].mDataByteSize = UInt32(n)
         }
 
-        // Ресемплинг делает AVAudioConverter: наивное прореживание 48→16 кГц
-        // даёт алиасинг, который потом виден как «металл» в расшифровке.
+        // Resampling is done by AVAudioConverter: naive decimation from 48 to
+        // 16 kHz gives aliasing, which later shows up as a metallic sound in
+        // the transcript.
         let ratio = outFormat.sampleRate / inFormat.sampleRate
         let capacity = AVAudioFrameCount(Double(frames) * ratio) + 32
         guard let outBuffer = AVAudioPCMBuffer(pcmFormat: outFormat, frameCapacity: capacity) else { return }
@@ -158,8 +159,8 @@ final class TapCapture {
         onSamples(UnsafeBufferPointer(start: channelData[0], count: Int(outBuffer.frameLength)))
     }
 
-    /// Убрать за собой обязательно: приватный агрегат, оставшийся после падения,
-    /// висит в списке аудиоустройств системы до перезагрузки.
+    /// Cleaning up is mandatory: a private aggregate left behind after a crash
+    /// stays in the system's audio device list until a reboot.
     func stop() {
         if let proc = ioProcID, aggregateID != kAudioObjectUnknown {
             AudioDeviceStop(aggregateID, proc)

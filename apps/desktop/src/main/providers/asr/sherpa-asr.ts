@@ -13,14 +13,14 @@ function fileIn(spec: SherpaSpec, name: string): string {
   return path.join(modelsDir(), spec.dir, name)
 }
 
-/** Час записи считается минутами; ждём с запасом, но не бесконечно. */
+/** An hour of recording takes minutes to compute; we wait generously, but not forever. */
 const WORKER_TIMEOUT_MS = 40 * 60_000
 
 /**
- * Расшифровать файл в отдельном процессе.
+ * Transcribe a file in a separate process.
  *
- * Ход работы приходит сообщениями, поэтому полоска прогресса остаётся живой,
- * а отмена — это просто снятие процесса.
+ * Progress arrives as messages, so the progress bar stays alive, and
+ * cancelling is simply killing the process.
  */
 async function transcribeInWorker(
   job: AsrJob,
@@ -58,7 +58,7 @@ async function transcribeInWorker(
   })
 }
 
-/** Провайдер для одной модели: снаружи все они выглядят одинаково. */
+/** A provider for one model: from the outside they all look the same. */
 function sherpaProvider(spec: SherpaSpec): AsrProvider {
   return {
     id: spec.id,
@@ -97,7 +97,7 @@ function sherpaProvider(spec: SherpaSpec): AsrProvider {
 
 export const SHERPA_ASR_PROVIDERS: AsrProvider[] = SPECS.map(sherpaProvider)
 
-/** Провайдер по идентификатору модели; null — модель не отсюда. */
+/** A provider by model id; null means the model is not from here. */
 export function sherpaProviderFor(modelId: string): AsrProvider | null {
   const index = SPECS.findIndex((s) => s.id === modelId)
   return index === -1 ? null : SHERPA_ASR_PROVIDERS[index]!

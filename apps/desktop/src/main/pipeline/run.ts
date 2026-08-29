@@ -47,11 +47,12 @@ function report(meetingId: string, stage: string, state: 'running' | 'done' | 'f
 }
 
 /**
- * Полная обработка записи: расшифровка → разделение по голосам → узнавание
- * участников → конспект.
+ * Full processing of a recording: transcription, voice separation, recognising
+ * the participants, summary.
  *
- * Этапы независимы и отмечаются в meta.json, поэтому упавшую расшифровку можно
- * перезапустить, не трогая всё остальное и уж точно не переписывая созвон.
+ * The stages are independent and recorded in meta.json, so a failed
+ * transcription can be restarted without touching anything else, and certainly
+ * without recording the call again.
  */
 export async function processMeeting(meetingId: string, from: Stage = 'transcribing'): Promise<void> {
   if (running.has(meetingId)) return
@@ -71,16 +72,16 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
   let meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
 
-  // Обработка перепишет расшифровку заново, и прошлые правки к ней уже не
-  // относятся: отмена вернула бы реплики, которых в новой расшифровке нет.
+  // Processing rewrites the transcript from scratch, and earlier edits no longer
+  // apply to it: undo would bring back utterances the new transcript does not have.
   forgetHistory(meetingId)
 
   const settings = await loadSettings()
   const order: Stage[] = ['transcribing', 'diarizing', 'identifying', 'summarizing']
   const startAt = Math.max(0, order.indexOf(from))
 
-  // Прошлая ошибка к новому запуску отношения не имеет: оставлять её на экране
-  // значит показывать красное «прервалось» рядом с идущей работой.
+  // An earlier error has nothing to do with a new run: leaving it on screen means
+  // showing a red "interrupted" next to work that is under way.
   const restarting = order.slice(startAt)
   meeting = await updateMeeting(meetingId, (current) => {
     const errors = { ...current.errors }
@@ -98,9 +99,10 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
     return
   }
 
-  // Начиная не с расшифровки, слова берём из уже готовой: без этого пересборка
-  // «с разделения по голосам» собирала расшифровку из пустоты и стирала её —
-  // ровно по той кнопке, которую предлагает вопрос «сколько человек говорило».
+  // When not starting from transcription, the words come from the one already
+  // there: without this, rebuilding "from voice separation" assembled the
+  // transcript out of nothing and erased it, on exactly the button offered by
+  // the question "how many people were speaking".
   let asrResults: AsrResult[] = startAt > order.indexOf('transcribing') ? asrFromUtterances(meeting.utterances, meeting.language) : []
   let turnsByTrack = new Map<TrackId, SpeakerTurn[]>()
 
@@ -113,8 +115,8 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
 
       if (stage === 'transcribing') {
         asrResults = await transcribeTracks(meetingId, tracks, settings.asrModel, settings.language)
-        // Записываем, чем именно расшифровано: через месяц по расшифровке
-        // непонятно, лёгкой моделью её делали или самой точной.
+        // We record what it was transcribed with: a month later a transcript gives no
+        // clue whether it was done with the light model or the most accurate one.
         meeting = await save(meeting, {
           providers: { ...meeting.providers, asr: settings.asrModel || preferredModel() }
         })
@@ -129,8 +131,8 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
       } else if (stage === 'identifying') {
         meeting = await identify(meetingId)
       } else if (stage === 'summarizing') {
-        // Конспект необязателен. Если модель не настроена — это не сбой
-        // расшифровки, а просто несделанный шаг: пугать красным незачем.
+        // A summary is optional. If no model is configured, that is not a transcription
+        // failure but simply a step not taken: no reason to alarm anyone in red.
         const provider = settings.autoSummarize ? getLlmProvider(settings.llmProvider) : null
         const status = provider ? await provider.ready().catch(() => ({ ready: false })) : { ready: false }
         if (status.ready) {
@@ -139,9 +141,9 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
             providers: { ...meeting.providers, llm: provider?.name ?? settings.llmProvider }
           })
         } else {
-          // Конспект не просили — но назвать запись по смыслу всё равно стоит:
-          // это один короткий запрос, а список из десятка «Записей 28 августа»
-          // не даёт найти нужный разговор.
+          // No summary was asked for, but naming the recording by its meaning is still
+          // worth it: that is one short request, and a list of a dozen "Recording, 28
+          // August" makes the conversation you want impossible to find.
           const namer = getLlmProvider(settings.llmProvider)
           if (namer && (await namer.ready().catch(() => ({ ready: false }))).ready) {
             meeting = await nameMeeting(meetingId, namer)
@@ -166,7 +168,7 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
       })
       report(meetingId, stage, 'failed', undefined, message)
       send('meetings:changed', { id: meetingId })
-      // Дальше идти незачем: конспект без расшифровки бессмыслен.
+      // No point going further: a summary without a transcript is meaningless.
       return
     }
   }
@@ -178,11 +180,11 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
 
 
 /**
- * Сообщить, что запись готова.
+ * Report that a recording is ready.
  *
- * Обработка идёт минуты, и человек к этому моменту обычно уже занят другим:
- * без уведомления он узнаёт о готовой расшифровке, только когда сам вспомнит
- * заглянуть.
+ * Processing takes minutes, and by then a person is usually busy with
+ * something else: without a notification they learn the transcript is ready
+ * only when they remember to look.
  */
 function notifyReady(meeting: Meeting): void {
   if (!Notification.isSupported()) return
@@ -204,20 +206,21 @@ function notifyReady(meeting: Meeting): void {
 }
 
 /**
- * Сохранить изменение этапа.
+ * Save a change to a stage.
  *
- * Обязательно через `updateMeeting`, а не записью снимка: конвейер держит
- * запись в памяти минутами, и за это время её успевают поменять — остановка
- * записи проставляет «готово» первому этапу, человек правит расшифровку,
- * агент дописывает задачу. Запись снимком затирала всё это молча: у одной
- * записи «Запись» так и осталась крутиться, хотя всё уже было готово.
+ * Always through `updateMeeting` rather than by writing a snapshot: the
+ * pipeline holds a recording in memory for minutes, and in that time it gets
+ * changed. Stopping the recording marks the first stage done, a person edits
+ * the transcript, an agent appends a task. Writing a snapshot wiped all of
+ * that silently: on one recording "Recording" went on spinning even though
+ * everything was already done.
  */
 async function save(meeting: Meeting, patch: Partial<Meeting>): Promise<Meeting> {
   return updateMeeting(meeting.id, (current) => ({
     ...current,
     ...patch,
-    // Этапы и ошибки сливаем, а не заменяем: в patch приходит только тот этап,
-    // который сейчас менялся.
+    // Stages and errors are merged rather than replaced: the patch carries only
+    // the stage that was changing just then.
     stages: { ...current.stages, ...patch.stages },
     errors: { ...current.errors, ...patch.errors }
   }))
@@ -229,8 +232,8 @@ async function transcribeTracks(
   modelId: string,
   language: string
 ): Promise<AsrResult[]> {
-  // Движок определяется выбранной моделью: человек выбирает качество, а не
-  // движок — сравнить их на глаз всё равно нельзя.
+  // The engine follows from the chosen model: a person chooses quality, not an
+  // engine, since comparing engines by eye is not possible anyway.
   const provider = providerForModel(modelId)
   const status = await provider.ready()
   if (!status.ready) throw new Error(`расшифровка недоступна: ${status.hint ?? t('провайдер не готов')}`)
@@ -239,8 +242,8 @@ async function transcribeTracks(
   for (const [index, track] of tracks.entries()) {
     const file = audioFile(meetingId, track)
 
-    // Пустую дорожку в распознавание не отдаём вовсе: на тишине Whisper
-    // выдаёт титры из обучающих данных вместо признания, что речи нет.
+    // An empty track is never handed to recognition: on silence Whisper produces
+    // subtitle credits out of its training data instead of admitting there is no speech.
     const wave = await readWavPcm16(file).catch(() => null)
     if (!wave || speechSeconds(wave.samples, wave.sampleRate) < 0.5) {
       out.push({ track, language, segments: [] })
@@ -256,16 +259,16 @@ async function transcribeTracks(
   return out
 }
 
-/** Средняя энергия участка записи — по ней видно, была ли там речь на самом деле. */
+/** The average energy of a stretch of recording, which shows whether there really was speech. */
 /**
- * Самое громкое место внутри отрезка.
+ * The loudest spot inside a stretch.
  *
- * Средняя громкость по всей реплике не годится: реплика склеивается из
- * нескольких фраз, между ними паузы, и они размывают речь до нуля. На реальной
- * записи «привет всем, как у вас дела, у меня всё нормально» — три фразы за
- * десять секунд — дали среднее 0.0058 при пороге 0.006, и живая речь была
- * отброшена как тишина. Вопрос ведь не «громко ли в среднем», а «звучала ли
- * здесь речь вообще».
+ * The average level over a whole utterance will not do: an utterance is glued
+ * together out of several phrases with pauses between them, and those dilute
+ * the speech to nothing. On a real recording "hello everyone, how are you, I'm
+ * fine", three phrases over ten seconds, gave an average of 0.0058 against a
+ * threshold of 0.006, and live speech was thrown away as silence. The question
+ * is not "is it loud on average" but "was there any speech here at all".
  */
 function loudestSecond(samples: Float32Array, sampleRate: number, from: number, to: number): number {
   const start = Math.max(0, Math.floor(from * sampleRate))
@@ -284,11 +287,11 @@ function loudestSecond(samples: Float32Array, sampleRate: number, from: number, 
 }
 
 /**
- * Дорожки диаризуются независимо.
+ * The tracks are diarized independently.
  *
- * Кластер 0 микрофона и кластер 0 системного звука — разные люди, смешивать их
- * нельзя. Зато один человек не может оказаться в обеих дорожках сразу, поэтому
- * и сопоставлять кластеры между дорожками не требуется.
+ * Cluster 0 of the microphone and cluster 0 of the system audio are different
+ * people and must not be mixed. On the other hand one person cannot be on both
+ * tracks at once, so matching clusters across tracks is not needed either.
  */
 async function diarizeTracks(
   meetingId: string,
@@ -303,9 +306,10 @@ async function diarizeTracks(
   const out = new Map<TrackId, SpeakerTurn[]>()
   for (const [index, track] of tracks.entries()) {
     report(meetingId, 'diarizing', 'running', index / tracks.length)
-    // Число участников, если его назвали, задаём жёстко. Делим пополам между
-    // дорожками с запасом: на микрофоне сидят те, кто в комнате, в системном
-    // звуке — удалённые, и точного деления заранее не знает никто.
+    // The number of participants, when it has been given, is set firmly. It is
+    // split in half between the tracks with room to spare: the microphone carries
+    // whoever is in the room, the system audio the remote people, and nobody knows
+    // the exact split in advance.
     const perTrack = speakerCount
       ? Math.max(1, Math.min(speakerCount, tracks.length > 1 ? Math.ceil(speakerCount / 2) + 1 : speakerCount))
       : undefined
@@ -316,10 +320,11 @@ async function diarizeTracks(
 }
 
 /**
- * Отчёт о том, что и почему не попало в расшифровку.
+ * A report of what did not make it into the transcript, and why.
  *
- * Фильтров по дороге несколько, и когда реплика пропадает, глазами по коду не
- * понять, который из них сработал. Включается `SPYLY_DIAG_FILTERS=1`.
+ * There are several filters along the way, and when an utterance disappears no
+ * amount of reading the code says which one fired. Switched on with
+ * `SPYLY_DIAG_FILTERS=1`.
  */
 function dropped(utterance: { start: number; end: number; text: string }, why: string): false {
   if (process.env.SPYLY_DIAG_FILTERS) {
@@ -332,12 +337,12 @@ function dropped(utterance: { start: number; end: number; text: string }, why: s
 }
 
 /**
- * Заменить текст реплики, оставив слова согласованными с ним.
+ * Replace the text of an utterance, keeping the words consistent with it.
  *
- * Слова несут времена, и по ним потом раскладывают речь по говорящим. Если
- * оставить их как были, в реплике останутся слова, которых в тексте уже нет.
- * Идём по словам подряд и берём те, что находятся в новом тексте дальше
- * предыдущего, — выброшенные просто не находятся.
+ * Words carry times, and speech is later laid out by speaker using them. Left
+ * as they were, the utterance would keep words the text no longer has. We walk
+ * the words in order and take those found in the new text past the previous
+ * one; the discarded ones simply are not found.
  */
 function withText<T extends { text: string; words: Word[]; start: number; end: number }>(
   utterance: T,
@@ -373,16 +378,18 @@ async function buildTranscript(
   for (const asr of asrResults) {
     const utterances = assignSpeakers(asr, turnsByTrack.get(asr.track) ?? [])
 
-    // Отсев выдумок: по тексту и по звуку под репликой. Одного текста мало —
-    // модель иногда сочиняет правдоподобную фразу; одной энергии тоже, потому
-    // что титры попадаются и поверх тихой речи.
+    // Filtering out invented text, by the text and by the audio under the
+    // utterance. The text alone is not enough, as the model sometimes makes up a
+    // plausible phrase; energy alone is not either, because credits also turn up
+    // on top of quiet speech.
     const wave = await readWavPcm16(audioFile(meetingId, asr.track)).catch(() => null)
     const cleaned = utterances
       .map((u) => {
         if (!isLikelyHallucination(u.text)) return u
-        // Подпись субтитров липнет к краю реплики и раньше утаскивала за собой
-        // всю живую речь: на реальной записи «Субтитры делал DimaTorzok»
-        // унесла тридцать семь секунд разговора. Вырезаем подпись, а не реплику.
+        // Subtitle credits stick to the edge of an utterance and used to drag all the
+        // live speech away with them: on a real recording "Subtitles by DimaTorzok"
+        // carried off thirty-seven seconds of conversation. We cut out the credits,
+        // not the utterance.
         const text = stripHallucination(u.text)
         if (!text || text === u.text || isLikelyHallucination(text)) {
           dropped(u, 'выдумка')
@@ -404,12 +411,12 @@ async function buildTranscript(
   }
 
   /*
-   * Без наушников микрофон слышит собеседника из колонок.
+   * Without headphones the microphone hears the other side through the speakers.
    *
-   * Сравнение текстов тут ненадёжно: распознавание двух дорожек расходится, и
-   * на реальной записи по тексту узнавалось лишь три эха из пяти. Поэтому
-   * сначала смотрим на громкость — путь «динамики → микрофон» ослабляет звук
-   * в разы, и это видно однозначно.
+   * Comparing the texts is unreliable here: recognition of the two tracks
+   * diverges, and on a real recording only three echoes out of five were
+   * recognised by text. So the level comes first: the path speakers to
+   * microphone weakens the sound several times over, and that is unmistakable.
    */
   {
     const micWave = await readWavPcm16(audioFile(meetingId, 'mic')).catch(() => null)
@@ -421,8 +428,8 @@ async function buildTranscript(
       const systemLevels = levelWindows(systemWave.samples, systemWave.sampleRate)
 
       if (micIsOnlyEcho(micLevels, systemLevels)) {
-        // Человек молчал всю запись: микрофонная дорожка — сплошное эхо, и
-        // всё, что из неё вышло, было бы приписано ему по ошибке.
+        // The person was silent for the whole recording: the microphone track is echo
+        // throughout, and everything coming out of it would be attributed to them by mistake.
         byTrack.set('mic', [])
       } else {
         const systemUtterances = byTrack.get('system') ?? []
@@ -448,8 +455,8 @@ async function buildTranscript(
             return own
           })
           .filter((u): u is NonNullable<typeof u> => u !== null)
-          // Последнее слово собеседника нередко приклеивается к началу вашей
-          // реплики: куски двух дорожек нарезаются по-разному.
+          // The other side's last word often sticks to the beginning of your utterance:
+          // the two tracks are cut into pieces differently.
           .map((u) => {
             const previous = systemUtterances
               .filter((s) => s.end <= u.start + 0.5)
@@ -463,8 +470,8 @@ async function buildTranscript(
     }
   }
 
-  // Что осталось — досеиваем по тексту: эхо бывает и громким, когда динамики
-  // выкручены.
+  // What is left is filtered further by text: echo can be loud too, when the
+  // speakers are turned up.
   const systemUtterances = byTrack.get('system') ?? []
   const beforeEcho = byTrack.get('mic') ?? []
   const micUtterances = suppressEcho(beforeEcho, systemUtterances)
@@ -473,12 +480,12 @@ async function buildTranscript(
   }
   const utterances = mergeTracks(micUtterances, systemUtterances)
 
-  // Участников берём из реплик, а не из отрезков диаризации: после снятия эха
-  // часть кластеров микрофона исчезает, и они не должны остаться в списке
-  // участников пустыми строками.
+  // Participants come from the utterances rather than from the diarization
+  // segments: once echo is removed some microphone clusters disappear, and they
+  // must not stay in the participant list as empty lines.
   const speakers: Speaker[] = []
-  // Спикер мог остаться без отрезков диаризации — например, дорожка целиком
-  // отдана одному говорящему; тогда он появляется только в репликах.
+  // A speaker may be left without diarization segments, if the whole track went
+  // to one speaker for instance; then they appear only in the utterances.
   for (const u of utterances) {
     if (speakers.some((s) => s.id === u.speakerId)) continue
     const [track, cluster] = u.speakerId.split(':')
@@ -491,8 +498,8 @@ async function buildTranscript(
     })
   }
 
-  // Реплики уже упорядочены по времени, поэтому нумерация идёт по первому
-  // появлению — так «Участник 2» и правда второй в разговоре.
+  // The utterances are already in time order, so numbering follows first
+  // appearance: that way "Speaker 2" really is the second one in the conversation.
   const counters = new Map<TrackId, number>()
   for (const speaker of speakers) {
     const next = (counters.get(speaker.track) ?? 0) + 1
@@ -505,7 +512,7 @@ async function buildTranscript(
   return next
 }
 
-/** Подставить имена постоянных участников по слепкам голоса. */
+/** Fill in the names of regular participants from their voice prints. */
 async function identify(meetingId: string): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
@@ -518,19 +525,20 @@ async function identify(meetingId: string): Promise<Meeting> {
     const file = audioFile(meetingId, track)
     if (!existsSync(file)) continue
     const wave = await readWave(file)
-    // Слепок снимаем по репликам участника, а не по отрезкам разделения.
-    // После снятия эха это уже не одно и то же: часть отрезков осталась без
-    // реплик, и по ним слепок либо не считался вовсе, либо считался по чужой
-    // речи. На реальной записи второй кластер микрофона из-за этого не получал
-    // слепка и оставался безымянным, хотя по репликам узнавался на 0.502.
+    // The voice print is taken from a participant's utterances rather than from
+    // the separation segments. Once echo is removed these are no longer the same
+    // thing: some segments were left without utterances, and a print over them was
+    // either not computed at all or computed over somebody else's speech. On a
+    // real recording this left the second microphone cluster without a print and
+    // nameless, even though by its utterances it matched at 0.502.
     const turns = meeting.utterances
       .filter((u) => u.track === track)
       .map((u) => ({ start: u.start, end: u.end, cluster: Number(u.speakerId.split(':')[1] ?? 0) }))
 
     for (const speaker of meeting.speakers.filter((s) => s.track === track)) {
       const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, speaker.cluster)
-      // Микрофонная дорожка — это тот, кто сидит за компьютером: для своего
-      // слепка порог узнавания там мягче.
+      // The microphone track is whoever sits at the computer: the recognition
+      // threshold for your own print is gentler there.
       if (embedding) clusters.push({ speakerId: speaker.id, embedding, ownTrack: track === 'mic' })
     }
   }
@@ -543,13 +551,13 @@ async function identify(meetingId: string): Promise<Meeting> {
 }
 
 /**
- * Свести кластеры, опознанные как один и тот же человек.
+ * Merge clusters recognised as the same person.
  *
- * Разделение по голосам может разбить речь одного человека на несколько
- * кластеров. Пока они безымянные, это видно только как лишние «Участник 4» и
- * «В комнате 6»; но если оба опознались по одному слепку, держать их порознь
- * незачем — в списке участников человек двоился, а его доля в разговоре
- * делилась пополам.
+ * Voice separation can break one person's speech into several clusters. While
+ * they are nameless this shows only as extra "Speaker 4" and "In the room 6";
+ * but if both matched the same voice print there is no reason to keep them
+ * apart, as the person appeared twice in the participant list and their share
+ * of the conversation was halved.
  */
 function mergeSameSpeaker(meeting: Meeting): Meeting {
   const keep = new Map<string, string>()
@@ -557,8 +565,8 @@ function mergeSameSpeaker(meeting: Meeting): Meeting {
 
   for (const speaker of meeting.speakers) {
     if (!speaker.name || speaker.nameSource !== 'voice-match') continue
-    // Один и тот же человек не может оказаться сразу на двух дорожках, поэтому
-    // сводим только внутри одной.
+    // The same person cannot be on two tracks at once, so merging happens only
+    // within one track.
     const key = `${speaker.track}:${speaker.name}`
     const first = keep.get(key)
     if (first === undefined) keep.set(key, speaker.id)
@@ -591,11 +599,11 @@ async function summarize(meetingId: string, providerId: string): Promise<Meeting
 }
 
 /**
- * Назвать запись по смыслу разговора.
+ * Name a recording after what the conversation was about.
  *
- * Название, данное человеком, не трогаем никогда — только то, что приложение
- * придумало само: «Запись 28 августа, 14:27» ничего не говорит о разговоре, и
- * в списке из десятка таких нужную не найти.
+ * A name given by a person is never touched, only one the application invented
+ * itself: "Recording, 28 August, 14:27" says nothing about the conversation,
+ * and in a list of a dozen like it the one you want cannot be found.
  */
 async function nameMeeting(meetingId: string, provider: LlmProvider): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
@@ -614,7 +622,7 @@ async function nameMeeting(meetingId: string, provider: LlmProvider): Promise<Me
   return next
 }
 
-/** Модель иногда оборачивает JSON в ```-блок несмотря на инструкцию. */
+/** The model sometimes wraps JSON in a ``` block despite the instruction. */
 function parseSummary(raw: string, model: string): Summary {
   const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim()
   const start = cleaned.indexOf('{')
@@ -625,7 +633,7 @@ function parseSummary(raw: string, model: string): Summary {
   try {
     parsed = JSON.parse(candidate)
   } catch {
-    // Если JSON не разобрался — сохраняем хотя бы текст, чтобы работа не пропала.
+    // If the JSON did not parse, keep at least the text, so the work is not lost.
     return Summary.parse({ tldr: cleaned.slice(0, 2000), generatedAt: new Date().toISOString(), model })
   }
   const result = Summary.safeParse({ ...(parsed as object), generatedAt: new Date().toISOString(), model })

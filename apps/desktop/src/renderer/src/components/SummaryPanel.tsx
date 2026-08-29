@@ -1,19 +1,19 @@
 import { t } from '@spyly/core'
 
-/** Пометка, что конспект правили руками. Значение служебное и не переводится. */
+/** A marker that the summary was edited by hand. The value is internal and is not translated. */
 const MANUAL_MODEL = 'вручную'
 import { useEffect, useState } from 'react'
 import type { ActionItem, Meeting, Summary } from '@spyly/core'
 import { IconClose, IconSparkle } from '../lib/icons'
 import { Button, EmptyState, IconButton, Input } from '../ui'
 
-/** Модель часто пишет срок уже с предлогом — второй «до» тут лишний. */
+/** The model often writes a deadline with a preposition already, so a second "by" is redundant. */
 function formatDue(due: string): string {
   const trimmed = due.trim()
   return /^(до|к|by|until)\s/i.test(trimmed) ? trimmed : t('до {trimmed}', { trimmed: trimmed })
 }
 
-/** Редактируемая строка списка: щёлкнул — правишь, пусто — удаляется. */
+/** An editable list row: click to edit, empty means deleted. */
 function EditableLine({
   value,
   placeholder,
@@ -168,10 +168,11 @@ function TaskRow({
 }
 
 /**
- * Конспект: то, что собрала модель, и то, что человек в нём исправил.
+ * The summary: what the model assembled, and what a person corrected in it.
  *
- * Всё редактируется: машина регулярно приписывает задачу не тому и выдумывает
- * сроки, а пересобирать конспект целиком ради одной ошибки — плохой обмен.
+ * Everything is editable: the machine regularly attributes a task to the wrong
+ * person and invents deadlines, and rebuilding the whole summary over one
+ * mistake is a poor trade.
  */
 export function SummaryPanel({
   meeting,
@@ -190,8 +191,7 @@ export function SummaryPanel({
   const [dirty, setDirty] = useState(false)
   const empty = meeting.utterances.length === 0
 
-  // Пересобранный конспект должен вытеснить черновик, но не затереть
-  // несохранённую правку.
+  // A rebuilt summary should displace the draft without wiping an unsaved edit.
   useEffect(() => {
     if (!dirty) setDraft(meeting.summary ?? null)
   }, [meeting.summary, dirty])

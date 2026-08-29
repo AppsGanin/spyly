@@ -6,10 +6,11 @@ import { Button, EmptyState } from '../ui'
 import { StartDialog } from '../components/StartDialog'
 
 /**
- * Экран без выбранной встречи.
+ * The screen with no meeting selected.
  *
- * Список записей живёт в боковой панели и повторять его в центре незачем:
- * здесь нужно либо объяснить, с чего начать, либо просто не мешать.
+ * The list of recordings lives in the sidebar and there is no reason to repeat
+ * it in the middle: here we either explain where to start, or simply stay out
+ * of the way.
  */
 export function Home({ openRecord = false }: { openRecord?: boolean } = {}) {
   const { meetings, notify, recording } = useStore()

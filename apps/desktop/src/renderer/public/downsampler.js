@@ -1,12 +1,12 @@
 /**
- * Сведение каналов и понижение частоты до 16 кГц.
+ * Mixing the channels down and lowering the rate to 16 kHz.
  *
- * Отдельным файлом, а не строкой в blob: политика безопасности приложения не
- * пускает blob-скрипты, и загруженный так обработчик молча не запускался —
- * запись получалась идеальной тишиной.
+ * A file of its own rather than a string in a blob: the application's security
+ * policy allows no blob scripts, and a worklet loaded that way silently failed
+ * to start, so the recording came out as perfect silence.
  *
- * Частоту приводим здесь, а не в главном процессе: через границу процессов
- * тогда идёт вчетверо меньше данных.
+ * The rate is converted here rather than in the main process: a quarter as much
+ * data then crosses the process boundary.
  */
 const TARGET_RATE = 16000
 
@@ -22,8 +22,8 @@ class Downsampler extends AudioWorkletProcessor {
     const input = inputs[0]
     if (!input || input.length === 0) return true
 
-    // Каналы складываем, а не берём первый: в стереодорожке голос может
-    // оказаться только в одном канале, и половина разговора пропала бы.
+    // The channels are summed rather than taking the first: in a stereo track
+    // the voice may sit in one channel only, and half the conversation would be lost.
     const frames = input[0].length
     for (let i = 0; i < frames; i++) {
       let sum = 0
@@ -41,7 +41,7 @@ class Downsampler extends AudioWorkletProcessor {
       this.position += this.ratio
     }
 
-    // Съеденное отбрасываем, иначе буфер растёт до конца записи.
+    // What has been consumed is dropped, or the buffer grows until the end of the recording.
     const consumed = Math.floor(this.position)
     if (consumed > 0) {
       this.buffer = this.buffer.slice(consumed)

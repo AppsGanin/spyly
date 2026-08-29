@@ -2,11 +2,11 @@ import EventKit
 import Foundation
 
 /**
- * События календаря вокруг текущего момента.
+ * Calendar events around the current moment.
  *
- * Нужны, чтобы запись сразу получала настоящее название и список участников:
- * иначе в архиве остаются «Запись 27 августа, 21:16» и «Участник 2», по
- * которым потом ничего не найти.
+ * They are there so that a recording gets a real title and a participant list
+ * straight away: otherwise the archive is left with "Recording, 27 August,
+ * 21:16" and "Speaker 2", by which nothing can be found later.
  */
 struct CalendarEvent: Encodable {
     let id: String
@@ -16,7 +16,7 @@ struct CalendarEvent: Encodable {
     let participants: [String]
     let location: String?
     let notes: String?
-    /// Идёт прямо сейчас, а не «скоро начнётся».
+    /// Happening right now, rather than "starting soon".
     let isNow: Bool
 }
 
@@ -27,11 +27,12 @@ private let iso: ISO8601DateFormatter = {
 }()
 
 /**
- * Запрос разрешения у системы.
+ * Asking the system for permission.
  *
- * Ждём, прокручивая цикл событий, а не блокируя поток семафором: окно запроса
- * показывает система, и ей нужен живой главный поток. С заблокированным
- * потоком окно не появлялось вовсе, а ответ приходил мгновенным отказом.
+ * We wait by turning the run loop rather than blocking the thread with a
+ * semaphore: the request window is shown by the system, and it needs a live
+ * main thread. With the thread blocked the window never appeared at all, and
+ * the answer came back as an instant refusal.
  */
 func requestCalendarAccess(store: EKEventStore) -> Bool {
     var granted = false
@@ -48,7 +49,7 @@ func requestCalendarAccess(store: EKEventStore) -> Bool {
         store.requestAccess(to: .event, completion: complete)
     }
 
-    // Человеку нужно время прочитать запрос и нажать кнопку.
+    // A person needs time to read the request and press a button.
     let deadline = Date().addingTimeInterval(120)
     while !finished && Date() < deadline {
         RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
@@ -65,12 +66,12 @@ func calendarAuthorized() -> Bool {
 }
 
 /**
- * Отказано ли окончательно.
+ * Whether it has been refused for good.
  *
- * Отличать это от «ещё не спрашивали» обязательно: системный диалог macOS
- * показывает один раз, и после отказа повторный запрос молча возвращает
- * false. Приложение должно в этом случае вести человека в настройки, а не
- * предлагать нажать кнопку, которая уже ничего не делает.
+ * Telling this apart from "not asked yet" is essential: macOS shows its dialog
+ * once, and after a refusal a repeat request silently returns false. In that
+ * case the application has to lead the person to settings rather than offer a
+ * button that no longer does anything.
  */
 func calendarDenied() -> Bool {
     let status = EKEventStore.authorizationStatus(for: .event)
@@ -81,10 +82,10 @@ func calendarDenied() -> Bool {
 }
 
 /**
- * События в окне вокруг «сейчас».
+ * The events in a window around "now".
  *
- * Смотрим и назад, и вперёд: запись часто начинают через пару минут после
- * начала встречи или за минуту до неё.
+ * We look both back and forward: a recording is often started a couple of
+ * minutes after a meeting began, or a minute before it.
  */
 func calendarEvents(backMinutes: Int, forwardMinutes: Int) -> [CalendarEvent] {
     let store = EKEventStore()
@@ -98,7 +99,7 @@ func calendarEvents(backMinutes: Int, forwardMinutes: Int) -> [CalendarEvent] {
     return store.events(matching: predicate)
         .filter { !$0.isAllDay }
         .map { event in
-            // Организатора включаем тоже: он такой же участник разговора.
+            // The organiser is included too: they are as much a participant as anyone.
             var names: [String] = []
             if let organizer = event.organizer?.name, !organizer.isEmpty { names.append(organizer) }
             for attendee in event.attendees ?? [] {

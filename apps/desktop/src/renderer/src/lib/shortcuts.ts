@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-/** Печатает ли пользователь прямо сейчас — тогда пробел и буквы не наши. */
+/** Whether the user is typing right now, in which case space and letters are not ours. */
 function isTyping(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null
   if (!element) return false
@@ -9,21 +9,21 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 export interface Shortcut {
-  /** Клавиша в нижнем регистре: 'f', ' ', 'escape'. */
+  /** The key in lower case: 'f', ' ', 'escape'. */
   key: string
   meta?: boolean
   shift?: boolean
-  /** Срабатывать даже когда фокус в поле ввода. */
+  /** Fire even when the focus is in an input field. */
   whileTyping?: boolean
   run: () => void
 }
 
 /**
- * Горячие клавиши окна.
+ * Window shortcuts.
  *
- * Отдельный слой, а не обработчики по компонентам: иначе они расползаются и
- * начинают конфликтовать друг с другом, а понять, что откуда срабатывает,
- * становится нельзя.
+ * A layer of its own rather than handlers scattered across components:
+ * otherwise they spread out and start conflicting with each other, and working
+ * out what fires from where becomes impossible.
  */
 export function useShortcuts(shortcuts: Shortcut[]): void {
   useEffect(() => {

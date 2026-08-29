@@ -3,9 +3,9 @@ import { setLang } from '@spyly/core'
 import { dayLabel, fullDateLabel, timeLabel } from '../src/renderer/src/lib/dates'
 
 /**
- * Здесь была бесконечная рекурсия: вспомогательная функция выбора локали
- * вызывала саму себя, и приложение падало с «Maximum call stack size exceeded»
- * на самом первом экране.
+ * There was infinite recursion here: the locale helper called itself, and the
+ * application died with "Maximum call stack size exceeded" on the very first
+ * screen.
  */
 describe('подписи дат', () => {
   const iso = new Date().toISOString()

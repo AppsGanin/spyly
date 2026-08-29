@@ -75,7 +75,7 @@ import { deleteVoice, finishEnrollment, listVoices, rememberSpeaker, startEnroll
 
 let session: RecordingSession | null = null
 let probes: NativeCapture[] = []
-/** Режим детектора держим рядом: опрос не должен каждые пять секунд читать файл. */
+/** The detector mode is kept close by: polling should not read a file every five seconds. */
 let cachedDetectMode: 'off' | 'notify' | 'auto' = 'notify'
 
 async function refreshDetectMode(): Promise<void> {
@@ -86,20 +86,20 @@ function currentState(): RecordingState {
   return session ? session.state() : idleState()
 }
 
-/** Идёт ли запись прямо сейчас — окну нужно знать, можно ли закрываться. */
+/** Whether a recording is running right now: the window needs to know whether it may close. */
 export function isRecordingNow(): boolean {
   const status = currentState().status
   return status === 'recording' || status === 'paused'
 }
 
-/** Об уже показанной ошибке второй раз не сообщаем. */
+/** An error already shown is not reported a second time. */
 let lastRecordingError: string | null = null
 
 function broadcastState(): void {
   const state = currentState()
 
-  // Ошибку записи раньше никто не показывал: она лежала в состоянии, а на
-  // экране человек видел идущую запись и узнавал о беде только в конце.
+  // Nobody used to show a recording error: it sat in the state while on screen
+  // the person saw a recording running, and learned of the trouble only at the end.
   if (state.error && state.error !== lastRecordingError) {
     send('toast', { kind: 'error', text: state.error })
   }
@@ -107,27 +107,27 @@ function broadcastState(): void {
 
   send('rec:state', state)
   updateTray(state)
-  // Панель поверх окон нужна ровно тогда, когда запись идёт — включая паузу:
-  // на паузе как раз важно видеть, что запись не забыта.
+  // The panel above other windows is needed exactly while a recording runs,
+  // pause included: on pause it matters most to see the recording is not forgotten.
   setOverlayVisible(state.status === 'recording' || state.status === 'paused')
 }
 
 async function permissions(): Promise<Permissions> {
   if (process.platform !== 'darwin') {
-    // Windows и Linux спрашивают про микрофон сами при первом обращении, а
-    // системный звук отдельного разрешения не требует вовсе. Отдельного API,
-    // чтобы узнать состояние заранее, там нет — поэтому не выдумываем его и
-    // не пугаем человека словом «отказано».
+    // Windows and Linux ask about the microphone themselves on first use, and
+    // system audio needs no separate permission at all. There is no API there to
+    // learn the state in advance, so we do not invent one and do not frighten
+    // anyone with the word "denied".
     return { microphone: 'not-determined', systemAudio: 'granted' }
   }
   const microphone = systemPreferences.getMediaAccessStatus('microphone') as Permissions['microphone']
-  // У захвата системного звука нет API статуса: единственный способ узнать —
-  // попробовать создать tap. Проба дешёвая и мгновенно сносится.
+  // System audio capture has no status API: the only way to find out is to try
+  // creating a tap. The probe is cheap and torn down immediately.
   const systemAudio = (await checkSystemAudioPermission()) ? 'granted' : 'denied'
   return { microphone, systemAudio }
 }
 
-/** Типобезопасная регистрация: имя канала и сигнатура берутся из контракта. */
+/** Type-safe registration: the channel name and signature come from the contract. */
 function handle<C extends IpcChannel>(
   channel: C,
   fn: (...args: Parameters<IpcRequests[C]>) => ReturnType<IpcRequests[C]> | Promise<ReturnType<IpcRequests[C]>>
@@ -136,8 +136,8 @@ function handle<C extends IpcChannel>(
     try {
       return await fn(...(args as Parameters<IpcRequests[C]>))
     } catch (error) {
-      // Без этого упавший обработчик виден только как молчащая кнопка: в
-      // renderer прилетает отказ, а в журнале приложения — ничего.
+      // Without this a failed handler shows only as a button that does nothing: the
+      // renderer gets a rejection and the application log gets nothing.
       const text = error instanceof Error ? (error.stack ?? error.message) : String(error)
       process.stderr.write(`[ipc:${channel}] ${text}\n`)
       throw error
@@ -146,38 +146,39 @@ function handle<C extends IpcChannel>(
 }
 
 /**
- * Живая расшифровка по ходу разговора.
+ * Live transcription as the conversation goes.
  *
- * Звук идёт в потоковую модель непрерывно, и она уточняет текст каждые 320 мс:
- * слова появляются почти сразу и дописываются, пока человек говорит. Прежний
- * способ — копить речь до паузы и отдавать куском — показывал фразу целиком и
- * только после того, как она договорена, то есть с опозданием до десятка
- * секунд на монологе. Он остаётся запасным на случай, если потоковая модель
- * не скачана.
+ * Audio flows into a streaming model continuously, and it refines the text
+ * every 320 ms: words appear almost at once and are extended while a person
+ * speaks. The previous approach, collecting speech until a pause and handing
+ * it over in one lump, showed a phrase whole and only once it was finished,
+ * which on a monologue meant up to ten seconds late. It stays as a fallback
+ * in case the streaming model has not been downloaded.
  *
- * Результат в любом случае черновой: после остановки файлы прогоняются
- * целиком, и это всегда точнее того, что можно понять по ходу речи.
+ * Either way the result is a draft: once recording stops the files are run
+ * through whole, and that is always more accurate than anything that can be
+ * made out mid-speech.
  */
 async function attachLiveTranscription(active: RecordingSession, language: string): Promise<void> {
   let stopped = false
 
   /**
-   * Громкость обеих дорожек по времени.
+   * The level of both tracks over time.
    *
-   * Главный признак эха — не текст, а уровень: голос из динамиков доходит до
-   * микрофона ослабленным в несколько раз. На настоящей записи отношение
-   * держалось около 0.20 и почти не колебалось, тогда как текст расходился
-   * настолько, что по нему эхо узнавалось лишь в трёх случаях из пяти.
+   * The main sign of echo is not the text but the level: a voice from the
+   * speakers reaches the microphone several times quieter. On a real recording
+   * the ratio held around 0.20 and barely wavered, whereas the text diverged so
+   * far that echo could be recognised by it in only three cases out of five.
    */
   const levels: Record<'mic' | 'system', LevelWindow[]> = { mic: [], system: [] }
   const fed: Record<'mic' | 'system', number> = { mic: 0, system: 0 }
 
   /**
-   * Что недавно сказал собеседник.
+   * What the other side said recently.
    *
-   * Его голос звучит из динамиков, и микрофон записывает его вместе с вашим.
-   * Без этой проверки одна и та же фраза появляется в живой расшифровке
-   * дважды — и как ваша, и как собеседника.
+   * Their voice comes out of the speakers, and the microphone records it along
+   * with yours. Without this check the same phrase appears twice in the live
+   * transcript, once as yours and once as theirs.
    */
   const recentRemote: { text: string; at: number }[] = []
 
@@ -190,17 +191,18 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   const looksLikeEcho = (track: 'mic' | 'system', text: string, startSec: number, endSec: number): boolean => {
     if (track !== 'mic') return false
 
-    // Правило то же, что и в финальной расшифровке: микрофон заметно тише
-    // того, что играло в динамиках, — значит, он слышал их, а не человека.
-    // Одно определение на оба пути, чтобы живой текст и итоговый не расходились.
+    // The rule is the same as in the final transcript: the microphone is markedly
+    // quieter than what was playing through the speakers, so it was hearing them
+    // rather than a person.
+    // One definition for both paths, so that the live text and the final one do not diverge.
     if (!micIsOwnVoice(levelAt(levels.mic, startSec, endSec), levelAt(levels.system, startSec, endSec))) {
       return true
     }
 
     return recentRemote.some(
       (item) =>
-        // Эхо приходит почти одновременно с оригиналом; окно с запасом на
-        // задержку динамиков и разное деление на куски.
+        // Echo arrives almost at the same time as the original; the window allows for
+        // speaker latency and for the two sides being cut into chunks differently.
         Math.abs(item.at - startSec) < 8 &&
         (textSimilarity(item.text, text) > 0.6 || containment(text, item.text) > 0.7)
     )
@@ -209,12 +211,12 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   let counter = 0
 
   /**
-   * Показать реплику и — если она закончена — записать в черновик на диске.
+   * Show an utterance and, if it is finished, write it into the draft on disk.
    *
-   * Незаконченные на диск не идут: файл читает агент через MCP, и версии одной
-   * растущей фразы там были бы мусором.
+   * Unfinished ones do not go to disk: the file is read by an agent over MCP,
+   * and versions of one growing phrase would be rubbish there.
    */
-  /** Показанные реплики: по ним видно, что уже нужно убирать, а не просто не показывать. */
+  /** Utterances already shown: they tell us what has to be removed rather than merely not shown. */
   const shown = new Set<string>()
 
   const publish = (
@@ -227,12 +229,12 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   ): void => {
     if (stopped) return
 
-    // На тишине распознавание выдаёт строку из обучающих данных — титры вроде
-    // «Субтитры сделал DimaTorzok». В финальной расшифровке это давно
-    // отсеивается, а живая показывала как есть.
+    // On silence, recognition emits a string out of its training data, credits
+    // along the lines of "Subtitles by DimaTorzok". The final transcript has
+    // filtered that out for a long time; the live one showed it as is.
     if (looksLikeEcho(track, text, start, end) || isLikelyHallucination(text)) {
-      // Фразу могли уже показать, пока она росла: отброшенное окончание
-      // оставило бы её на экране навсегда — с мигающим курсором и без конца.
+      // The phrase may already have been shown while it was growing: a discarded
+      // ending would leave it on screen forever, with a blinking cursor and no end.
       if (shown.has(id)) {
         shown.delete(id)
         send('live:utterance', { id, meetingId: active.meetingId, track, text: '', start, end, final: true })
@@ -261,9 +263,9 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   const chunkers = new Map<'mic' | 'system', SpeechChunker>()
 
   if (!streaming) {
-    // Без потоковой модели остаётся прежний способ: копить речь до паузы и
-    // отдавать куском в whisper-server. Текст приходит с опозданием на фразу,
-    // но лучше так, чем ничего.
+    // Without the streaming model the old approach remains: collect speech until
+    // a pause and hand it to whisper-server in one lump. The text arrives a phrase
+    // late, but that beats nothing.
     try {
       await startWhisperServer(language)
     } catch (error) {
@@ -273,25 +275,26 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   }
 
   /**
-   * Успевает ли распознавание за речью.
+   * Whether recognition keeps up with speech.
    *
-   * Потоковая модель считает прямо здесь, в главном процессе, а он же принимает
-   * звук и пишет его в файл. На проверяемой машине уходит около 0.11 секунды
-   * счёта на секунду звука с каждой дорожки — запас восьмикратный. Но машина
-   * может оказаться слабее или занятой, и тогда важнее сохранить запись, чем
-   * показывать текст: живую расшифровку выключаем, честно сказав почему.
+   * The streaming model computes right here, in the main process, and the same
+   * process takes in audio and writes it to a file. On the machine this was
+   * measured on it costs around 0.11 seconds of computation per second of audio
+   * from each track, an eightfold margin. But the machine may turn out to be
+   * weaker or busy, and then keeping the recording matters more than showing
+   * text: live transcription is switched off, with an honest reason.
    */
   let spentMs = 0
   let heardMs = 0
   const checkPace = (): void => {
-    // Первые секунды не в счёт: в них попадает загрузка модели.
+    // The first seconds do not count: they include loading the model.
     if (heardMs < 20_000 || spentMs <= heardMs * 0.35) return
     stopped = true
     for (const live of transcribers.values()) {
       try {
         live.finish()
       } catch {
-        // Уже неважно: живую расшифровку всё равно останавливаем.
+        // It no longer matters: live transcription is being stopped anyway.
       }
     }
     transcribers.clear()
@@ -302,7 +305,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
     })
   }
 
-  /** Отдать обновление от потоковой модели. */
+  /** Hand over an update from the streaming model. */
   const onStreamUpdate = (track: 'mic' | 'system', update: LiveUpdate): void => {
     let id = segmentIds.get(track)
     if (!id) {
@@ -310,11 +313,11 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
       segmentIds.set(track, id)
     }
     publish(track, id, update.text, update.start, update.end, update.final)
-    // Фраза закончена — следующая получит свой номер и встанет отдельной строкой.
+    // The phrase is finished; the next one gets its own number and its own line.
     if (update.final) segmentIds.delete(track)
   }
 
-  // --- запасной путь: нарезка по паузам и whisper-server ---
+  // --- fallback path: cutting at pauses and whisper-server ---
 
   let inFlight = 0
   const pending: { track: 'mic' | 'system'; samples: Float32Array; startSec: number }[] = []
@@ -323,8 +326,8 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
 
   const pump = (): void => {
     if (stopped) return
-    // Два одновременных запроса — предел: дальше они просто встают в очередь
-    // на сервере и увеличивают задержку.
+    // Two requests at once is the limit: beyond that they simply queue on the
+    // server and add to the delay.
     while (inFlight < 2 && pending.length > 0) {
       const item = pending.shift()!
       inFlight++
@@ -342,8 +345,8 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
           )
         })
         .catch((error: unknown) => {
-          // Раньше ошибка глоталась молча: сервер умирал, а живая расшифровка
-          // просто переставала появляться — без единого слова о причине.
+          // The error used to be swallowed silently: the server died and live
+          // transcription simply stopped appearing, without a word about why.
           if (stopped) return
           stopped = true
           send('toast', {
@@ -361,12 +364,12 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
   const makeChunker = (track: 'mic' | 'system') =>
     new SpeechChunker(track, (samples, startSec) => {
       if (stopped) return
-      // Тишину не отправляем вовсе: так выдумка не появится в принципе, а
-      // сервер не тратит время на пустые куски.
+      // Silence is not sent at all: that way invented text cannot appear in the
+      // first place, and the server wastes no time on empty chunks.
       if (rms(samples) < SILENCE_RMS_THRESHOLD) return
       pending.push({ track, samples, startSec })
-      // Очередь глубже трёх означает, что машина не успевает: копить дальше
-      // бессмысленно — текст приедет с опозданием на минуты.
+      // A queue deeper than three means the machine is not keeping up: collecting
+      // more is pointless, the text would arrive minutes late.
       while (pending.length > 3) {
         pending.shift()
         dropped++
@@ -382,13 +385,13 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
     })
 
   active.on('samples', (track: 'mic' | 'system', chunk: Float32Array) => {
-    // Уровни запоминаем по времени: по ним потом видно, что микрофон в этот
-    // момент лишь повторял динамики.
+    // Levels are remembered against time: later they show that at that moment the
+    // microphone was only repeating the speakers.
     const start = fed[track] / 16000
     fed[track] += chunk.length
     const window = levels[track]
     window.push({ start, end: fed[track] / 16000, rms: rms(chunk) })
-    // Минуты истории хватает: эхо приходит почти одновременно.
+    // A minute of history is enough: echo arrives almost simultaneously.
     while (window.length > 0 && start - window[0]!.start > 60) window.shift()
 
     if (stopped) return
@@ -416,7 +419,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
         if (update) onStreamUpdate(track, update)
         checkPace()
       } catch {
-        // Один сбойный кусок не повод ронять живую расшифровку целиком.
+        // One bad chunk is no reason to bring live transcription down entirely.
       }
       return
     }
@@ -435,22 +438,22 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
       try {
         for (const tail of live.finish()) onStreamUpdate(track, tail)
       } catch {
-        // Хвост фразы не критичен: полный проход всё равно перекроет черновик.
+        // The tail of a phrase is not critical: the full pass will cover the draft anyway.
       }
     }
     transcribers.clear()
-    // Модель весит полгигабайта — между записями держать её в памяти незачем.
+    // The model weighs half a gigabyte; no reason to hold it in memory between recordings.
     if (streaming) releaseLiveModel()
   })
 }
 
-/** Сколько времени запись считается «недавней» и её ещё можно продолжить. */
+/** How long a recording counts as "recent" and can still be continued. */
 
 /**
- * Последняя запись, к которой разумно дописать продолжение.
+ * The last recording it makes sense to append a continuation to.
  *
- * Созвон часто обрывается и возобновляется через пару минут: две отдельные
- * записи вместо одного разговора — лишняя работа для человека потом.
+ * A call often breaks off and resumes a couple of minutes later: two separate
+ * recordings instead of one conversation is extra work for a person afterwards.
  */
 async function startRecording(options: StartRecordingOptions): Promise<RecordingState> {
   if (session) return session.state()
@@ -483,8 +486,8 @@ async function startRecording(options: StartRecordingOptions): Promise<Recording
   const settings = await loadSettings()
   try {
     await next.start()
-    // Черновик прошлой части чистим: при продолжении записи отсчёт времени
-    // начинается заново, и склеенный файл дал бы агенту мешанину.
+    // The draft of the previous part is cleared: when a recording is continued the
+    // clock starts again, and a glued-together file would give an agent a muddle.
     await rm(meetingFile(next.meetingId, 'live.jsonl'), { force: true })
     if (settings.liveTranscription) void attachLiveTranscription(next, settings.language)
   } catch (error) {
@@ -493,18 +496,18 @@ async function startRecording(options: StartRecordingOptions): Promise<Recording
     send('toast', { kind: 'error', text: t('Не удалось начать запись: {message}', { message: message }) })
     throw error
   }
-  // Встреча создаётся на диске сразу, но список в интерфейсе сам об этом не
-  // узнает: без этого события live-расшифровку было бы негде смотреть до
-  // самой остановки записи.
+  // The meeting is created on disk at once, but the list in the interface does
+  // not learn of it by itself: without this event there would be nowhere to
+  // watch the live transcript until the recording stopped.
   send('meetings:changed', { id: next.meetingId })
   broadcastState()
   return next.state()
 }
 
 /**
- * Остановка «на всякий случай» — из обработчиков, которым нечего делать с
- * ошибкой. Молчать нельзя: если остановить не вышло, запись всё ещё идёт, и
- * человек должен об этом узнать.
+ * A stop "just in case", from handlers that have nothing to do with the error.
+ * Staying silent will not do: if stopping failed, the recording is still
+ * running and the person has to find out.
  */
 async function failsafeStop(): Promise<void> {
   try {
@@ -543,7 +546,7 @@ async function stopRecording(): Promise<{ meetingId: string | null }> {
     return { meetingId: active.meetingId }
   }
 
-  // Расшифровка идёт фоном: пользователь сразу возвращается к списку встреч.
+  // Transcription runs in the background: the user goes straight back to the meeting list.
   void processMeeting(active.meetingId).catch((error: unknown) => {
     send('toast', { kind: 'error', text: `Обработка не удалась: ${String(error)}` })
   })
@@ -557,10 +560,10 @@ function stopProbes(): void {
 }
 
 /**
- * Переключение записи горячей клавишей.
+ * Toggling a recording with a shortcut.
  *
- * Останавливаем сразу, а начинаем с источниками по умолчанию: в момент, когда
- * разговор уже идёт, выбирать микрофон некогда.
+ * Stopping happens at once, starting uses the default sources: at the moment a
+ * conversation is already under way there is no time to pick a microphone.
  */
 export function toggleRecordingFromShortcut(): void {
   if (session) {
@@ -572,7 +575,7 @@ export function toggleRecordingFromShortcut(): void {
     .catch(() => undefined)
 }
 
-/** Только для проверочных прогонов: начать запись без участия интерфейса. */
+/** For test runs only: start a recording without the interface being involved. */
 export async function autoStartForCheck(): Promise<void> {
   await startRecording({ mic: true, system: true, title: 'Проверка интерфейса' })
 }
@@ -580,13 +583,13 @@ export async function autoStartForCheck(): Promise<void> {
 export function registerIpc(): void {
   trayActions.onShowWindow = showMainWindow
 
-  // Детектор созвонов читает режим из настроек на каждом опросе, поэтому
-  // переключение в интерфейсе действует сразу и перезапуск не нужен.
+  // The call detector reads the mode from settings on every poll, so switching
+  // it in the interface takes effect at once and needs no restart.
   startCallDetector({
     mode: () => cachedDetectMode,
-    // Микрофон занимаем и мы сами — на записи слепка голоса и на проверке
-    // звука. Предлагать записать разговор в ответ на собственные действия
-    // приложения нельзя.
+    // We take the microphone ourselves too, while recording a voice print and
+    // during the sound check. Offering to record a conversation in response to
+    // the application's own actions will not do.
     isRecording: () => session !== null || appUsesMicrophone() || rendererUsesMicrophone(),
     onDetected: ({ app, auto }) => {
       send('call:detected', { app, at: Date.now() })
@@ -610,8 +613,8 @@ export function registerIpc(): void {
       if (which === 'microphone') {
         await systemPreferences.askForMediaAccess('microphone')
       } else {
-        // Диалог захвата системного звука показывает сама CoreAudio при первой
-        // попытке создать tap — отдельного API запроса у macOS нет.
+        // The system audio capture dialog is shown by CoreAudio itself on the first
+        // attempt to create a tap; macOS has no separate request API.
         await checkSystemAudioPermission()
       }
     }
@@ -644,10 +647,10 @@ export function registerIpc(): void {
   handle('calendar:request', async () => {
     const { requestCalendarAccess } = await import('../detect/calendar.js')
     const granted = await requestCalendarAccess()
-    // Раньше отправляли в настройки только при явном отказе. Но система может
-    // и вовсе не показать своё окно — тогда состояние остаётся «не спрашивали»,
-    // и человек упирается в кнопку, которая ничего не делает. Поэтому любой
-    // неуспех ведёт в настройки: там доступ выдаётся руками и наверняка.
+    // We used to send people to settings only on an outright refusal. But the
+    // system may not show its dialog at all, and then the state stays "not asked"
+    // and a person is stuck against a button that does nothing. So any failure
+    // leads to settings: there access is granted by hand and for certain.
     return { granted, needsSettings: !granted }
   })
 
@@ -673,10 +676,10 @@ export function registerIpc(): void {
     stopProbes()
     if (!isSupported()) return
 
-    // Модель для живой расшифровки грузится секунды. Прогреваем её, пока
-    // пользователь выбирает источники: иначе начало созвона осталось бы без
-    // текста. Whisper-сервер поднимаем только когда потоковой модели нет:
-    // он держит в памяти полтора гигабайта, и зря такое не занимают.
+    // The model for live transcription takes seconds to load. It is warmed up
+    // while the user picks sources: otherwise the start of a call would have no
+    // text. The whisper server is only started when there is no streaming model:
+    // it holds a gigabyte and a half in memory, which is not to be taken lightly.
     void loadSettings().then((s) => {
       if (!s.liveTranscription) return
       if (isLiveModelReady()) setTimeout(() => warmLiveModel(), 0).unref?.()
@@ -711,9 +714,9 @@ export function registerIpc(): void {
 
   handle('audio:stopProbe', () => {
     stopProbes()
-    // Если запись так и не началась, держать модели в памяти незачем: вместе
-    // они занимают под два гигабайта, а диалог выбора источников открывают и
-    // закрывают чаще, чем пишут разговор.
+    // If a recording never started, there is no point holding models in memory:
+    // together they take close to two gigabytes, and the source picker is opened
+    // and closed more often than a conversation is recorded.
     setTimeout(() => {
       if (session) return
       stopWhisperServer()
@@ -736,7 +739,7 @@ export function registerIpc(): void {
   handle('rec:mark', (note) => session?.mark(note ?? '') ?? null)
   handle('rec:markNote', (id, note) => session?.annotate(id, note))
 
-  // Звук, пришедший из renderer: на Windows и Linux захват живёт там.
+  // Audio arriving from the renderer: on Windows and Linux capture lives there.
   handle('capture:samples', (track, pcm) => {
     deliverSamples(track, new Float32Array(pcm))
   })
@@ -754,14 +757,14 @@ export function registerIpc(): void {
   })
 
   handle('meetings:update', async (id, patch) => {
-    // Через общую очередь правок: раньше здесь были отдельные чтение и запись,
-    // и правка, пришедшая между ними, терялась — в том числе от конвейера,
-    // который дописывает запись по ходу обработки.
+    // Through the shared edit queue: this used to be a separate read and write,
+    // and an edit arriving between them was lost, including one from the pipeline
+    // that fills a recording in as processing goes.
     const next = await editWithHistory(
       id,
       patch.title !== undefined ? t('переименование') : t('правку сведений'),
       (meeting) => {
-        // Человек назвал запись сам — больше её не переименовываем.
+        // The person named the recording themselves, so we stop renaming it.
         const renamed = patch.title !== undefined && patch.title !== meeting.title
         return { ...meeting, ...patch, id: meeting.id, titleAuto: renamed ? false : meeting.titleAuto }
       }
@@ -791,10 +794,10 @@ export function registerIpc(): void {
         s.id === speakerId ? { ...s, name: clean || undefined, nameSource: 'manual' as const } : s
       )
 
-      // Разделение по голосам иногда дробит одного человека на нескольких.
-      // Назвать их одним именем — это и есть «они один и тот же»: сводим их,
-      // иначе человек остался бы в списке дважды, а его доля в разговоре
-      // делилась бы пополам.
+      // Voice separation sometimes breaks one person into several. Giving them one
+      // name is exactly the statement "these are the same person": they are merged,
+      // otherwise the person would sit in the list twice and their share of the
+      // conversation would be halved.
       const track = speakers.find((s) => s.id === speakerId)?.track
       const twin = clean
         ? speakers.find((s) => s.id !== speakerId && s.name === clean && s.track === track)
@@ -817,8 +820,8 @@ export function registerIpc(): void {
       }
     })
     send('meetings:changed', { id })
-    // Правка — самый честный источник терминов: человек только что показал,
-    // как слово должно выглядеть на самом деле.
+    // An edit is the most honest source of terms: the person has just shown how
+    // the word is really meant to look.
     const settings = await loadSettings()
     return { meeting: next, terms: learnedTerms(before, text, settings.vocabulary) }
   })
@@ -877,11 +880,12 @@ export function registerIpc(): void {
   })
 
   /**
-   * Вырезание фрагмента.
+   * Cutting out a fragment.
    *
-   * Звук заменяется тишиной, а не укорачивается: сдвиг длительности переломал
-   * бы все таймкоды, отметки и уже собранный конспект. Для задачи «убрать
-   * лишнее из записи» тишина решает ровно то же — слов там больше нет.
+   * The audio is replaced with silence rather than shortened: a shift in
+   * duration would break every timestamp, every mark and the summary already
+   * assembled. For "take this out of the recording" silence does exactly the
+   * same job, as the words are no longer there.
    */
   handle('meetings:removeRange', async (id, from, to) => {
     forgetHistory(id)
@@ -910,11 +914,11 @@ export function registerIpc(): void {
   handle('meetings:related', (id) => findRelated(id))
 
   /**
-   * Черновик живой расшифровки.
+   * The draft from live transcription.
    *
-   * Остаётся после записи намеренно: по нему видно, что было на экране во
-   * время разговора. Финальная расшифровка точнее, но черновик показывает
-   * происходившее так, как его видел человек, — и иногда это важнее.
+   * It is kept after a recording on purpose: it shows what was on screen during
+   * the conversation. The final transcript is more accurate, but the draft shows
+   * what happened the way a person saw it, and sometimes that matters more.
    */
   handle('meetings:live', async (id) => {
     const file = meetingFile(id, 'live.jsonl')
@@ -927,13 +931,13 @@ export function registerIpc(): void {
         .map((line) => JSON.parse(line) as { track: 'mic' | 'system'; text: string; start: number; end: number })
         .sort((a, b) => a.start - b.start)
     } catch {
-      // Черновик — вспомогательные данные: битый файл не повод показывать ошибку.
+      // The draft is auxiliary data: a broken file is no reason to show an error.
       return []
     }
   })
 
   handle('meetings:updateSummary', async (id, summary) => {
-    // Правку помечаем моделью «вручную»: потом видно, что это не машина.
+    // The edit is marked with the model "by hand": later it is clear this was not a machine.
     const next = await editWithHistory(id, t('правку конспекта'), (meeting) => ({
       ...meeting,
       summary: { ...summary, model: t('вручную') }
@@ -1000,8 +1004,8 @@ export function registerIpc(): void {
   handle('settings:providers', () => listProviders())
 
   handle('settings:hasKey', async (id) => ({
-    // Само значение наружу не отдаём никогда: интерфейсу достаточно знать,
-    // что ключ есть, а показать его он всё равно не должен.
+    // The value itself is never handed out: the interface only needs to know the
+    // key exists, and should not show it in any case.
     present: await hasSecret(id),
     encrypted: encryptionAvailable()
   }))
@@ -1012,7 +1016,7 @@ export function registerIpc(): void {
 
   handle('models:list', () => listModels())
   handle('models:download', (id) => {
-    // Загрузка живёт своей жизнью: интерфейс не должен ждать её окончания.
+    // The download lives its own life: the interface must not wait for it to finish.
     void downloadModel(id).catch(() => undefined)
   })
   handle('models:pause', (id) => pauseDownload(id))
@@ -1032,9 +1036,9 @@ export function registerIpc(): void {
   handle('voices:enrollStart', () => startEnrollment())
   handle('voices:enrollStop', (name) => finishEnrollment(name))
 
-  // Главное окно во время записи могут закрыть — приложение живёт в трее. Но
-  // плавающая панель остаётся на экране, и её таймер не должен замирать,
-  // поэтому шлём состояние, пока есть запись, а не пока есть окно.
+  // The main window can be closed while recording, as the app lives in the tray.
+  // But the floating panel stays on screen and its timer must not freeze, so the
+  // state is sent while there is a recording, not while there is a window.
   setInterval(() => {
     if (session) broadcastState()
   }, 1000).unref?.()

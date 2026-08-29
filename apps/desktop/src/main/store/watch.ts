@@ -3,11 +3,12 @@ import { existsSync } from 'node:fs'
 import { meetingsDir } from './paths.js'
 
 /**
- * Слежение за папкой с записями.
+ * Watching the recordings folder.
  *
- * Файлы — источник правды, и меняет их не только приложение: через MCP в
- * конспект пишет агент, а папку можно поправить и руками. Без слежения такие
- * изменения были бы видны только после перезапуска.
+ * Files are the source of truth, and it is not only the application that
+ * changes them: an agent writes into the summary over MCP, and the folder can
+ * be edited by hand too. Without watching, such changes would only show up
+ * after a restart.
  */
 let watcher: FSWatcher | null = null
 let timer: NodeJS.Timeout | null = null
@@ -17,7 +18,7 @@ export function watchMeetings(onChange: (id: string) => void): void {
   const dir = meetingsDir()
   if (!existsSync(dir)) return
 
-  // Одна правка файла даёт несколько событий подряд; собираем их в одно.
+  // One edit to a file produces several events in a row; they are collected into one.
   const pending = new Set<string>()
   const flush = () => {
     timer = null
@@ -34,7 +35,7 @@ export function watchMeetings(onChange: (id: string) => void): void {
       if (timer) clearTimeout(timer)
       timer = setTimeout(flush, 400)
     })
-    // Слежение — удобство, а не необходимость: сорваться оно не должно.
+    // Watching is a convenience, not a necessity: it must not break anything.
     watcher.on('error', () => stopWatchingMeetings())
   } catch {
     watcher = null

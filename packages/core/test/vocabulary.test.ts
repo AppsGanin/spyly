@@ -18,8 +18,8 @@ describe('learnedTerms', () => {
     ])
   })
 
-  // Иначе заглавная буква в начале предложения каждый раз выглядела бы
-  // как новый термин.
+  // Otherwise a capital letter at the start of a sentence would look like a new
+  // term every time.
   it('правку регистра термином не считает', () => {
     expect(learnedTerms('потом посмотрим', 'Потом посмотрим')).toEqual([])
   })

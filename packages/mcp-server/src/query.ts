@@ -1,22 +1,22 @@
 import type { Meeting, MeetingMeta, Utterance } from '@spyly/core'
 
 /**
- * Разбор и фильтрация записей.
+ * Parsing and filtering recordings.
  *
- * Живёт отдельно от протокола, потому что теми же фильтрами пользуется и
- * поиск внутри приложения: правила «за неделю», «необработанные», «что
- * говорила Мария» должны совпадать везде.
+ * It lives apart from the protocol because the same filters are used by the
+ * search inside the application: the rules for "this week", "unprocessed" and
+ * "what Maria said" have to agree everywhere.
  */
 
-/** Состояние обработки — то, что человек спрашивает как «необработанные». */
+/** The processing state, what a person asks about as "unprocessed". */
 export type MeetingStatus = 'done' | 'processing' | 'failed' | 'no-transcript' | 'no-summary'
 
 export interface MeetingFilter {
-  /** Начало периода: ISO-дата или слово вроде «сегодня», «неделя». */
+  /** The start of the period: an ISO date or a word such as "today" or "week". */
   since?: string
   until?: string
   status?: MeetingStatus
-  /** Участник: имя целиком или его часть. */
+  /** A participant: the whole name or part of it. */
   speaker?: string
   limit?: number
 }
@@ -28,10 +28,10 @@ function startOfDay(date: Date): Date {
 }
 
 /**
- * Понимание дат «по-человечески».
+ * Understanding dates the way people say them.
  *
- * Агент получает запрос словами («что было на этой неделе»), и требовать от
- * него ISO-даты — лишний повод ошибиться.
+ * The agent gets a request in words ("what happened this week"), and demanding
+ * ISO dates from it is one more chance to get it wrong.
  */
 export function parseWhen(input: string | undefined, now = new Date()): Date | null {
   if (!input) return null
@@ -59,7 +59,7 @@ export function parseWhen(input: string | undefined, now = new Date()): Date | n
     if (text.includes(word)) return new Date(today.getTime() - days * DAY)
   }
 
-  // «за 3 дня», «5 days»
+  // The spoken forms "3 days" and "5 days".
   const relative = /(\d+)\s*(дн|day|недел|week|месяц|month)/.exec(text)
   if (relative) {
     const amount = Number(relative[1])
@@ -72,7 +72,7 @@ export function parseWhen(input: string | undefined, now = new Date()): Date | n
   return Number.isNaN(parsed) ? null : new Date(parsed)
 }
 
-/** В каком состоянии обработка записи. */
+/** What state a recording's processing is in. */
 export function meetingStatus(meeting: Pick<Meeting, 'stages' | 'utterances' | 'summary'>): MeetingStatus {
   const stages = meeting.stages ?? {}
   if (Object.values(stages).includes('running')) return 'processing'
@@ -87,7 +87,7 @@ export function matchesFilter(meeting: Meeting, filter: MeetingFilter, now = new
   const since = parseWhen(filter.since, now)
   const until = parseWhen(filter.until, now)
   if (since && at < since.getTime()) return false
-  // Верхняя граница включает весь указанный день.
+  // The upper bound covers the whole of the day given.
   if (until && at > until.getTime() + DAY) return false
   if (filter.status && meetingStatus(meeting) !== filter.status) return false
 
@@ -104,7 +104,7 @@ export interface Hit {
   speaker: string
 }
 
-/** Совпадения внутри одной записи, с именем говорящего. */
+/** Matches inside one recording, with the speaker's name. */
 export function findInMeeting(meeting: Meeting, query: string, speaker?: string): Hit[] {
   const needle = query.trim().toLowerCase()
   const names = new Map(meeting.speakers.map((s) => [s.id, s.name ?? (s.isMe ? 'Вы' : s.id)]))
@@ -122,7 +122,7 @@ export function findInMeeting(meeting: Meeting, query: string, speaker?: string)
     .map((u) => ({ utterance: u, speaker: names.get(u.speakerId) ?? u.speakerId }))
 }
 
-/** Краткая карточка записи для ответа агенту. */
+/** A short card of a recording for the answer to an agent. */
 export function summarize(meeting: Meeting): {
   id: string
   title: string

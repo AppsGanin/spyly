@@ -40,7 +40,7 @@ export async function loadSettings(): Promise<Settings> {
     try {
       stored = JSON.parse(await readFile(file, 'utf8')) as Partial<Settings>
     } catch {
-      // Битый файл настроек не должен мешать запуску — откатываемся к дефолтам.
+      // A damaged settings file must not stand in the way of startup, so we fall back to defaults.
     }
   }
   const merged = { ...defaults(), ...stored }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { isLikelyHallucination } from '../src/hallucination.js'
 
-// Whisper сваливается в повтор одной фразы там, где человек ничего подобного
-// не говорил. Проверка на повтор одного слова этого не ловила.
+// Whisper falls into repeating one phrase where the person said nothing of the
+// kind. A check for a single repeated word did not catch that.
 describe('зацикленный вывод', () => {
   it('ловит фразу, повторённую много раз', () => {
     expect(isLikelyHallucination('Я не знаю, что это значит. '.repeat(14))).toBe(true)
@@ -37,7 +37,7 @@ describe('зацикленный вывод', () => {
   })
 
   it('короткие повторы речи не считает залипанием', () => {
-    // Люди повторяются: «хорошо, хорошо» — нормальная реплика.
+    // People do repeat themselves: "all right, all right" is a normal utterance.
     expect(isLikelyHallucination('Хорошо, хорошо')).toBe(false)
   })
 })

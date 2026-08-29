@@ -16,8 +16,8 @@ export default function App() {
   const { settings, view, setView, recording, meetings } = useStore()
   const [restored, setRestored] = useState(false)
 
-  // Пока настройки не загрузились, рисовать нечего: тема и состояние
-  // онбординга приходят оттуда, и мелькание экрана было бы заметно.
+  // Until the settings have loaded there is nothing to draw: the theme and the
+  // onboarding state come from there, and a flash of the screen would be noticeable.
   useEffect(() => {
     if (!settings) return
     const root = document.documentElement
@@ -32,14 +32,14 @@ export default function App() {
     setView({ kind: 'meeting', id })
   })
 
-  // Захват звука на Windows и Linux живёт в окне: главный процесс просит
-  // открыть поток, а куски уходят обратно через IPC.
+  // Audio capture on Windows and Linux lives in the window: the main process asks
+  // for a stream to be opened, and the chunks go back over IPC.
   useIpcEvent('capture:start', ({ track, micDeviceId }) => {
     void (async () => {
       const result = await startCapture(
         { mic: track === 'mic', system: track === 'system', micDeviceId },
         (id, samples) => {
-          // Отдаём копию буфера: исходный переиспользуется под следующий кусок.
+          // A copy of the buffer is handed over: the original is reused for the next chunk.
           void api.call('capture:samples', id, samples.buffer.slice(0) as ArrayBuffer)
         }
       )
@@ -63,16 +63,16 @@ export default function App() {
     }
     if (kind === 'settings') setView({ kind: 'settings' })
     else if (kind === 'meeting') {
-      // Проверочным прогонам нужна самая свежая запись: только на её странице
-      // видно расшифровку, конспект и панель экспорта.
+      // Test runs need the most recent recording: its page is the only place showing
+      // the transcript, the summary and the export bar.
       void api.call('meetings:list').then((list) => {
         if (list[0]) setView({ kind: 'meeting', id: list[0].id })
       })
     } else setView({ kind: 'home' })
   })
 
-  // При запуске открываем последнюю встречу: пустой экран при непустом
-  // списке — лишний клик на ровном месте.
+  // At startup the last meeting is opened: an empty screen with a non-empty list
+  // is one click wasted for nothing.
   useEffect(() => {
     if (restored || meetings.length === 0 || view.kind !== 'home') return
     setRestored(true)
@@ -80,8 +80,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetings.length, restored])
 
-  // Начавшаяся запись открывает свою встречу с любого экрана: там идёт живая
-  // расшифровка, и искать её вручную пользователь не должен.
+  // A recording that has started opens its own meeting from any screen: live
+  // transcription runs there, and the user should not have to go looking for it.
   useEffect(() => {
     if (recording.status !== 'recording' || !recording.meetingId) return
     if (view.kind === 'meeting' && view.id === recording.meetingId) return
@@ -89,7 +89,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recording.status, recording.meetingId])
 
-  // Клавиши окна: запись, поиск и настройки — то, к чему тянутся чаще всего.
+  // Window shortcuts: recording, search and settings, the things reached for most often.
   useShortcuts(
     useMemo(
       () => [

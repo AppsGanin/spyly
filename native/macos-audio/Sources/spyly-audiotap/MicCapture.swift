@@ -1,16 +1,16 @@
 import AVFoundation
 import Foundation
 
-/// Захват микрофона.
+/// Microphone capture.
 ///
-/// Живёт в том же хелпере, что и системный звук, чтобы обе дорожки писались
-/// одинаково — Float32 моно на одной частоте — и запись не зависела от того,
-/// открыто ли окно приложения.
+/// It lives in the same helper as the system audio so that both tracks are
+/// written the same way, Float32 mono at one sample rate, and so that recording
+/// does not depend on whether the application window is open.
 final class MicCapture {
-    /// Движок пересоздаётся: после неудачной попытки с подавлением эха тот же
-    /// экземпляр больше не запускается.
+    /// The engine is recreated: after a failed attempt with echo cancellation
+    /// the same instance will not start again.
     private var engine = AVAudioEngine()
-    /// Немой микшер: держит граф живым ради узла подавления эха.
+    /// A silent mixer: it keeps the graph alive for the sake of the echo cancellation node.
     private var silentMixer = AVAudioMixerNode()
     private var converter: AVAudioConverter?
     private let onSamples: (UnsafeBufferPointer<Float>) -> Void
@@ -21,7 +21,7 @@ final class MicCapture {
         self.onSamples = onSamples
     }
 
-    /// Доступные устройства ввода — для выпадающего списка в настройках.
+    /// The available input devices, for the drop-down in settings.
     static func inputDevices() -> [[String: Any]] {
         let session = AVCaptureDevice.DiscoverySession(
             deviceTypes: [.microphone, .external],
@@ -31,17 +31,18 @@ final class MicCapture {
     }
 
     /**
-     * Запуск захвата.
+     * Starting the capture.
      *
-     * Сначала пробуем с подавлением эха: собеседника слышно из динамиков, и
-     * микрофон записывает его вместе с вашим голосом — запись звучит с эхом,
-     * а в расшифровке одни и те же фразы появляются дважды. Своей обработкой
-     * это не лечится, нужен системный узел.
+     * Echo cancellation is tried first: the other side is audible through the
+     * speakers, and the microphone records them along with your voice, so the
+     * recording sounds echoed and the same phrases appear twice in the
+     * transcript. Processing of our own does not cure that; a system node is
+     * needed.
      *
-     * Но он работает не везде: ему нужен один и тот же аппарат на вход и
-     * выход, и на внешнем микрофоне с отдельными колонками движок просто не
-     * запускается. Тогда откатываемся на обычный захват — эхо неприятно, а вот
-     * потерять запись целиком недопустимо.
+     * But it does not work everywhere: it needs the same hardware on input and
+     * output, and with an external microphone and separate speakers the engine
+     * simply will not start. We then fall back to ordinary capture: echo is
+     * unpleasant, whereas losing the recording entirely is unacceptable.
      */
     func start(deviceUID: String?, cancelEcho: Bool = true) throws {
         if cancelEcho {
@@ -60,7 +61,7 @@ final class MicCapture {
         try startEngine(deviceUID: deviceUID, voiceProcessing: false)
     }
 
-    /// Начать с чистого листа: повторно тот же движок уже не поднимется.
+    /// Start from a clean slate: the same engine will not come up a second time.
     private func teardown() {
         if engine.isRunning { engine.stop() }
         engine.inputNode.removeTap(onBus: 0)
@@ -73,17 +74,18 @@ final class MicCapture {
     private func startEngine(deviceUID: String?, voiceProcessing: Bool) throws {
         let input = engine.inputNode
 
-        // Порядок важен: формат входа зависит от того, включён ли узел
-        // подавления, поэтому читаем его только после переключения.
+        // The order matters: the input format depends on whether the
+        // cancellation node is on, so it is read only after switching.
         if voiceProcessing {
-            // Узел один на вход и выход: включать надо оба конца, иначе движок
-            // не инициализирует выходной узел и падает с -10875.
+            // One node serves input and output: both ends have to be switched
+            // on, or the engine fails to initialise the output node and dies
+            // with -10875.
             try input.setVoiceProcessingEnabled(true)
             try engine.outputNode.setVoiceProcessingEnabled(true)
         }
 
-        // Выбор конкретного микрофона идёт мимо AVAudioEngine — через нижележащий
-        // AudioUnit, иначе движок всегда возьмёт устройство по умолчанию.
+        // Choosing a particular microphone goes around AVAudioEngine, through
+        // the underlying AudioUnit, or the engine always takes the default device.
         if let uid = deviceUID, let deviceID = MicCapture.deviceID(forUID: uid) {
             var id = deviceID
             if let unit = input.audioUnit {
@@ -123,9 +125,9 @@ final class MicCapture {
             self.onSamples(UnsafeBufferPointer(start: ch[0], count: Int(out.frameLength)))
         }
 
-        // Узлу подавления нужен работающий выход: без него движок не крутит
-        // граф и с микрофона приходит ровная тишина. Громкость нулевая, так
-        // что в динамики ничего не попадает и обратной связи не возникает.
+        // The cancellation node needs a working output: without one the engine
+        // does not turn the graph and the microphone delivers flat silence. The
+        // volume is zero, so nothing reaches the speakers and no feedback occurs.
         if voiceProcessing {
             engine.attach(silentMixer)
             silentMixer.outputVolume = 0

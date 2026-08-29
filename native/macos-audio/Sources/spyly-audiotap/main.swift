@@ -2,10 +2,10 @@ import AVFoundation
 import EventKit
 import Foundation
 
-// Протокол с Node:
-//   stdout — сырой PCM: Float32, моно, запрошенная частота дискретизации
-//   stderr — построчный JSON со статусом, ошибками и уровнем сигнала
-// Разделение потоков позволяет читать звук без парсинга и не смешивать его с логами.
+// The protocol with Node:
+//   stdout is raw PCM: Float32, mono, at the sample rate that was asked for
+//   stderr is line-by-line JSON with status, errors and the signal level
+// Splitting the streams lets the audio be read without parsing and keeps it out of the logs.
 
 func emit(_ payload: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: payload),
@@ -21,7 +21,7 @@ func fail(_ message: String, code: Int32 = 1) -> Never {
 struct Options {
     var mode = "capture"
     var micDevice: String?
-    /// Убирать из микрофона то, что играет в динамиках. Выключается флагом.
+    /// Remove what is playing through the speakers from the microphone. Switched off by a flag.
     var cancelEcho = true
     var sampleRate: Double = 16000
     var excludePIDs: [pid_t] = []
@@ -108,8 +108,8 @@ case "mic-status":
     exit(0)
 
 case "check":
-    // Проба разрешения: создаём tap и сразу сносим. Единственный надёжный способ
-    // узнать, пустят ли нас, — попробовать.
+    // A permission probe: a tap is created and torn down at once. Trying is the
+    // only reliable way to learn whether we will be let in.
     var probe = AudioObjectID(kAudioObjectUnknown)
     let description = CATapDescription(stereoGlobalTapButExcludeProcesses: [])
     description.isPrivate = true
@@ -126,16 +126,16 @@ default:
     break
 }
 
-// ── режим захвата ───────────────────────────────────────────────────────────
+// ── capture mode ────────────────────────────────────────────────────────────
 
 let stdoutHandle = FileHandle.standardOutput
 
-/// Уровень сигнала считается синхронно под замком.
+/// The signal level is computed synchronously under a lock.
 ///
-/// Раньше здесь было `levelQueue.async { ... samples.count ... }` — замыкание
-/// переживало колбэк и читало `UnsafeBufferPointer` уже после освобождения
-/// буфера. Наружу это вылезало нулевым уровнем, но по сути было чтением
-/// освобождённой памяти.
+/// This used to be `levelQueue.async { ... samples.count ... }`: the closure
+/// outlived the callback and read an `UnsafeBufferPointer` after the buffer had
+/// been released. It showed up outside as a zero level, but it was reading
+/// freed memory.
 final class LevelMeter {
     private let lock = NSLock()
     private var peak: Float = 0
@@ -148,7 +148,7 @@ final class LevelMeter {
         lock.unlock()
     }
 
-    /// Забрать накопленный пик и обнулить его до следующего отчёта.
+    /// Take the peak that has accumulated and reset it until the next report.
     func drain() -> (peak: Float, frames: Int) {
         lock.lock()
         let result = (peak, frames)
@@ -160,7 +160,7 @@ final class LevelMeter {
 
 let meter = LevelMeter()
 
-/// Обе дорожки пишутся одинаково: считаем уровень и отдаём PCM в stdout.
+/// Both tracks are written the same way: compute the level and hand the PCM to stdout.
 let writeSamples: (UnsafeBufferPointer<Float>) -> Void = { samples in
     var sumSquares: Float = 0
     for v in samples { sumSquares += v * v }
@@ -172,8 +172,8 @@ let writeSamples: (UnsafeBufferPointer<Float>) -> Void = { samples in
 let capture = TapCapture(targetRate: options.sampleRate, onSamples: writeSamples)
 let mic = MicCapture(targetRate: options.sampleRate, onSamples: writeSamples)
 
-// Уборка обязательна и на сигналах: иначе приватный агрегат останется
-// висеть в системе после убийства процесса.
+// Cleaning up on signals is mandatory too: otherwise the private aggregate is
+// left behind in the system after the process is killed.
 var signalSources: [DispatchSourceSignal] = []
 var shuttingDown = false
 func shutdown(_ code: Int32) {
@@ -191,7 +191,7 @@ for sig in [SIGINT, SIGTERM, SIGHUP] {
     signalSources.append(source)
 }
 
-// Если родитель (Electron) умер, писать больше некому — выходим.
+// If the parent (Electron) has died there is nobody left to write for, so we exit.
 let parentWatch = DispatchSource.makeTimerSource(queue: .main)
 parentWatch.schedule(deadline: .now() + 2, repeating: 2)
 parentWatch.setEventHandler {

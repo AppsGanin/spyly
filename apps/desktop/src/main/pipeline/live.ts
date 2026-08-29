@@ -1,23 +1,23 @@
 import type { TrackId } from '@spyly/core'
 
-/** 32 мс при 16 кГц — кадр, на котором считается энергия. */
+/** 32 ms at 16 kHz, the frame the energy is computed over. */
 const FRAME = 512
 const SAMPLE_RATE = 16000
-/** Пауза, после которой реплика считается законченной. */
+/** The pause after which an utterance counts as finished. */
 const SILENCE_TO_END_MS = 700
-/** Максимальная длина куска: иначе монолог не покажется до самого конца. */
+/** The longest a chunk may be, or a monologue would not show until the very end. */
 const MAX_SEGMENT_SEC = 12
-/** Слишком короткие всплески — это стуки и клики, а не речь. */
+/** Bursts that are too short are knocks and clicks, not speech. */
 const MIN_SEGMENT_SEC = 0.7
-/** Столько звука до начала речи прицепляем, чтобы не срезать первый слог. */
+/** This much audio before speech starts is attached, so the first syllable is not cut off. */
 const PREROLL_SEC = 0.25
 
 /**
- * Нарезка потока на реплики по энергии сигнала.
+ * Cutting a stream into utterances by signal energy.
  *
- * Отдельная модель VAD здесь была бы лишней: задача не «есть ли речь вообще»,
- * а «человек договорил или ещё нет», и порог по шумовому полу с этим
- * справляется, ничего не загружая в память.
+ * A separate VAD model would be excessive here: the question is not "is there
+ * speech at all" but "has the person finished", and a threshold over the noise
+ * floor handles that without loading anything into memory.
  */
 export class SpeechChunker {
   private buffer: Float32Array[] = []
@@ -49,8 +49,8 @@ export class SpeechChunker {
     const frameSec = frame.length / SAMPLE_RATE
     this.offsetSec += frameSec
 
-    // Шумовой пол подстраивается медленно и только по тишине: иначе громкая
-    // речь поднимет порог, и следующие фразы начнут теряться.
+    // The noise floor adjusts slowly and only over silence: otherwise loud speech
+    // raises the threshold and the phrases after it start going missing.
     if (!this.speaking) {
       this.noiseFloor = this.noiseFloor * 0.995 + rms * 0.005
     }
@@ -72,8 +72,8 @@ export class SpeechChunker {
     }
 
     if (this.speaking) {
-      // Короткие паузы внутри фразы оставляем в куске: без них речь рвётся
-      // на отдельные слова и расшифровка получается рваной.
+      // Short pauses inside a phrase stay in the chunk: without them speech is torn
+      // into separate words and the transcript comes out ragged.
       this.append(frame)
       this.segmentSec += frameSec
       this.silenceMs += frameSec * 1000
@@ -99,7 +99,7 @@ export class SpeechChunker {
     }
   }
 
-  /** Отдать накопленное наружу; вызывается и при остановке записи. */
+  /** Hand out what has accumulated; also called when a recording stops. */
   flush(): void {
     const wasSpeaking = this.speaking
     this.speaking = false
@@ -124,7 +124,7 @@ export class SpeechChunker {
   }
 }
 
-/** WAV в памяти: whisper-server принимает файл, а не сырые сэмплы. */
+/** A WAV in memory: whisper-server takes a file, not raw samples. */
 export function encodeWav(samples: Float32Array, sampleRate = SAMPLE_RATE): Buffer {
   const header = Buffer.alloc(44)
   const dataBytes = samples.length * 2

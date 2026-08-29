@@ -9,20 +9,20 @@ const BYTES_PER_SAMPLE = 2
 const WAV_HEADER = 44
 
 /**
- * Починить записи, оставшиеся после падения приложения.
+ * Repair recordings left behind by a crash.
  *
- * Заголовок WAV обновляется по ходу записи, но последние секунды всё равно
- * могут не попасть в длину, поэтому пересчитываем её по фактическому размеру
- * файла и снимаем статус «идёт запись», иначе встреча навсегда зависнет
- * в списке как активная.
+ * The WAV header is updated as the recording goes, but the last seconds may
+ * still not make it into the length, so it is recomputed from the actual file
+ * size and the "recording" status is cleared, or the meeting would hang in the
+ * list as active forever.
  */
 export async function recoverOrphanedRecordings(): Promise<MeetingMeta[]> {
-  // Сперва восстанавливаем описания, потерянные из-за битого meta.json:
-  // иначе такие записи не попадут даже в список осиротевших.
+  // First the descriptions lost to a damaged meta.json are restored: otherwise
+  // such recordings would not even reach the list of orphans.
   await rebuildBrokenMeetings()
 
-  // Обработка, прерванная закрытием приложения, иначе висит вечно: этап
-  // остаётся «идёт», крутится кружок, и продолжить его некому.
+  // Processing interrupted by the application closing hangs forever otherwise:
+  // the stage stays "running", a spinner turns, and there is nobody to continue it.
   await unstickProcessing()
 
   const orphans = await findOrphanedRecordings()
@@ -55,11 +55,11 @@ export async function recoverOrphanedRecordings(): Promise<MeetingMeta[]> {
 }
 
 /**
- * Собрать описание записи заново, когда meta.json испорчен.
+ * Rebuild a recording's description when meta.json is damaged.
  *
- * Имя папки хранит дату и название — этого хватает, чтобы вернуть запись в
- * список. Расшифровку не трогаем: если она цела, она подхватится сама, а если
- * нет — обработку можно запустить заново.
+ * The folder name holds the date and the title, which is enough to bring the
+ * recording back into the list. The transcript is left alone: if it is intact
+ * it will be picked up by itself, and if not, processing can be run again.
  */
 async function rebuildBrokenMeetings(): Promise<void> {
   for (const id of await findBrokenMeetings()) {
@@ -72,7 +72,7 @@ async function rebuildBrokenMeetings(): Promise<void> {
       durationSec = Math.max(durationSec, bytes / (SAMPLE_RATE * BYTES_PER_SAMPLE))
     }
 
-    // `2026-08-27--sozvon-po-billingu--a1b2` → дата и название.
+    // `2026-08-27--billing-call--a1b2` gives the date and the title.
     const parts = id.split('--')
     const date = parts[0] ?? ''
     const slug = (parts[1] ?? '').replace(/-/g, ' ').trim()
@@ -99,12 +99,13 @@ async function rebuildBrokenMeetings(): Promise<void> {
 }
 
 /**
- * Снять зависшие этапы обработки.
+ * Clear processing stages that are stuck.
  *
- * Приложение могли закрыть или снять посреди расшифровки. Ничего страшного не
- * произошло — звук на месте, — но этап так и остался «идёт»: в списке крутится
- * кружок, а продолжить работу некому. Помечаем прерванным и объясняем, что
- * делать: кнопка «Повторить обработку» уже есть на странице записи.
+ * The application may have been closed or killed in the middle of
+ * transcription. Nothing terrible has happened, the audio is there, but the
+ * stage stayed "running": a spinner turns in the list and there is nobody to
+ * carry the work on. We mark it interrupted and explain what to do; the
+ * "Process again" button is already on the recording page.
  */
 async function unstickProcessing(): Promise<void> {
   const stages = ['transcribing', 'diarizing', 'identifying', 'summarizing'] as const

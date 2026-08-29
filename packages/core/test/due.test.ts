@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dueState, parseDue } from '../src/due.js'
 
-// Четверг, чтобы «пятница» и «конец недели» были завтра, а не через неделю.
+// A Thursday, so that "Friday" and "the end of the week" are tomorrow rather than a week away.
 const thursday = new Date(2026, 8, 3, 15, 0, 0)
 
 describe('parseDue', () => {
@@ -44,7 +44,7 @@ describe('parseDue', () => {
   })
 
   it('незнакомое выражение не превращает в дату', () => {
-    // Придуманный срок хуже ненайденного: по нему придёт напоминание.
+    // An invented deadline is worse than one that was never found: a reminder will arrive for it.
     expect(parseDue('как получится', thursday)).toBeNull()
     expect(parseDue('', thursday)).toBeNull()
     expect(parseDue(undefined, thursday)).toBeNull()

@@ -2,7 +2,7 @@ import type { SVGProps } from 'react'
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number }
 
-/** Иконки рисуем сами: набор нужен маленький, а лишняя зависимость дорога. */
+/** The icons are drawn here: the set needed is small, and an extra dependency is expensive. */
 function Icon({ children, size = 16, ...rest }: IconProps) {
   return (
     <svg
@@ -73,17 +73,17 @@ export const IconChevron = (p: IconProps) => (
 export const IconSparkle = (p: IconProps) => (
   <Icon {...p}><path d="M8 2l1.4 3.6L13 7l-3.6 1.4L8 12l-1.4-3.6L3 7l3.6-1.4L8 2z" /></Icon>
 )
-/** Голос узнан по слепку — подпись рядом с именем участника. */
+/** The voice was recognised from a print, a caption next to the participant's name. */
 export const IconVoiceMatch = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 6.5v3M6 3.5v9M9 5.5v5M12 7v2" />
   </Icon>
 )
 /**
- * Дописать к записи.
+ * Append to a recording.
  *
- * Красная точка записи плюс стрелка вправо: одна точка рядом с остальными
- * иконками читается просто как «запись», а не как продолжение существующей.
+ * A red recording dot plus an arrow to the right: a dot on its own among the
+ * other icons simply reads as "record" rather than as continuing an existing one.
  */
 export const IconContinueRecord = (p: IconProps) => (
   <Icon {...p}>

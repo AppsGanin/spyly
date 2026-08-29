@@ -1,19 +1,19 @@
 import { setLang, type Lang } from '@spyly/core'
 
 /**
- * Язык интерфейса — до всего остального.
+ * The interface language, before anything else.
  *
- * Часть подписей лежит в константах на уровне модулей, а они вычисляются при
- * импорте. Поэтому язык надо задать раньше, чем выполнится любой другой модуль
- * окна: этот файл импортируется первым, и только затем всё остальное.
+ * Some captions live in module-level constants, and those are computed on
+ * import. So the language has to be set before any other module of the window
+ * runs: this file is imported first, and only then everything else.
  *
- * Настройки читаются асинхронно и к этому моменту ещё не готовы, поэтому язык
- * продублирован в локальном хранилище окна — его хранилище настроек держит в
- * согласии с настоящей настройкой.
+ * Settings are read asynchronously and are not ready by this point, so the
+ * language is duplicated in the window's local storage, which the settings
+ * store keeps in step with the real setting.
  */
 try {
   const saved = localStorage.getItem('spyly.lang')
   if (saved === 'ru' || saved === 'en') setLang(saved as Lang)
 } catch {
-  // Приватный режим — останется язык по умолчанию.
+  // Private mode: the default language will stay.
 }

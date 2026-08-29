@@ -6,7 +6,7 @@ import { IconChevron, IconCopy, IconFolder } from '../lib/icons'
 import { useStore } from '../lib/store'
 import { Button, Menu } from '../ui'
 
-/** Куда попадал выбор в прошлый раз — чтобы следующий был в одно нажатие. */
+/** Where the choice landed last time, so the next one is a single click. */
 const LAST_TEMPLATE_KEY = 'spyly.export.template'
 
 function remembered(key: string, fallback: string): string {
@@ -18,21 +18,21 @@ function remembered(key: string, fallback: string): string {
 }
 
 /**
- * Отдать разговор агенту.
+ * Handing a conversation to an agent.
  *
- * Запускать агента из приложения мы больше не пытаемся: у него есть прямой
- * доступ к записям через MCP, и «спроси Claude про вчерашний созвон» работает
- * лучше, чем терминал, открытый нами в случайной папке.
+ * We no longer try to start an agent from the application: it has direct
+ * access to recordings over MCP, and "ask Claude about yesterday's call" works
+ * better than a terminal we opened in some arbitrary folder.
  *
- * Здесь остаётся то, для чего агент не нужен: положить готовый промпт в буфер
- * и показать папку с файлами.
+ * What remains here is what needs no agent: putting a finished prompt on the
+ * clipboard and showing the folder with the files.
  */
 export function ExportBar({
   meetingId,
   ready
 }: {
   meetingId: string
-  /** Есть ли что отдавать: до расшифровки промпт состоит из одного заголовка. */
+  /** Whether there is anything to hand over: before transcription the prompt is one heading. */
   ready: boolean
 }) {
   const { settings, notify } = useStore()
@@ -50,7 +50,7 @@ export function ExportBar({
       try {
         localStorage.setItem(LAST_TEMPLATE_KEY, id)
       } catch {
-        // Приватный режим — выбор просто не переживёт перезапуск.
+        // Private mode: the choice simply will not survive a restart.
       }
       const name = templates.find((t) => t.id === id)?.name
       notify('success', name ? t('Промпт «{name}» в буфере', { name: name }) : t('Промпт в буфере'))

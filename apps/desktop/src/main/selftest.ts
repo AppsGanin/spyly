@@ -28,11 +28,11 @@ import { audioFile, meetingDir, meetingFile } from './store/paths.js'
 import { loadSettings } from './store/settings.js'
 
 /**
- * Сквозная проверка: реальная запись → расшифровка → разделение по голосам.
+ * The end-to-end check: a real recording, transcription, voice separation.
  *
- * Запускается как `electron apps/desktop --selftest <файл.wav>`: файл
- * проигрывается внешним процессом, поэтому проверяется именно захват
- * системного звука, а не подсовывание готовых данных в конвейер.
+ * Started as `electron apps/desktop --selftest <file.wav>`: the file is played
+ * by an external process, so what gets checked is the actual system audio
+ * capture rather than fixtures pushed into the pipeline.
  */
 export async function runSelfTest(fixture: string, seconds: number): Promise<number> {
   const log = (...parts: unknown[]) => process.stdout.write(parts.join(' ') + '\n')
@@ -49,23 +49,24 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   }
 
   /*
-   * Ждём, пока освободится звук.
+   * Wait for the audio to be free.
    *
-   * Проверка играет файл и ловит его системным захватом. Если рядом ещё
-   * доживает прошлый прогон, устройство занято, и запись выходит пустой —
-   * тест падает по причине, к продукту отношения не имеющей.
+   * The check plays a file and catches it with the system capture. If a previous
+   * run is still winding down nearby, the device is busy and the recording comes
+   * out empty: the test fails for a reason that has nothing to do with the
+   * product.
    */
   await waitForAudioFree(log)
 
   const settings = await loadSettings()
   log(`язык расшифровки: ${settings.language}`)
 
-  // Модель для живого режима грузится секунды; в приложении её прогревает
-  // диалог выбора источников, здесь — делаем это до старта записи, иначе
-  // прогрев попал бы в её длительность.
+  // The model for live mode takes seconds to load; in the application the source
+  // picker warms it up, here we do it before the recording starts, otherwise the
+  // warm-up would land inside its duration.
   //
-  // Задержку считаем честно: сколько прошло от момента, когда слово прозвучало,
-  // до момента, когда его текст оказался на руках. Именно её видит человек.
+  // Latency is measured honestly: how long from the moment a word was spoken to
+  // the moment its text was in hand. That is what a person sees.
   const liveTexts: { lagSec: number; text: string; final: boolean }[] = []
   let liveReady = false
   const streamingLive = isLiveModelReady()
@@ -86,11 +87,11 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   log(`запись начата: ${session.meetingId}`)
 
   /**
-   * Когда по каждой дорожке пришёл первый сэмпл.
+   * When the first sample arrived on each track.
    *
-   * Отсчитывать от старта записи нельзя: источник может начать отдавать звук
-   * с задержкой в секунды (в проверке — пока не заиграет файл), и эта пауза
-   * записалась бы в задержку расшифровки, которой там нет.
+   * Counting from the start of the recording will not do: a source can begin
+   * handing over audio seconds late (here, until the file starts playing), and
+   * that pause would go into transcription latency where there is none.
    */
   const firstSampleAt = new Map<'mic' | 'system', number>()
   const noteLive = (
@@ -103,8 +104,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     const since = firstSampleAt.get(track) ?? Date.now()
     liveTexts.push({ lagSec: (Date.now() - since) / 1000 - end, text, final })
     if (!final) return
-    // Пишем черновик так же, как рабочий путь: по нему живёт вкладка
-    // «Черновик» и видит идущий разговор агент через MCP.
+    // The draft is written the same way as on the working path: the "Draft" tab
+    // lives off it, and an agent sees the conversation in progress over MCP.
     void appendFile(
       meetingFile(session.meetingId, 'live.jsonl'),
       `${JSON.stringify({ track, text, start, end })}\n`
@@ -152,7 +153,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     })
   }
 
-  // Играем чужим процессом: свой звук исключается из захвата.
+  // Played by another process: our own audio is excluded from capture.
   const player = spawn('afplay', [fixture], { stdio: 'ignore' })
   await new Promise((resolve) => setTimeout(resolve, (seconds / 2) * 1000))
   const markResult = session.mark('проверка')
@@ -162,7 +163,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   const { durationSec } = await session.stop()
   log(`запись остановлена, длительность ${durationSec.toFixed(1)} с`)
 
-  // Хвост последней фразы досчитывается уже после остановки.
+  // The tail of the last phrase is computed after the stop.
   await new Promise((resolve) => setTimeout(resolve, 4000))
   stopWhisperServer()
   if (liveReady) {
@@ -170,8 +171,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     const lags = liveTexts.map((t) => t.lagSec).filter((lag) => Number.isFinite(lag))
     const worst = lags.length > 0 ? Math.max(...lags) : 0
     if (streamingLive) {
-      // Смысл потоковой модели в том, что слова видны почти сразу. Порог с
-      // запасом на медленную машину, но заведомо ниже прежних десятков секунд.
+      // The point of a streaming model is that words are visible almost at once. The
+      // threshold allows for a slow machine but is well below the old tens of seconds.
       check(worst < 3, 'слова появляются сразу', `худшая задержка ${worst.toFixed(1)} с`)
       const growing = liveTexts.filter((t) => !t.final).length
       check(growing > 0, 'фраза дописывается по ходу речи', `${growing} уточнений`)
@@ -227,7 +228,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   check(withinDuration, 'таймкоды не выходят за длительность записи')
 
   log('')
-  // --- название по смыслу ---
+  // --- naming by meaning ---
   {
     const { cleanTitle, isAutoTitle } = await import('@spyly/core')
     check(isAutoTitle('Запись 28 августа, 14:27'), 'название по умолчанию узнаётся')
@@ -240,7 +241,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   for (const u of meeting.utterances.slice(0, 12)) {
     log(`  ${timecode(u.start)}  ${speakerLabel(speakers.get(u.speakerId), u.speakerId).padEnd(14)} ${u.text}`)
   }
-  // ── файлы на диске ────────────────────────────────────────────────────
+  // ── files on disk ─────────────────────────────────────────────────────
   const { existsSync: exists } = await import('node:fs')
   const { readFile } = await import('node:fs/promises')
   for (const name of ['meta.json', 'transcript.json', 'transcript.md']) {
@@ -250,7 +251,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   check(markdown.includes('## Расшифровка'), 'markdown-расшифровка собрана')
   check(markdown === renderTranscriptMarkdown(meeting), 'markdown на диске совпадает с текущим состоянием')
 
-  // --- отмена и возврат правок ---
+  // --- undo and redo ---
   {
     const { editWithHistory, undo, redo, historyState, forgetHistory } = await import('./store/history.js')
 
@@ -282,18 +283,18 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
         'возврат приводит правку обратно'
       )
 
-      // Возвращаем запись в исходное состояние: дальше её проверяют другие шаги.
+      // The recording goes back to its original state: later steps check it too.
       await undo(session.meetingId)
       check(
         (await readMeeting(session.meetingId))?.utterances.find((u) => u.id === target.id)?.text === wasText,
         'запись оставлена в исходном виде'
       )
 
-      // Новая правка обрывает ветку возврата.
+      // A new edit cuts the redo branch off.
       await editWithHistory(session.meetingId, 'ещё правку', (m) => m)
       check(!historyState(session.meetingId).canRedo, 'новая правка обрывает возврат')
 
-      // Вырезание фрагмента меняет звук, снимок его не вернёт — история рвётся.
+      // Cutting out a fragment changes the audio, and a snapshot will not bring it back, so history breaks.
       forgetHistory(session.meetingId)
       const empty = historyState(session.meetingId)
       check(!empty.canUndo && !empty.canRedo, 'необратимое действие обрывает историю')
@@ -301,12 +302,12 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // --- одновременные правки не теряют друг друга ---
+  // --- simultaneous edits do not lose each other ---
   {
-    // Здесь была потеря данных: переименование и смена имени участника шли
-    // мимо общей очереди — отдельными чтением и записью. Правка, пришедшая
-    // между ними, пропадала; конвейер, дописывающий запись по ходу обработки,
-    // попадал в это окно постоянно.
+    // There was data loss here: renaming and changing a participant's name went
+    // around the shared queue, as a separate read and write. An edit arriving
+    // between them vanished, and the pipeline, filling a recording in as
+    // processing goes, hit that window constantly.
     const { updateMeeting } = await import('./store/meetings.js')
     await Promise.all([
       updateMeeting(session.meetingId, (m) => ({ ...m, speakerCount: 3 })),
@@ -319,10 +320,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     check(after?.title === 'Проверка очереди', 'одновременное переименование уцелело')
   }
 
-  // --- пересборка не с самого начала ---
+  // --- rebuilding from somewhere other than the start ---
   {
-    // Здесь была потеря данных: запуск обработки «с разделения по голосам»
-    // собирал расшифровку из пустоты и стирал её целиком.
+    // There was data loss here: starting processing "from voice separation"
+    // assembled the transcript out of nothing and erased it entirely.
     const before = (await readMeeting(session.meetingId))?.utterances.length ?? 0
     if (before > 0) {
       await processMeeting(session.meetingId, 'diarizing')
@@ -332,11 +333,11 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   }
 
 
-  // ── узнавание участников по голосу ────────────────────────────────────
-  // Состояние читаем заново: проверка выше пересобирает участников, и
-  // прочитанный раньше список к этому моменту уже не тот — в собранном
-  // приложении разделение по голосам дало другие кластеры, и слепок снимался
-  // с идентификатора, которого больше нет.
+  // ── recognising participants by voice ─────────────────────────────────
+  // The state is read afresh: the check above rebuilds the participants, and a
+  // list read earlier is no longer the same by this point. In the packaged app
+  // voice separation gave different clusters, and the print was taken from an
+  // identifier that no longer exists.
   const fresh = await readMeeting(session.meetingId)
   const firstSpeaker = fresh?.speakers[0]
   if (firstSpeaker) {
@@ -345,9 +346,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     check(profile !== null, 'слепок голоса сохранён')
     check((await listVoices()).length === before + 1, 'профиль появился в реестре')
 
-    // Голос участника мог не узнаться сам: слепок шумный, реплик мало. Тогда
-    // его привязывают к уже знакомому голосу — выбором имени из списка. Второй
-    // слепок при этом не заводится, а существующий уточняется этой записью.
+    // A participant's voice may not be recognised by itself: a noisy print, too
+    // few utterances. Then it is linked to a voice already known, by picking a
+    // name from a list. No second print is created; the existing one is refined by
+    // this recording.
     const again = await rememberSpeaker(session.meetingId, firstSpeaker.id, 'Тестовый участник')
     check((await listVoices()).length === before + 1, 'привязка к знакомому голосу не плодит слепков')
     check(
@@ -357,7 +359,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     )
 
     if (profile) {
-      // Прогоняем узнавание на той же записи: участник должен опознаться.
+      // Recognition is run over the same recording: the participant should be identified.
       const renamed = await readMeeting(session.meetingId)
       if (renamed) {
         await writeMeeting({
@@ -376,14 +378,14 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── словарь доходит до движка ─────────────────────────────────────────
+  // ── the dictionary reaches the engine ─────────────────────────────────
   {
     const { buildVocabularyPrompt } = await import('./providers/asr/whisper-cpp.js')
     const { listVoices: voices } = await import('./store/voices.js')
     const prompt = await buildVocabularyPrompt()
-    // В подсказку попадает не только словарь: имена из реестра голосов тоже —
-    // ради них она во многом и нужна. К этому месту тест уже записал слепок,
-    // поэтому пустой подсказка быть не должна.
+    // The hint carries more than the dictionary: names from the voice registry go
+    // in too, and they are much of the reason it exists. By this point the test
+    // has already recorded a print, so the hint must not be empty.
     const expected = [
       ...settings.vocabulary.filter(Boolean),
       ...(await voices()).map((v) => v.name).filter(Boolean)
@@ -399,12 +401,12 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── метки ─────────────────────────────────────────────────────────────
+  // ── marks ─────────────────────────────────────────────────────────────
   check(meeting.marks.length >= 0, 'поле отметок на месте')
 
-  // ── продолжение записи ────────────────────────────────────────────────
-  // Самая рискованная часть: дозапись идёт в существующий WAV, и ошибка здесь
-  // портит уже записанный разговор, а не только новую часть.
+  // ── continuing a recording ────────────────────────────────────────────
+  // The riskiest part: the extra audio goes into an existing WAV, and a mistake
+  // here spoils a conversation already recorded, not only the new part.
   {
     const before = await readMeeting(session.meetingId)
     const beforeDuration = before?.durationSec ?? 0
@@ -438,8 +440,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
 
     const continued = await readMeeting(session.meetingId)
     if (continued) {
-      // Этап записи обязательно закрываем: иначе в списке навсегда останется
-      // крутящийся кружок рядом с уже готовой расшифровкой.
+      // The recording stage is always closed: otherwise a spinner stays in the list
+      // forever next to a transcript that is already done.
       await writeMeta({
         ...metaOf(continued),
         durationSec: total,
@@ -450,9 +452,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── черновик живой расшифровки ────────────────────────────────────────
-  // Раньше он удалялся после обработки. Теперь остаётся: по нему видно, что
-  // было на экране во время разговора, — отдельной вкладкой.
+  // ── the live transcription draft ──────────────────────────────────────
+  // It used to be deleted after processing. Now it stays: it shows what was on
+  // screen during the conversation, on a tab of its own.
   {
     const file = meetingFile(session.meetingId, 'live.jsonl')
     if (!existsSync(file)) {
@@ -462,8 +464,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
         .split('\n')
         .filter(Boolean)
         .map((line) => JSON.parse(line) as { track: string; text: string; start: number })
-        // Куски двух дорожек пишутся вперемешку, по мере готовности; порядок
-        // наводит тот, кто читает, — так же делает и обработчик.
+        // Chunks of the two tracks are written interleaved, as they become ready; the
+        // order is imposed by whoever reads them, and the handler does the same.
         .sort((a, b) => a.start - b.start)
       check(lines.length > 0, 'черновик сохранён', `${lines.length} реплик`)
       check(
@@ -477,10 +479,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── сведение приглушает эхо ───────────────────────────────────────────
-  // Голос собеседника звучит из динамиков и попадает в микрофон: в простой
-  // сумме он оказывается дважды. Проверяем, что при сведении микрофон
-  // приглушается там, где говорит собеседник.
+  // ── the mix ducks the echo ────────────────────────────────────────────
+  // The other side's voice comes out of the speakers and into the microphone: in
+  // a plain sum it ends up there twice. We check that mixing ducks the
+  // microphone where the other side is speaking.
   {
     const { mixTracks: mix, writeWavPcm16: write, readWavPcm16: read } = await import('./audio/wav.js')
     const rate = 16000
@@ -488,8 +490,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     const micTrack = new Float32Array(rate * seconds)
     const sysTrack = new Float32Array(rate * seconds)
 
-    // Первые две секунды говорит собеседник, и микрофон ловит его эхо.
-    // Последние две — говорит человек, собеседник молчит.
+    // For the first two seconds the other side speaks and the microphone catches
+    // their echo. For the last two the person speaks and the other side is silent.
     for (let i = 0; i < rate * 2; i++) {
       sysTrack[i] = Math.sin(i * 0.05) * 0.5
       micTrack[i] = Math.sin(i * 0.05) * 0.3
@@ -510,8 +512,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
       for (let i = from; i < to; i++) sum += mixed[i]! * mixed[i]!
       return Math.sqrt(sum / Math.max(1, to - from))
     }
-    // Пока говорит собеседник, вклад микрофона приглушён, поэтому уровень
-    // близок к его собственному, а не к сумме двух голосов.
+    // While the other side speaks the microphone's contribution is ducked, so the
+    // level is close to their own rather than to the sum of two voices.
     const whileRemote = energy(rate / 2, rate * 1.5)
     const whileOwn = energy(rate * 2.5, rate * 3.5)
     check(whileRemote < 0.45, 'при речи собеседника микрофон приглушён', whileRemote.toFixed(3))
@@ -521,17 +523,17 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     await Promise.all([micFile, sysFile, outFile].map((f) => remove(f, { force: true })))
   }
 
-  // ── этапы не затираются устаревшим снимком ────────────────────────────
-  // Конвейер держит запись в памяти минутами; если он пишет её целиком, то
-  // затирает всё, что за это время поменялось, — так у записи оставался
-  // крутящийся этап «Запись» при готовой расшифровке.
+  // ── stages are not wiped by a stale snapshot ──────────────────────────
+  // The pipeline holds a recording in memory for minutes; writing it back whole
+  // wipes everything that changed in the meantime, which is how a recording kept
+  // a spinning "Recording" stage while its transcript was ready.
   {
     const { updateMeeting } = await import('./store/meetings.js')
     const before = await readMeeting(session.meetingId)
     if (!before) {
       check(false, 'есть запись для проверки этапов')
     } else {
-      // Берём снимок, потом меняем файл мимо него, потом пишем через снимок.
+      // Take a snapshot, then change the file around it, then write through the snapshot.
       const stale = before
       await updateMeeting(session.meetingId, (m) => ({
         ...m,
@@ -552,10 +554,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── тишина не должна порождать выдумок ────────────────────────────────
-  // Whisper на пустой дорожке выдаёт титры из обучающих данных
-  // («Редактор субтитров…», «Продолжение следует…»). Проверяем, что до
-  // расшифровки такие дорожки вообще не доходят.
+  // ── silence must not breed invented text ──────────────────────────────
+  // On an empty track Whisper produces credits out of its training data
+  // ("Subtitles by...", "To be continued..."). We check that such tracks never
+  // reach transcription at all.
   {
     const quiet = new RecordingSession({ mic: false, system: true, title: 'Проверка тишины' }, [])
     await quiet.start()
@@ -580,17 +582,17 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     await deleteMeeting(quiet.meetingId)
   }
 
-  // ── правка расшифровки ────────────────────────────────────────────────
-  // Разделить, склеить, переназначить говорящего, вырезать. Всё это пишет на
-  // диск, поэтому проверяем на настоящих файлах, а не на выдуманных данных.
+  // ── editing the transcript ────────────────────────────────────────────
+  // Split, join, reassign the speaker, cut. All of that writes to disk, so it is
+  // checked on real files rather than on made-up data.
   {
     const before = await readMeeting(session.meetingId)
     const target = before?.utterances[0]
     if (!before || !target) {
       check(false, 'есть реплика для правки')
     } else {
-      // Делим по пробелу: посреди слова деление законно вставляет границу, и
-      // сравнивать склейку с исходным текстом было бы бессмысленно.
+      // Split at a space: in the middle of a word the split legitimately inserts a
+      // boundary, and comparing the join against the original text would be meaningless.
       const middle = Math.floor(target.text.length / 2)
       const at = target.text.indexOf(' ', middle) + 1 || middle
       const split = splitUtterance(target, at)
@@ -611,7 +613,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
         check(merged.start === target.start && merged.end === target.end, 'склейка возвращает исходные границы')
       }
 
-      // Уверенность по словам нужна подсветке сомнительных мест.
+      // Per-word confidence is what highlights the doubtful places.
       const withConfidence = before.utterances.filter((u) =>
         u.words.some((w) => typeof w.confidence === 'number')
       )
@@ -624,8 +626,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── вырезание фрагмента ───────────────────────────────────────────────
-  // Самая опасная операция: она портит уже записанный звук и необратима.
+  // ── cutting out a fragment ────────────────────────────────────────────
+  // The most dangerous operation: it spoils audio already recorded and cannot be undone.
   {
     const before = await readMeeting(session.meetingId)
     const victim = before?.utterances[before.utterances.length - 1]
@@ -648,9 +650,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
       for (let i = from; i < to; i++) peak = Math.max(peak, Math.abs(after.samples[i]!))
       check(peak === 0, 'в вырезанном промежутке настоящая тишина', `пик ${peak}`)
 
-      // За пределами промежутка звук должен остаться нетронутым. Смотрим
-      // обе стороны: начало записи бывает тихим само по себе, и проверка по
-      // одному только началу падала на ровном месте.
+      // Outside the stretch the audio must be untouched. We look at both sides: the
+      // start of a recording can be quiet by itself, and a check on the start alone
+      // failed for no reason.
       let outsidePeak = 0
       for (let i = 0; i < after.samples.length; i++) {
         if (i >= from && i < to) continue
@@ -675,7 +677,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── резка по тишине для автоопределения языка ─────────────────────────
+  // ── cutting at silences for language detection ────────────────────────
   {
     const { splitOnSilence } = await import('./audio/wav.js')
     const source = audioFile(session.meetingId, 'system')
@@ -685,15 +687,15 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
 
     check(parts.length === 0 || parts.length > 1, 'резка либо не трогает запись, либо даёт несколько кусков')
 
-    // Отдельно — файл с заведомыми паузами: на живой фикстуре подходящих
-    // разрывов может не найтись, и настоящая резка осталась бы непроверенной.
+    // Separately, a file with deliberate pauses: a live fixture may have no
+    // suitable breaks, and the real cutting would go unchecked.
     {
       const { writeWavPcm16 } = await import('./audio/wav.js')
       const rate = 16000
       const synthetic = new Float32Array(rate * 30)
       for (let i = 0; i < synthetic.length; i++) {
         const second = i / rate
-        // Речь по 4 секунды, паузы по секунде — как в обычном разговоре.
+        // Four seconds of speech, one second of pause, as in an ordinary conversation.
         const talking = Math.floor(second) % 5 !== 4
         synthetic[i] = talking ? Math.sin(i * 0.05) * 0.3 : 0
       }
@@ -708,7 +710,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
 
       const cutsAtPauses = cut.slice(1).every((piece) => {
         const at = piece.offsetSec % 5
-        // Граница должна попадать в паузу — она идёт с 4-й по 5-ю секунду.
+        // The boundary has to land in a pause, which runs from the 4th to the 5th second.
         return at >= 3.8 || at <= 0.2
       })
       check(cutsAtPauses, 'резка попадает в паузы, а не в середину фразы',
@@ -732,10 +734,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── одновременные правки ──────────────────────────────────────────────
-  // Конспект правит человек, задачи дописывает агент через MCP, а конвейер в
-  // это же время сохраняет этап. Без очереди правка, начатая раньше, молча
-  // затирала бы ту, что закончилась позже.
+  // ── simultaneous edits ────────────────────────────────────────────────
+  // A person edits the summary, an agent appends tasks over MCP, and at the same
+  // time the pipeline saves a stage. Without a queue an edit started earlier
+  // would silently wipe one that finished later.
   {
     const { updateMeeting } = await import('./store/meetings.js')
     const target = await readMeeting(session.meetingId)
@@ -753,7 +755,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
       check(after?.tags.includes('второй') === true, 'вторая одновременная правка не потерялась')
       check(after?.title === 'Переименовано на ходу', 'третья правка тоже на месте')
 
-      // Неудачная правка не должна ронять очередь: следующие обязаны пройти.
+      // A failed edit must not bring the queue down: the ones after it have to go through.
       await updateMeeting(session.meetingId, () => {
         throw new Error('нарочная ошибка')
       }).catch(() => undefined)
@@ -764,9 +766,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── битое описание записи ─────────────────────────────────────────────
-  // Испорченный meta.json прятал запись из списка целиком: звук на диске,
-  // а в приложении её нет. Проверяем, что она возвращается.
+  // ── a damaged recording description ───────────────────────────────────
+  // A corrupted meta.json hid a recording from the list entirely: the audio on
+  // disk, and nothing in the application. We check that it comes back.
   {
     const { writeFile, copyFile, rm: remove } = await import('node:fs/promises')
     const { meetingFile } = await import('./store/paths.js')
@@ -795,7 +797,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     await remove(backup, { force: true })
   }
 
-  // ── словарь учится на правках ─────────────────────────────────────────
+  // ── the dictionary learns from edits ──────────────────────────────────
   {
     const { learnedTerms } = await import('@spyly/core')
     check(
@@ -808,9 +810,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     )
   }
 
-  // ── конспект настоящей моделью ────────────────────────────────────────
-  // Именно здесь всплыл бы запуск codex без node в PATH: сам файл находится,
-  // а `#!/usr/bin/env node` внутри падает с кодом 127.
+  // ── a summary from a real model ───────────────────────────────────────
+  // This is exactly where running codex without node in PATH would surface: the
+  // file itself is found, and the `#!/usr/bin/env node` inside fails with code 127.
   {
     const { LLM_PROVIDERS } = await import('./providers/llm/index.js')
     const ready: string[] = []
@@ -833,9 +835,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     }
   }
 
-  // ── свой OpenAI-совместимый сервис ────────────────────────────────────
-  // Через него подключают OpenRouter и подобные. Проверяем весь путь на
-  // локальной заглушке: настройки, ключ, форма запроса, разбор ответа.
+  // ── a custom OpenAI-compatible service ────────────────────────────────
+  // This is how OpenRouter and the like are connected. The whole path is checked
+  // against a local stub: settings, key, request shape, parsing the answer.
   {
     const { createServer } = await import('node:http')
     const { setSecret } = await import('./store/secrets.js')
@@ -883,15 +885,15 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     check(seen.path === '/v1/chat/completions', 'запрос ушёл по нужному пути', seen.path ?? '')
     check(seen.auth === 'Bearer sk-test-0123456789', 'ключ подставлен в заголовок')
 
-    // Ключ с посторонними символами обязан давать понятную ошибку, а не
-    // падение внутри fetch.
+    // A key with stray characters has to give a clear error rather than a failure
+    // inside fetch.
     await setSecret('openai-compatible.key', 'ключ-с-кириллицей')
     const broken = await openAiCompatibleProvider
       .complete([{ role: 'user', content: 'x' }], {})
       .then(() => '')
       .catch((error: unknown) => (error instanceof Error ? error.message : String(error)))
-    // Сравниваем со словами того же перевода, а не с русским текстом: иначе
-    // проверка падала, когда интерфейс переключён на английский.
+    // Compared against words of the same translation rather than the Russian text:
+    // otherwise the check failed when the interface was switched to English.
     check(
       broken === t('в ключе есть посторонние символы — скопируйте его заново, без пробелов и кавычек'),
       'испорченный ключ объяснён словами',
@@ -903,7 +905,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
       'сообщения дошли целиком')
     check(seen.body?.stream === false, 'потоковый режим выключен')
 
-    // Ошибку сервиса надо показывать словами, а не кодом.
+    // A service error has to be shown in words, not as a code.
     server.close()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     const failed = await openAiCompatibleProvider
@@ -916,9 +918,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     await saveSettings({ openAiCompatible: before.openAiCompatible })
   }
 
-  // ── скорость на большом архиве ────────────────────────────────────────
-  // Похожие записи ищутся при каждом открытии страницы: если это стоит
-  // секунды, окно будет замирать на каждом клике.
+  // ── speed on a large archive ──────────────────────────────────────────
+  // Similar recordings are looked for every time a page is opened: if that costs
+  // seconds, the window will freeze on every click.
   {
     const { findRelated } = await import('./store/related.js')
     const { listMeetings: all } = await import('./store/meetings.js')
@@ -935,7 +937,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     check(cold < 3000, 'поиск похожих на холодную укладывается в три секунды', `${cold} мс на ${total} записей`)
     check(warm < 300, 'повторное открытие мгновенное', `${warm} мс`)
 
-    // Итоги читают весь период целиком — за квартал это может быть весь архив.
+    // Digests read the whole period, which for a quarter can be the entire archive.
     const { buildDigest: build, lastDays: period } = await import('@spyly/core')
     const { readMeeting: read } = await import('./store/meetings.js')
     const digestAt = Date.now()
@@ -956,9 +958,9 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   }
 
   log('')
-  // Проверка пишет настоящую запись в настоящее хранилище. Оставлять её там
-  // нельзя: за несколько прогонов список записей человека забивается мусором.
-  // Разобраться в упавшем прогоне поможет SPYLY_KEEP=1.
+  // The check writes a real recording into the real store. It must not be left
+  // there: over a few runs a person's list of recordings fills up with rubbish.
+  // SPYLY_KEEP=1 helps when looking into a failed run.
   if (process.env.SPYLY_KEEP || failures > 0) {
     log(`файлы: ${meetingDir(session.meetingId)}`)
   } else {
@@ -970,13 +972,13 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   return failures
 }
 
-/** Мета без расшифровки: продолжению нужна только она. */
+/** Meta without the transcript: continuing needs only that. */
 function metaOf(meeting: Meeting): MeetingMeta {
   const { speakers, utterances, summary, ...meta } = meeting
   return meta
 }
 
-/** Есть ли рядом чужой захват звука — он мешает проверке. */
+/** Whether someone else is capturing audio nearby, which gets in the way of the check. */
 async function waitForAudioFree(log: (...parts: unknown[]) => void): Promise<void> {
   const { execFile } = await import('node:child_process')
   const busy = async (): Promise<boolean> =>
@@ -990,8 +992,8 @@ async function waitForAudioFree(log: (...parts: unknown[]) => void): Promise<voi
   let waited = false
   for (let attempt = 0; attempt < 20; attempt++) {
     if (!(await busy())) {
-      // Процесс вышел, но CoreAudio отпускает приватный агрегат не мгновенно:
-      // захват, начатый сразу, получает тишину вместо звука.
+      // The process has exited, but CoreAudio does not release the private aggregate
+      // instantly: a capture started right away gets silence instead of sound.
       await new Promise((resolve) => setTimeout(resolve, waited ? 2000 : 1200))
       return
     }
@@ -1007,9 +1009,9 @@ async function waitForAudioFree(log: (...parts: unknown[]) => void): Promise<voi
 export function selfTestArgs(): { fixture: string; seconds: number } | null {
   const index = process.argv.indexOf('--selftest')
   if (index === -1) return null
-  // Без имени файла `path.resolve('')` даёт текущую папку, а она существует —
-  // проверка уходила дальше и падала пятью загадочными провалами вместо
-  // внятного «файл не указан».
+  // Without a file name `path.resolve('')` gives the current folder, and that
+  // exists, so the check went further and failed with five mysterious failures
+  // instead of a plain "no file given".
   const raw = process.argv[index + 1] ?? ''
   const fixture = raw.trim() && !raw.startsWith('--') ? path.resolve(raw) : ''
   const seconds = Number(process.argv[index + 2] ?? 20)

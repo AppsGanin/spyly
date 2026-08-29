@@ -7,25 +7,26 @@ import { enrichedPath, findBinary } from '../../binaries.js'
 import type { LlmMessage, LlmProvider } from '../types.js'
 
 /**
- * Конспект через уже установленный кодинг-агент.
+ * A summary through a coding agent that is already installed.
  *
- * У Anthropic и OpenAI нет публичного OAuth для сторонних приложений — только
- * ключи. Но если у пользователя стоит Claude Code или Codex, они уже
- * авторизованы его подпиской, и конспект можно собрать через них: ключ вводить
- * не нужно, отдельная оплата по токенам не появляется.
+ * Anthropic and OpenAI have no public OAuth for third-party applications, only
+ * API keys. But if the user has Claude Code or Codex installed, those are
+ * already authorised by their subscription and a summary can be made through
+ * them: no key to enter, no separate per-token bill.
  */
 
 interface CliSpec {
   id: string
   name: string
   binary: string
-  /** Аргументы разового запроса. `out` — файл для ответа, если движок так умеет. */
+  /** Arguments for a one-off request. `out` is the file for the answer, if the engine can do that. */
   args: (prompt: string, out: string) => string[]
   /**
-   * Читать ответ из файла, а не из stdout.
+   * Read the answer from a file rather than from stdout.
    *
-   * Codex пишет в stdout ещё и служебное: заголовок сессии и счётчик токенов.
-   * Вычищать это регулярками — верный источник будущих поломок.
+   * Codex also writes housekeeping to stdout: the session header and a token
+   * counter. Cleaning that out with regular expressions is a sure source of
+   * future breakage.
    */
   readsFile?: boolean
   hint: string
@@ -43,9 +44,9 @@ const SPECS: CliSpec[] = [
     id: 'codex-cli',
     name: 'Codex',
     binary: 'codex',
-    // Конспект собирается вне проекта, поэтому проверку на git-репозиторий
-    // нужно снять, а песочницу оставить на чтение: модель здесь ничего не
-    // должна ни запускать, ни менять.
+    // The summary is assembled outside a project, so the git repository check has
+    // to come off while the sandbox stays read-only: the model here should neither
+    // run nor change anything.
     args: (prompt, out) => [
       'exec',
       '--skip-git-repo-check',
@@ -61,18 +62,19 @@ const SPECS: CliSpec[] = [
 ]
 
 async function run(spec: CliSpec, binary: string, prompt: string, timeoutMs = 180_000): Promise<string> {
-  // Codex — скрипт с `#!/usr/bin/env node`, и без node в PATH он падает, даже
-  // когда сам файл найден. У приложения, запущенного из Dock, такого PATH нет.
+  // Codex is a script with `#!/usr/bin/env node`, and without node in PATH it
+  // fails even when the file itself is found. An app started from the Dock has
+  // no such PATH.
   const PATH = await enrichedPath()
   const out = path.join(os.tmpdir(), `spyly-llm-${Date.now()}-${process.pid}.txt`)
 
   try {
     const stdout = await new Promise<string>((resolve, reject) => {
       const child = spawn(binary, spec.args(prompt, out), {
-        // stdin закрыт: иначе Codex ждёт продолжения запроса оттуда.
+        // stdin is closed: otherwise Codex waits for the rest of the request from there.
         stdio: ['ignore', 'pipe', 'pipe'],
-        // Агент запускается вне проекта: конспект не должен цеплять чужие файлы
-        // и правила из случайной рабочей папки.
+        // The agent starts outside a project: a summary must not pick up other files
+        // and rules from whatever working folder it happens to be in.
         cwd: os.tmpdir(),
         env: { ...process.env, PATH, CI: '1' }
       })
@@ -94,7 +96,7 @@ async function run(spec: CliSpec, binary: string, prompt: string, timeoutMs = 18
 
     if (!spec.readsFile) return stdout
     const text = await readFile(out, 'utf8').catch(() => '')
-    // Файла может не оказаться — тогда лучше отдать хоть что-то из stdout.
+    // The file may not be there, and then handing back at least something from stdout is better.
     return text.trim() || stdout
   } finally {
     if (spec.readsFile) await rm(out, { force: true })

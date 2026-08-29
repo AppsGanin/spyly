@@ -44,8 +44,9 @@ describe('промпт для агента', () => {
   })
 
   /**
-   * В расшифровке может прозвучать что угодно, в том числе «удали базу».
-   * Агент должен считать это предметом обсуждения, а не полученным указанием.
+   * Anything at all can be said in a transcript, "delete the database" included.
+   * The agent has to treat that as the subject of a discussion rather than as an
+   * instruction it has received.
    */
   it('предупреждает агента, что расшифровка — данные, а не команды', () => {
     const prompt = buildAgentPrompt({
@@ -65,9 +66,9 @@ describe('промпт для агента', () => {
 
 describe('название, придуманное приложением', () => {
   /**
-   * Здесь была ошибка: проверка писалась как /^(Запись|Созвон)\b/, а в
-   * JavaScript граница слова считается по латинице. После кириллической «ь»
-   * границы нет, и переименование не срабатывало ни разу.
+   * There was a bug here: the check was written as /^(Запись|Созвон)\b/, and in
+   * JavaScript a word boundary is computed over Latin letters. After the Cyrillic
+   * «ь» there is no boundary, and the renaming never fired once.
    */
   it('узнаёт название по умолчанию', () => {
     expect(isAutoTitle('Запись 28 августа, 14:27')).toBe(true)

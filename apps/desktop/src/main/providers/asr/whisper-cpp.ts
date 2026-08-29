@@ -22,7 +22,7 @@ function binaryPath(): string {
   return candidates.find(existsSync) ?? candidates[0]!
 }
 
-/** Формат `-oj -ojf`: сегменты с токенами, у каждого свои таймкоды. */
+/** The `-oj -ojf` format: segments with tokens, each with its own timestamps. */
 interface WhisperJson {
   transcription?: {
     timestamps?: { from: string; to: string }
@@ -32,18 +32,18 @@ interface WhisperJson {
   }[]
 }
 
-/** Служебные токены Whisper вида `[_BEG_]`, `<|ru|>` в текст попадать не должны. */
+/** Whisper's own tokens such as `[_BEG_]` and `<|ru|>` must not end up in the text. */
 function isSpecialToken(text: string): boolean {
   return /^\s*(\[_[A-Z]+_\]|<\|.*?\|>)\s*$/.test(text)
 }
 
 /**
- * Разбор вывода whisper.cpp, запущенного с `-ml 1 -sow`.
+ * Parsing the output of whisper.cpp run with `-ml 1 -sow`.
  *
- * В этом режиме единицей сегмента является слово, поэтому словами становятся
- * именно сегменты. Токены внутри — это подслова («об», «суд», «им»), склеивать
- * расшифровку из них нельзя: текст развалится на куски. Они годятся только на
- * то, чтобы усреднить уверенность модели по слову.
+ * In this mode the unit of a segment is a word, so the segments are what
+ * become words. The tokens inside are sub-words ("ju", "dic", "ial"), and a
+ * transcript cannot be glued together out of them: the text falls apart. They
+ * are only good for averaging the model's confidence over a word.
  */
 function wordsOf(raw: WhisperJson): Word[] {
   const words: Word[] = []
@@ -66,12 +66,12 @@ function wordsOf(raw: WhisperJson): Word[] {
   return words
 }
 
-/** Слова → результат распознавания. */
+/** Words to a recognition result. */
 function assemble(words: Word[], track: 'mic' | 'system', language: string): AsrResult {
   if (words.length === 0) return { track, language, segments: [] }
 
-  // Дальше по конвейеру слова всё равно перегруппируются по говорящим,
-  // поэтому дробить их здесь на предложения бессмысленно.
+  // Further down the pipeline the words get regrouped by speaker anyway, so
+  // breaking them into sentences here is pointless.
   const segments: AsrSegment[] = [
     {
       text: words.map((w) => w.text).join(' '),
@@ -110,10 +110,10 @@ export const whisperCppProvider: AsrProvider = {
 
     const prompt = await buildVocabularyPrompt()
 
-    // На «определять автоматически» whisper выбирает язык один раз, по первым
-    // тридцати секундам, и дальше держится за него — фраза по-английски
-    // посреди русского разговора приедет транслитерацией. Поэтому режем запись
-    // по тишине и определяем язык на каждом куске отдельно.
+    // On "detect automatically" whisper picks the language once, from the first
+    // thirty seconds, and holds on to it after that: an English phrase in the
+    // middle of a Russian conversation arrives transliterated. So we cut the
+    // recording at the silences and detect the language on each piece separately.
     if (options.language === 'auto') {
       const parts = await splitOnSilence(wavPath)
       if (parts.length > 1) {
@@ -144,10 +144,10 @@ export const whisperCppProvider: AsrProvider = {
 }
 
 /**
- * Один прогон whisper.cpp по файлу.
+ * One run of whisper.cpp over a file.
  *
- * Возвращает и распознанный язык: при `auto` он нужен вызывающему, чтобы
- * понять, на чём в итоге говорили.
+ * It also returns the language it recognised: with `auto` the caller needs it
+ * to know what was actually being spoken.
  */
 async function runWhisper(
   model: string,
@@ -164,21 +164,21 @@ async function runWhisper(
     '-oj', '-ojf',
     '-of', outPrefix,
     '-pp',
-    // Пословное деление: без него таймкоды приходят на 5–30-секундные куски,
-    // и диаризация не сможет разложить их по говорящим.
+    // Word-level splitting: without it the timestamps come for 5 to 30 second
+    // chunks, and diarization cannot lay them out by speaker.
     '-ml', '1',
     '-sow',
     '-t', String(Math.max(2, Math.min(8, os.cpus().length - 2))),
-    // Не тащим текст предыдущего окна в следующее: именно на этом Whisper
-    // сваливается в повтор и выдаёт одну фразу двадцать раз подряд там, где
-    // человек её не говорил.
+    // The text of the previous window is not carried into the next: this is exactly
+    // where Whisper falls into repetition and emits one phrase twenty times in a
+    // row where nobody said it.
     '-mc', '0',
-    // Порог энтропии: при вырождении декодирование повторяется с другой
-    // температурой вместо того, чтобы залипнуть.
+    // The entropy threshold: on degeneration, decoding is retried at a different
+    // temperature instead of getting stuck.
     '-et', '2.8',
-    // Подсказка со словами, которых модель иначе не знает: имена коллег,
-    // названия проектов, жаргон. Без carry-initial-prompt она действует
-    // только на первые тридцать секунд, а разговор идёт час.
+    // A hint with words the model would otherwise not know: colleagues' names,
+    // project names, jargon. Without carry-initial-prompt it only affects the
+    // first thirty seconds, while a conversation runs for an hour.
     ...(prompt ? ['--prompt', prompt, '--carry-initial-prompt'] : [])
   ]
 
@@ -231,12 +231,12 @@ function mostCommon(values: string[]): string | null {
   return best
 }
 
-/** Порядок «по умолчанию»: крупнее — точнее, поэтому сверху самая крупная. */
+/** The "default" order: larger is more accurate, so the largest is on top. */
 const WHISPER_MODELS = ['whisper-large-v3', 'whisper-large-v3-turbo', 'whisper-medium', 'whisper-small']
 
 let chosenModel = ''
 
-/** Явный выбор пользователя из настроек; пусто — решаем сами. */
+/** An explicit choice by the user in settings; empty means we decide. */
 export function setPreferredModel(id: string): void {
   chosenModel = id
 }
@@ -250,11 +250,11 @@ export function preferredModel(): string {
 }
 
 /**
- * Подсказка распознаванию: имена и термины.
+ * A hint to recognition: names and terms.
  *
- * Whisper не знает, что «биллинг» — это биллинг, а не «Беллинге», пока не
- * увидит слово в контексте. Имена запомненных участников подставляются сами:
- * их пользователь уже ввёл, повторять незачем.
+ * Whisper does not know that "billing" is billing rather than "Belling" until
+ * it sees the word in context. The names of remembered participants are filled
+ * in automatically: the user has already entered them, no reason to ask again.
  */
 async function buildVocabularyPrompt(): Promise<string> {
   const settings = await loadSettings()
@@ -266,11 +266,11 @@ async function buildVocabularyPrompt(): Promise<string> {
       if (voice.name.trim()) terms.add(voice.name.trim())
     }
   } catch {
-    // Реестр голосов недоступен — обойдёмся одним словарём.
+    // The voice registry is unavailable, so the dictionary alone will have to do.
   }
 
   if (terms.size === 0) return ''
-  // Модель ждёт связный текст, а не список: так подсказка работает лучше.
+  // The model expects connected text rather than a list: the hint works better that way.
   return `В разговоре встречаются: ${[...terms].join(', ')}.`
 }
 

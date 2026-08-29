@@ -1,10 +1,10 @@
 /**
- * Словарь терминов, который учится на правках.
+ * A term dictionary that learns from edits.
  *
- * Если человек поправил в расшифровке «кубернетес» на «Kubernetes», то же слово
- * распознается неверно и в следующий раз. Вместо того чтобы заставлять его
- * отдельно ходить в настройки и вбивать термин руками, вытаскиваем кандидатов
- * прямо из правки.
+ * If a person corrected a phonetic spelling to "Kubernetes" in a transcript,
+ * the same word will be recognised wrongly next time too. Instead of making
+ * them go to settings separately and type the term in by hand, the candidates
+ * are pulled straight out of the edit.
  */
 
 const WORD = /[\p{L}\p{N}][\p{L}\p{N}._+-]*/gu
@@ -14,11 +14,11 @@ function words(text: string): string[] {
 }
 
 /**
- * Слова, которые появились при правке и похожи на термин.
+ * Words that appeared during an edit and look like a term.
  *
- * Намеренно осторожно: лучше не предложить ничего, чем засорить словарь
- * обычными словами — словарь идёт в подсказку распознавателю и, разрастаясь,
- * начинает ему мешать.
+ * Deliberately cautious: better to suggest nothing than to clutter the
+ * dictionary with ordinary words, since the dictionary goes into the hint for
+ * the recogniser and starts getting in its way as it grows.
  */
 export function learnedTerms(before: string, after: string, known: readonly string[] = []): string[] {
   const had = new Set(words(before).map((w) => w.toLowerCase()))
@@ -30,9 +30,9 @@ export function learnedTerms(before: string, after: string, known: readonly stri
     if (had.has(key) || seen.has(key)) continue
     seen.add(key)
 
-    // Термин — это либо слово с необычным написанием (заглавные внутри,
-    // цифры, дефис, точка), либо латиница среди кириллицы, либо имя
-    // с большой буквы. Обычное строчное русское слово термином не считаем.
+    // A term is either a word with unusual spelling (capitals inside it, digits, a
+    // hyphen, a full stop), or Latin letters among Cyrillic, or a name with a
+    // capital. An ordinary lower-case Russian word does not count as a term.
     const hasInnerCaps = /\p{Lu}/u.test(word.slice(1))
     const hasDigitsOrPunct = /[\d._+-]/.test(word)
     const isLatin = /^[A-Za-z][A-Za-z\d._+-]*$/.test(word)

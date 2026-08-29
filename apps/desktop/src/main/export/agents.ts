@@ -7,10 +7,10 @@ import path from 'node:path'
 import { enrichedPath, findBinary } from '../binaries.js'
 
 /**
- * Окружение для запуска чужих команд.
+ * The environment for running other people's commands.
  *
- * Приложение из Dock не видит ни node, ни homebrew, а `claude` и `codex` — это
- * скрипты, которым node нужен для собственного запуска.
+ * An app started from the Dock sees neither node nor homebrew, and `claude`
+ * and `codex` are scripts that need node to start at all.
  */
 async function childEnv(): Promise<NodeJS.ProcessEnv> {
   return { ...process.env, PATH: await enrichedPath() }
@@ -22,11 +22,11 @@ import { storageRoot } from '../store/paths.js'
 const run = promisify(execFile)
 
 /**
- * Подключение Spyly к агентам одним нажатием.
+ * Connecting Spyly to agents in one click.
  *
- * Раньше здесь были команды для копирования в терминал — но человек, который
- * записывает созвоны, не обязан лезть в конфиги. Каждый агент хранит настройки
- * MCP по-своему, поэтому под каждый свой способ.
+ * This used to be commands to copy into a terminal, but someone who records
+ * calls should not have to go digging through config files. Each agent keeps
+ * its MCP settings its own way, so each gets its own path here.
  */
 
 export type AgentId = 'claude-desktop' | 'claude-code' | 'codex'
@@ -36,7 +36,7 @@ export interface AgentStatus {
   name: string
   installed: boolean
   connected: boolean
-  /** Почему нельзя подключить, если нельзя. */
+  /** Why it cannot be connected, when it cannot. */
   hint?: string
 }
 
@@ -46,12 +46,12 @@ export interface AgentActionResult {
 }
 
 /**
- * Путь к серверу, который переживёт обновление приложения.
+ * A path to the server that survives an application update.
  *
- * Прописывать путь той копии, из которой запустились, нельзя: если приложение
- * гоняли из папки сборки или прямо с образа диска, ссылка протухнет при первом
- * же обновлении, и агент молча перестанет видеть записи. Поэтому предпочитаем
- * установленную копию в «Программах».
+ * Writing down the path of the copy we started from will not do: if the app
+ * was run out of a build folder or straight off a disk image, the link goes
+ * stale at the first update and the agent quietly stops seeing recordings. So
+ * an installed copy in Applications is preferred.
  */
 const INSTALLED_APP = '/Applications/Spyly.app'
 
@@ -72,17 +72,17 @@ function serverCommand(): { command: string; args: string[]; env: Record<string,
   }
 }
 
-/** Запущено ли приложение не из «Программ» — тогда прописанный путь недолговечен. */
+/** Whether the app is running from outside Applications, where a recorded path is short-lived. */
 function runningFromTemporaryLocation(): boolean {
   if (!app.isPackaged) return false
   return !existsSync(path.join(INSTALLED_APP, 'Contents', 'Resources', 'bin', 'spyly-mcp'))
 }
 
 /**
- * Проверить, что прописанная команда действительно отвечает по протоколу.
+ * Check that the command written down really answers over the protocol.
  *
- * Без этого неправильный путь выглядит как «подключено», а агент просто
- * молча ничего не находит.
+ * Without this a wrong path looks like "connected", and the agent simply
+ * finds nothing, silently.
  */
 export async function verifyServer(): Promise<{ ok: boolean; message: string }> {
   const server = serverCommand()
@@ -123,7 +123,7 @@ export async function verifyServer(): Promise<{ ok: boolean; message: string }> 
   })
 }
 
-// ── Claude Desktop: JSON-конфиг ───────────────────────────────────────────
+// ── Claude Desktop: a JSON config ──────────────────────────────────────────
 
 function claudeDesktopConfig(): string {
   if (process.platform === 'darwin') {
@@ -173,7 +173,7 @@ async function claudeDesktopConnected(): Promise<boolean> {
   return Boolean(config && (config.mcpServers as Record<string, unknown> | undefined)?.spyly)
 }
 
-// ── Claude Code: через собственную команду ────────────────────────────────
+// ── Claude Code: through its own command ───────────────────────────────────
 
 async function claudeCodeConnected(): Promise<boolean> {
   const binary = await findBinary('claude')
@@ -192,8 +192,8 @@ async function claudeCodeConnect(connect: boolean): Promise<AgentActionResult> {
   const server = serverCommand()
   try {
     if (connect) {
-      // `--scope user` — чтобы созвоны были видны из любого проекта, а не
-      // только из того, где команду выполнили.
+      // `--scope user` so that calls are visible from any project, not only from
+      // the one the command was run in.
       await run(
         binary,
         ['mcp', 'add', 'spyly', '--scope', 'user', '--env', `SPYLY_DIR=${storageRoot()}`, '--', server.command, ...server.args],
@@ -211,7 +211,7 @@ async function claudeCodeConnect(connect: boolean): Promise<AgentActionResult> {
   }
 }
 
-// ── Codex: секция в config.toml ───────────────────────────────────────────
+// ── Codex: a section in config.toml ────────────────────────────────────────
 
 function codexConfig(): string {
   return path.join(os.homedir(), '.codex', 'config.toml')
@@ -237,7 +237,7 @@ function codexBlock(): string {
   ].join('\n')
 }
 
-/** Вырезать секцию Spyly, не тронув остальной конфиг. */
+/** Cut out the Spyly section without touching the rest of the config. */
 function stripCodexSection(text: string): string {
   const lines = text.split('\n')
   const out: string[] = []
@@ -247,7 +247,7 @@ function stripCodexSection(text: string): string {
       skipping = true
       continue
     }
-    // Секция кончается на следующем заголовке в квадратных скобках.
+    // The section ends at the next heading in square brackets.
     if (skipping && /^\s*\[/.test(line)) skipping = false
     if (!skipping) out.push(line)
   }
@@ -280,7 +280,7 @@ async function codexConnect(connect: boolean): Promise<AgentActionResult> {
   return { ok: true, message: t('Готово. Codex увидит ваши созвоны в новых сессиях.') }
 }
 
-// ── общий интерфейс ───────────────────────────────────────────────────────
+// ── the shared interface ───────────────────────────────────────────────────
 
 export async function agentStatuses(): Promise<AgentStatus[]> {
   const claudeCodeBinary = await findBinary('claude')

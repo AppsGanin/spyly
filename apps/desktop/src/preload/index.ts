@@ -2,10 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcChannel, IpcEventName, IpcEvents, IpcRequests } from '../shared/ipc.js'
 
 /**
- * Мост между процессами.
+ * The bridge between the processes.
  *
- * Renderer не получает ни Node, ни ipcRenderer напрямую: только вызов по имени
- * канала и подписка на события. Валидация аргументов — на стороне main.
+ * The renderer gets neither Node nor ipcRenderer directly: only a call by
+ * channel name and a subscription to events. Argument validation lives on the
+ * main side.
  */
 const api = {
   invoke<C extends IpcChannel>(channel: C, ...args: Parameters<IpcRequests[C]>): Promise<ReturnType<IpcRequests[C]>> {

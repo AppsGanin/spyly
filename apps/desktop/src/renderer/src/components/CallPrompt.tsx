@@ -5,10 +5,11 @@ import { Button, Modal } from '../ui'
 import { t } from '@spyly/core'
 
 /**
- * Предложение записать замеченный разговор.
+ * An offer to record a conversation that has been noticed.
  *
- * Диалог, а не молчаливый автостарт: приложение, которое само начинает писать
- * разговор, — ровно то, чего от такого софта опасаются.
+ * A dialog rather than a silent auto-start: an application that begins
+ * recording a conversation by itself is exactly what people fear from software
+ * like this.
  */
 export function CallPrompt() {
   const { settings, recording, notify } = useStore()

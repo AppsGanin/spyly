@@ -3,8 +3,9 @@ import { keepOwnVoice, levelAt, micIsOnlyEcho, micIsOwnVoice, trimEchoedStart, t
 import type { Utterance, Word } from '../src/types.js'
 
 /**
- * Числа взяты с настоящей записи, где человек молчал, а микрофон писал только
- * динамики: отношение громкостей держалось около 0.20 и почти не колебалось.
+ * The numbers are taken from a real recording where the person was silent and
+ * the microphone recorded nothing but the speakers: the ratio of levels held
+ * around 0.20 and barely wavered.
  */
 const windows = (values: number[]): LevelWindow[] =>
   values.map((rms, i) => ({ start: i * 0.25, end: (i + 1) * 0.25, rms }))
@@ -15,12 +16,12 @@ describe('своя речь или эхо динамиков', () => {
   })
 
   it('живую речь пропускает', () => {
-    // Человек говорит поверх тихого собеседника.
+    // The person speaks over a quiet other side.
     expect(micIsOwnVoice(0.12, 0.02)).toBe(true)
   })
 
   it('в тишине системной дорожки считает речь своей', () => {
-    // Сравнивать не с чем — значит, говорили в микрофон.
+    // There is nothing to compare against, so someone was speaking into the microphone.
     expect(micIsOwnVoice(0.03, 0.001)).toBe(true)
   })
 
@@ -47,9 +48,9 @@ describe('своя речь или эхо динамиков', () => {
 })
 
 /**
- * Последнее слово собеседника приклеивается к началу своей реплики: куски
- * двух дорожек нарезаются по-разному. На настоящей записи «…но тогда я,
- * конечно, готов» превратилось в «готов прикольно прикольно…» от вашего имени.
+ * The other side's last word sticks to the start of your own utterance: the
+ * two tracks are cut into pieces differently. On a real recording "...but then
+ * I am certainly ready" turned into "ready, nice, nice..." under your name.
  */
 describe('чужой хвост в начале реплики', () => {
   const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
@@ -66,7 +67,7 @@ describe('чужой хвост в начале реплики', () => {
   }
   const remote = { text: 'Поэтому имеет смысл читать комментарии, но тогда я, конечно, готов.', end: 106.5 }
 
-  // Приклеенное слово тихое — микрофон слышал динамики; своя речь громкая.
+  // The word that stuck is quiet, so the microphone was hearing the speakers; your own speech is loud.
   const levels = {
     mic: (from: number) => (from < 107.3 ? 0.016 : 0.12),
     system: () => 0.08
@@ -79,7 +80,7 @@ describe('чужой хвост в начале реплики', () => {
   })
 
   it('своё слово не трогает, даже если оно совпало с чужим', () => {
-    // Человек и правда может повторить чужое слово — но громко, своим голосом.
+    // A person really can repeat someone else's word, but loudly, in their own voice.
     const loud = { mic: () => 0.12, system: () => 0.08 }
     expect(trimEchoedStart(mine, remote, loud).text).toBe(mine.text)
   })
@@ -100,9 +101,9 @@ describe('чужой хвост в начале реплики', () => {
 })
 
 /**
- * Времена слов распознавание расставляет приблизительно, и приклеившееся слово
- * нередко оказывается там, где обе дорожки молчат. На настоящей записи «готов»
- * стояло на 106.9 с, где микрофон давал 0.001, а система — ноль.
+ * Recognition places word times approximately, and a word that stuck often ends
+ * up where both tracks are silent. On a real recording the word "ready" stood
+ * at 106.9 s, where the microphone gave 0.001 and the system gave zero.
  */
 describe('слово на тишине', () => {
   const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
@@ -127,17 +128,17 @@ describe('слово на тишине', () => {
   })
 
   it('громкое слово оставляет, даже если система молчит', () => {
-    // Человек и правда сказал «готов» в тишине — это его слово.
+    // The person really did say "ready" into the silence, so it is their word.
     const levels = { mic: () => 0.05, system: () => 0 }
     expect(trimEchoedStart(mine, remote, levels).text).toBe(mine.text)
   })
 })
 
 /**
- * Реплика микрофона нередко склеена из двух половин: сначала эхо собеседника,
- * следом собственная речь. На настоящей записи такая реплика дала среднее
- * отношение 0.52 и была отброшена целиком — вместе со словами «я не знаю, что
- * он означает», сказанными при полной тишине в динамиках.
+ * A microphone utterance is often glued from two halves: first the other
+ * side's echo, then speech of your own. On a real recording such an utterance
+ * gave an average ratio of 0.52 and was discarded whole, along with the words
+ * "I don't know what it means", spoken in complete silence from the speakers.
  */
 describe('своя речь внутри реплики с эхом', () => {
   const word = (text: string, start: number): Word => ({ text, start, end: start + 0.4 })
@@ -152,7 +153,7 @@ describe('своя речь внутри реплики с эхом', () => {
     provisional: false
   })
 
-  // До 110 с говорит собеседник, после — тишина в динамиках и речь человека.
+  // Up to 110 s the other side speaks; after that the speakers are silent and the person talks.
   const levels = {
     mic: () => 0.02,
     system: (from: number) => (from < 109.5 ? 0.1 : 0)

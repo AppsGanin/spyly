@@ -11,21 +11,22 @@ interface ModelSpec {
   name: string
   purpose: ModelInfo['purpose']
   url: string
-  /** Имя файла на диске; для архивов — папка после распаковки. */
+  /** The file name on disk; for archives, the folder after extraction. */
   file: string
   sizeBytes: number
   archive?: 'tar.bz2'
-  /** Как вариант называется для человека: он выбирает качество, а не файл. */
+  /** What the variant is called for a person: they choose quality, not a file. */
   tier?: string
-  /** Чем этот вариант отличается на практике. */
+  /** What this variant does differently in practice. */
   tradeoff?: string
-  /** Разумный выбор по умолчанию для своего движка. */
+  /** A sensible default for its engine. */
   recommended?: boolean
 }
 
 /**
- * Модели не вшиты в бандл: large-v3-turbo один весит полгигабайта, а
- * большинству пользователей хватит меньшей. Качаются по требованию.
+ * Models are not baked into the bundle: large-v3-turbo alone weighs half a
+ * gigabyte, and a smaller one is enough for most people. They are downloaded
+ * on demand.
  */
 export const MODELS: ModelSpec[] = [
   {
@@ -178,7 +179,7 @@ export async function listModels(): Promise<ModelInfo[]> {
 interface Download {
   progress: number
   controller: AbortController
-  /** Пауза оставляет докачку на диске, отмена — стирает. */
+  /** Pausing leaves the partial download on disk, cancelling erases it. */
   intent: 'run' | 'pause' | 'cancel'
 }
 
@@ -189,7 +190,7 @@ export function downloadState(id: string): { progress: number; paused: boolean }
   return active ? { progress: active.progress, paused: false } : null
 }
 
-/** Есть ли недокачанный кусок — по нему видно, что загрузку можно продолжить. */
+/** Whether there is a partial download, which shows the download can be resumed. */
 export function partialBytes(id: string): number {
   const spec = MODELS.find((m) => m.id === id)
   if (!spec) return 0
@@ -216,11 +217,11 @@ function report(spec: ModelSpec, progress: number, downloaded: boolean): void {
 }
 
 /**
- * Скачивание с возможностью продолжить.
+ * A download that can be resumed.
  *
- * Модели большие, и на плохой связи важно не начинать заново: недокачанное
- * лежит рядом в `.part`, и следующая попытка просит у сервера остаток через
- * заголовок Range.
+ * The models are large, and on a poor connection it matters not to start over:
+ * what was downloaded sits alongside in `.part`, and the next attempt asks the
+ * server for the remainder through a Range header.
  */
 export async function downloadModel(id: string): Promise<void> {
   const spec = MODELS.find((m) => m.id === id)
@@ -241,8 +242,8 @@ export async function downloadModel(id: string): Promise<void> {
       headers: already > 0 ? { range: `bytes=${already}-` } : {}
     })
 
-    // 206 — сервер отдал остаток; 200 на запрос с Range означает, что докачку
-    // он не поддерживает и прислал файл целиком: начинаем заново.
+    // 206 means the server handed over the remainder; 200 to a Range request means
+    // it does not support resuming and sent the whole file: we start over.
     const resuming = already > 0 && response.status === 206
     if (!response.ok || !response.body) throw new Error(t('сервер ответил {response_status}', { response_status: response.status }))
 
@@ -284,7 +285,7 @@ export async function downloadModel(id: string): Promise<void> {
       await rm(tmp, { force: true })
       report(spec, 0, false)
     } else if (intent === 'pause') {
-      // Докачку оставляем на диске: она пригодится при возобновлении.
+      // The partial download stays on disk: it will be useful when resuming.
       report(spec, 0, false)
     } else {
       await rm(tmp, { force: true })
@@ -297,7 +298,7 @@ export async function downloadModel(id: string): Promise<void> {
   }
 }
 
-/** Остановить загрузку, сохранив уже скачанное. */
+/** Stop the download, keeping what has been downloaded. */
 export function pauseDownload(id: string): void {
   const active = inFlight.get(id)
   if (!active) return
@@ -305,7 +306,7 @@ export function pauseDownload(id: string): void {
   active.controller.abort()
 }
 
-/** Остановить загрузку и стереть недокачанное. */
+/** Stop the download and erase the partial file. */
 export async function cancelDownload(id: string): Promise<void> {
   const active = inFlight.get(id)
   if (active) {
@@ -313,7 +314,7 @@ export async function cancelDownload(id: string): Promise<void> {
     active.controller.abort()
     return
   }
-  // Загрузка уже не идёт — убираем оставшийся кусок.
+  // The download is no longer running, so the leftover piece goes.
   const spec = MODELS.find((m) => m.id === id)
   if (!spec) return
   await rm(path.join(modelsDir(), `${spec.file}.part`), { force: true })
@@ -326,7 +327,7 @@ export async function removeModel(id: string): Promise<void> {
   if (p && existsSync(p)) await rm(p, { recursive: true, force: true })
 }
 
-/** tar есть в macOS и в большинстве дистрибутивов; отдельная зависимость не нужна. */
+/** tar ships with macOS and most distributions; no separate dependency needed. */
 async function extractTarBz2(archive: string, dest: string): Promise<void> {
   const { spawn } = await import('node:child_process')
   await new Promise<void>((resolve, reject) => {
@@ -336,7 +337,7 @@ async function extractTarBz2(archive: string, dest: string): Promise<void> {
   })
 }
 
-/** Модели распознавания, от быстрой к точной. */
+/** Recognition models, from the fast one to the accurate one. */
 export function asrModels(): string[] {
   return [
     'whisper-large-v3-turbo',
@@ -349,7 +350,7 @@ export function asrModels(): string[] {
   ]
 }
 
-/** Ничего не расшифруется, пока не скачано минимально необходимое. */
+/** Nothing will be transcribed until the bare minimum has been downloaded. */
 export function missingRequiredModels(asrModelId: string): ModelSpec[] {
   return MODELS.filter(
     (m) => (m.id === asrModelId || m.purpose === 'diarization' || m.purpose === 'embedding' || m.purpose === 'vad') && !isDownloaded(m.id)

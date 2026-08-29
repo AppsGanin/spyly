@@ -1,14 +1,15 @@
 import type { Meeting, MeetingMeta } from './types.js'
 
 /**
- * Поиск родственных записей.
+ * Finding related recordings.
  *
- * Один разговор редко живёт сам по себе: тема тянется через несколько встреч,
- * и, открыв запись, полезно сразу видеть, где об этом же говорили раньше.
- * Считаем близость по двум признакам — общие участники и общие редкие слова.
+ * One conversation rarely stands alone: a subject runs through several
+ * meetings, and on opening a recording it helps to see straight away where the
+ * same thing was discussed before. Closeness is computed from two signs: shared
+ * participants and shared rare words.
  */
 
-/** Слова, которые есть в любом разговоре и потому ничего не различают. */
+/** Words that occur in any conversation and therefore distinguish nothing. */
 const STOP = new Set([
   'это', 'что', 'как', 'так', 'вот', 'там', 'тут', 'если', 'или', 'для', 'над', 'под', 'при',
   'она', 'они', 'оно', 'его', 'ему', 'нас', 'вам', 'нам', 'мне', 'меня', 'тебя', 'себя',
@@ -22,21 +23,22 @@ function terms(text: string): string[] {
 }
 
 /**
- * Грубая основа слова — первые шесть букв.
+ * A crude word stem: the first six letters.
  *
- * Настоящая лемматизация тянула бы за собой словарь на десятки мегабайт, а для
- * сравнения тем достаточно обрубка: «биллинг», «биллинга» и «биллингу» дают
- * одно и то же, а разные слова совпадают первыми шестью буквами редко.
+ * Real lemmatisation would drag in a dictionary tens of megabytes long, while a
+ * stump is enough for comparing subjects: the inflected forms of "billing" all
+ * give the same thing, and different words rarely agree on their first six
+ * letters.
  */
 export function stem(word: string): string {
   return word.length > 6 ? word.slice(0, 6) : word
 }
 
 /**
- * Характерные слова записи: основа → как слово прозвучало.
+ * The characteristic words of a recording: stem to the word as it was spoken.
  *
- * Пример нужен, чтобы показать человеку «совпало: биллинг, миграция», а не
- * обрубки вида «биллин».
+ * The example is needed so a person is shown "matched: billing, migration"
+ * rather than stumps like "billin".
  */
 export function meetingTerms(meeting: Meeting, limit = 60): Map<string, string> {
   const counts = new Map<string, number>()
@@ -45,15 +47,15 @@ export function meetingTerms(meeting: Meeting, limit = 60): Map<string, string> 
     for (const word of terms(utterance.text)) {
       const key = stem(word)
       counts.set(key, (counts.get(key) ?? 0) + 1)
-      // Показываем самую короткую форму: обычно она и есть словарная.
+      // The shortest form is shown: it is usually the dictionary one.
       const known = examples.get(key)
       if (!known || word.length < known.length) examples.set(key, word)
     }
   }
 
-  // Слово, прозвучавшее один раз, чаще всего просто ослышка распознавателя.
-  // Но на коротком разговоре не повторяется почти ничего, и отбрасывать
-  // одиночные значило бы остаться вовсе без слов.
+  // A word spoken once is most often just a recogniser mishearing. But in a short
+  // conversation almost nothing repeats, and discarding the singletons would
+  // leave us with no words at all.
   let meaningful = [...counts.entries()].filter(([, count]) => count > 1)
   if (meaningful.length < 8) meaningful = [...counts.entries()]
 
@@ -81,18 +83,18 @@ function overlap(a: Iterable<string>, b: { has(key: string): boolean }, sizeA: n
 
 export interface Related {
   meeting: MeetingMeta
-  /** 0..1 — насколько записи похожи. */
+  /** 0..1, how similar the recordings are. */
   score: number
-  /** Что именно совпало: показываем человеку, а не голое число. */
+  /** What exactly matched: shown to a person rather than a bare number. */
   sharedTerms: string[]
   sharedPeople: string[]
 }
 
 /**
- * Записи, похожие на эту.
+ * Recordings similar to this one.
  *
- * Порог намеренно высокий: ложная связь «это продолжение вчерашнего» хуже,
- * чем её отсутствие — она уводит не туда.
+ * The threshold is deliberately high: a false link saying "this continues
+ * yesterday's" is worse than none, as it leads the wrong way.
  */
 export function relatedMeetings(
   meeting: Meeting,
@@ -101,8 +103,8 @@ export function relatedMeetings(
     limit?: number
     minScore?: number
     /**
-     * Откуда брать слова записи. Разбор расшифровки — самая дорогая часть, и
-     * вызывающий обычно уже держит её в кэше.
+     * Where to take a recording's words from. Parsing the transcript is the most
+     * expensive part, and the caller usually holds it in a cache already.
      */
     termsOf?: (meeting: Meeting) => Map<string, string>
   } = {}
@@ -120,8 +122,8 @@ export function relatedMeetings(
     const shared = [...myTerms.entries()].filter(([key]) => theirTerms.has(key)).map(([, word]) => word)
     const people = [...myNames].filter((n) => theirNames.has(n))
 
-    // Слова весят больше людей: одни и те же коллеги встречаются во всех
-    // разговорах, а общая терминология — признак общей темы.
+    // Words weigh more than people: the same colleagues turn up in every
+    // conversation, while shared terminology is a sign of a shared subject.
     const score =
       overlap(myTerms.keys(), theirTerms, myTerms.size, theirTerms.size) * 0.75 +
       overlap(myNames, theirNames, myNames.size, theirNames.size) * 0.25

@@ -130,8 +130,9 @@ export function Spinner() {
 }
 
 /**
- * Диалог на нативном <dialog>: он сам даёт фокус-ловушку, закрытие по Escape
- * и затемнение через ::backdrop — своя реализация была бы хуже.
+ * A dialog on the native <dialog>: it provides the focus trap, closing on
+ * Escape and the dimming through ::backdrop by itself, and our own
+ * implementation would be worse.
  */
 export function Modal({
   open,
@@ -167,11 +168,11 @@ export function Modal({
 }
 
 /**
- * Меню действий у элемента списка.
+ * The action menu on a list item.
  *
- * Держим действия под одной кнопкой, а не выкладываем рядом: у каждой реплики
- * их четыре, и вынесенные наружу они превратили бы расшифровку в панель
- * инструментов.
+ * The actions are kept under one button rather than laid out alongside: every
+ * utterance has four of them, and out in the open they would turn the
+ * transcript into a toolbar.
  */
 export function Menu({
   trigger,
@@ -188,11 +189,11 @@ export function Menu({
   const open = at !== null
 
   /**
-   * Меню рисуется поверх окна, а не внутри своего места.
+   * The menu is drawn over the window rather than inside its own place.
    *
-   * Кнопка нередко стоит в прокручиваемом списке, и вложенный список пунктов
-   * обрезался бы его краем. Поэтому список выносится в конец страницы, а место
-   * ему считается по кнопке — и у нижнего края он разворачивается вверх.
+   * The button often sits in a scrolling list, and a nested list of items would
+   * be clipped by its edge. So the list is moved to the end of the page and its
+   * place is computed from the button, opening upwards near the bottom edge.
    */
   const place = (): void => {
     const button = root.current?.getBoundingClientRect()
@@ -215,9 +216,9 @@ export function Menu({
     const escape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setAt(null)
     }
-    // Список висит на своих координатах, поэтому при прокрутке или изменении
-    // размера окна место считается заново. Закрывать его на любую прокрутку
-    // нельзя: прокрутиться может и соседняя часть окна, к меню не относящаяся.
+    // The list hangs at its own coordinates, so on a scroll or a window resize the
+    // place is recomputed. Closing it on any scroll will not do: a neighbouring
+    // part of the window, nothing to do with the menu, can scroll as well.
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', escape)
     window.addEventListener('resize', place)
@@ -230,8 +231,8 @@ export function Menu({
     }
   }, [open])
 
-  // Высота списка известна только после отрисовки: первый проход ставит его по
-  // кнопке, второй — уточняет, хватает ли места снизу.
+  // The height of the list is only known after rendering: the first pass places
+  // it against the button, the second works out whether there is room below.
   useLayoutEffect(() => {
     if (!open || at.flip || !list.current) return
     const height = list.current.offsetHeight
@@ -296,9 +297,9 @@ export function EmptyState({
   )
 }
 
-/** Полоска уровня из столбиков — читается лучше, чем одна линия. */
+/** A level meter made of bars: it reads better than a single line. */
 export function LevelMeter({ level, bars = 12 }: { level: number; bars?: number }) {
-  // Логарифмическая шкала: линейная почти всё время выглядит как ноль.
+  // A logarithmic scale: a linear one looks like zero almost all of the time.
   const normalized = Math.min(1, Math.max(0, Math.log10(1 + level * 60) / Math.log10(61)))
   const lit = Math.round(normalized * bars)
   return (

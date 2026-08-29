@@ -3,11 +3,11 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Button } from '../ui'
 
 /**
- * Граница ошибок интерфейса.
+ * The interface error boundary.
  *
- * Без неё любая ошибка при отрисовке оставляет пользователя перед пустым
- * чёрным окном — при этом запись продолжает идти в главном процессе, и человек
- * об этом не узнает. Здесь хотя бы видно, что случилось, и можно вернуться.
+ * Without it any rendering error leaves the user in front of an empty black
+ * window, while the recording carries on in the main process and they never
+ * find out. Here at least what happened is visible, and there is a way back.
  */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   override state: { error: Error | null } = { error: null }
@@ -17,7 +17,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Уходит в лог главного процесса — иначе следов не останется вовсе.
+    // Goes into the main process log, or there would be no trace at all.
     console.error(t('Сбой интерфейса:'), error, info.componentStack)
   }
 

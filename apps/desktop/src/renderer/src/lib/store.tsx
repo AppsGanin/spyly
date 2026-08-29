@@ -33,10 +33,10 @@ interface Store {
   toasts: Toast[]
   notify: (kind: Toast['kind'], text: string) => void
   dismissToast: (id: number) => void
-  /** Прогресс обработки по встречам — показывается прямо в списке. */
+  /** Processing progress per meeting, shown right in the list. */
   progress: Record<string, StageProgress>
   levels: { mic: number; system: number }
-  /** Черновые реплики текущей записи: показываются, пока идёт запись. */
+  /** Draft utterances of the current recording: shown while it runs. */
   live: LiveUtterance[]
 }
 
@@ -75,17 +75,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /**
-   * Отказ, который никто не поймал.
+   * A rejection nobody caught.
    *
-   * Действий в интерфейсе десятки, и оборачивать каждое в try/catch — верный
-   * способ однажды забыть. Здесь ловим всё разом: молчаливо не сработавшая
-   * кнопка хуже, чем сообщение об ошибке.
+   * There are dozens of actions in the interface, and wrapping each of them in
+   * try/catch is a sure way to forget one day. Here everything is caught at once:
+   * a button that silently did nothing is worse than an error message.
    */
   useEffect(() => {
     const onRejection = (event: PromiseRejectionEvent) => {
       const reason: unknown = event.reason
       const text = reason instanceof Error ? reason.message : String(reason)
-      // Отменённые запросы — не ошибка: так гасятся устаревшие загрузки.
+      // Aborted requests are not an error: that is how stale loads are cancelled.
       if (/abort|cancell?ed/i.test(text)) return
       event.preventDefault()
       notify('error', text.replace(/^Error invoking remote method '[^']+':\s*/, ''))
@@ -107,8 +107,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void (async () => {
       const [loadedSettings, state] = await Promise.all([api.call('settings:get'), api.call('rec:state')])
-      // Язык применяется при следующей отрисовке окна, поэтому если кэш отстал
-      // от настроек — обновляем его и перезагружаемся один раз.
+      // The language takes effect on the window's next render, so if the cache has
+      // fallen behind the settings we update it and reload once.
       try {
         if (localStorage.getItem('spyly.lang') !== loadedSettings.uiLang) {
           localStorage.setItem('spyly.lang', loadedSettings.uiLang)
@@ -116,7 +116,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           return
         }
       } catch {
-        // Приватный режим — язык останется тем, что уже применён.
+        // Private mode: the language will stay as already applied.
       }
       setSettings(loadedSettings)
       setRecording(state)
@@ -126,19 +126,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useIpcEvent('rec:state', (next) => {
     setRecording((prev) => {
-      // Новая запись — старые черновики к ней отношения не имеют.
+      // A new recording: old drafts have nothing to do with it.
       if (next.meetingId !== prev.meetingId) setLive([])
       return next
     })
   })
   useIpcEvent('live:utterance', (utterance) => {
     setLive((prev) => {
-      // Пустой текст — просьба убрать реплику: её окончание оказалось эхом
-      // или выдумкой, и на экране ей больше не место.
+      // Empty text is a request to remove an utterance: its ending turned out to be
+      // echo or invention, and it no longer belongs on screen.
       if (!utterance.text) return prev.filter((u) => u.id !== utterance.id)
 
-      // Потоковая модель присылает растущую фразу много раз под одним `id`:
-      // это не новая реплика, а уточнение уже показанной.
+      // The streaming model sends a growing phrase many times under one `id`: this is
+      // not a new utterance but a refinement of one already shown.
       const known = prev.findIndex((u) => u.id === utterance.id)
       if (known !== -1) {
         const next = [...prev]
@@ -146,10 +146,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return next
       }
 
-      // Без наушников микрофон слышит собеседника из колонок, и одна фраза
-      // приходит дважды — с обеих дорожек. Дорожка собеседников чище, поэтому
-      // при совпадении оставляем её. Сверяем только договорённые: у растущей
-      // фразы текст ещё меняется, и совпадение здесь ничего не значит.
+      // Without headphones the microphone hears the other side through the speakers,
+      // and one phrase arrives twice, from both tracks. The other side's track is
+      // cleaner, so on a match that is the one kept. Only finished phrases are
+      // compared: a growing one is still changing, and a match there means nothing.
       if (utterance.final) {
         const near = prev.filter(
           (u) => u.final && u.track !== utterance.track && Math.abs(u.start - utterance.start) < 4

@@ -8,12 +8,13 @@ import { app } from 'electron'
 import type { AudioApp, AudioDevice } from '../../shared/ipc.js'
 
 /**
- * Обёртка над нативным хелпером захвата звука.
+ * Wrapper around the native audio capture helper.
  *
- * На macOS путь через Chromium (`getDisplayMedia` + `audio: 'loopback'`) не
- * работает: аудиотрек приходит уже завершённым, а внутренняя проба разрешений
- * CoreAudio-тапа падает молча. Поэтому и системный звук, и микрофон берёт
- * отдельный бинарник, который отдаёт сырой PCM в stdout, а статус — в stderr.
+ * On macOS the Chromium path (`getDisplayMedia` + `audio: 'loopback'`) does
+ * not work: the audio track arrives already ended, and the internal CoreAudio
+ * tap permission probe fails silently. So both the system audio and the
+ * microphone are taken by a separate binary that writes raw PCM to stdout and
+ * its status to stderr.
  */
 
 export const SAMPLE_RATE = 16000
@@ -82,7 +83,7 @@ export async function listMics(): Promise<AudioDevice[]> {
   }
 }
 
-/** Занят ли микрофон другим приложением — признак идущего созвона. */
+/** Whether another application holds the microphone, a sign of a call in progress. */
 export async function micStatus(): Promise<{ busy: boolean; apps: string[] }> {
   if (!isSupported()) return { busy: false, apps: [] }
   const { stdout } = await runOnce(['mic-status'], 3000)
@@ -95,10 +96,10 @@ export async function micStatus(): Promise<{ busy: boolean; apps: string[] }> {
 }
 
 export interface CaptureOptions {
-  /** `system` — звук приложений, `mic` — микрофон. */
+  /** `system` is application audio, `mic` is the microphone. */
   source: 'system' | 'mic'
   micDeviceId?: string
-  /** PID приложений; пусто — весь системный звук. */
+  /** Application PIDs; empty means all system audio. */
   includePids?: number[]
   excludePids?: number[]
 }
@@ -112,12 +113,12 @@ export interface CaptureEvents {
 }
 
 /**
- * Сколько наших захватов микрофона сейчас открыто.
+ * How many microphone captures of our own are currently open.
  *
- * Детектор созвонов замечает, что микрофон занят, и предлагает начать запись.
- * Но занимать его можем и мы сами — при записи слепка голоса или на проверке
- * звука, — и тогда приложение предлагало записать разговор в ответ на
- * собственные же действия.
+ * The call detector notices that the microphone is busy and offers to start
+ * recording. But we can be the ones holding it, while recording a voice print
+ * or during the sound check, and then the app was offering to record a
+ * conversation in response to its own actions.
  */
 let openMicCaptures = 0
 
@@ -125,7 +126,7 @@ export function appUsesMicrophone(): boolean {
   return openMicCaptures > 0
 }
 
-/** Живой поток PCM из хелпера. */
+/** A live PCM stream from the helper. */
 export class NativeCapture extends EventEmitter {
   private child: ChildProcessByStdio<null, Readable, Readable> | null = null
   private tail: Buffer = Buffer.alloc(0)
@@ -161,7 +162,7 @@ export class NativeCapture extends EventEmitter {
     })
   }
 
-  /** PCM приходит произвольными кусками; собираем по 4 байта на сэмпл. */
+  /** PCM arrives in arbitrary chunks; assemble it 4 bytes per sample. */
   private onAudio(chunk: Buffer): void {
     const buf = this.tail.length ? Buffer.concat([this.tail, chunk]) : chunk
     const usable = buf.length - (buf.length % 4)
@@ -188,7 +189,7 @@ export class NativeCapture extends EventEmitter {
           this.emit('error', msg.message ?? t('неизвестная ошибка захвата'))
         }
       } catch {
-        // Не-JSON в stderr — например сообщение системного логгера; игнорируем.
+        // Non-JSON on stderr, a message from the system logger for instance; ignored.
       }
     }
   }
@@ -199,8 +200,8 @@ export class NativeCapture extends EventEmitter {
     const child = this.child
     if (!child) return
     child.kill('SIGTERM')
-    // Хелпер сам сносит приватный агрегат; если завис — добиваем, иначе
-    // устройство останется висеть в системе.
+    // The helper removes the private aggregate itself; if it hangs we finish it
+    // off, otherwise the device stays behind in the system.
     setTimeout(() => {
       if (this.child === child) child.kill('SIGKILL')
     }, 1500).unref?.()

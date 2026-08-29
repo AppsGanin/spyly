@@ -5,11 +5,12 @@ import path from 'node:path'
 import { app } from 'electron'
 
 /**
- * События календаря вокруг текущего момента.
+ * Calendar events around the current moment.
  *
- * Читает их нативный хелпер: у Electron доступа к EventKit нет. Календарь
- * нужен ровно для одного — чтобы запись сразу называлась «Созвон по биллингу»,
- * а не «Запись 27 августа», и участники были известны до диаризации.
+ * They are read by the native helper: Electron has no access to EventKit. The
+ * calendar is there for exactly one thing, so that a recording is called
+ * "Billing call" straight away rather than "Recording, 27 August", and the
+ * participants are known before diarization.
  */
 
 export interface CalendarEvent {
@@ -62,7 +63,7 @@ export async function calendarGranted(): Promise<boolean> {
   return code === 0
 }
 
-/** Запрос разрешения показывает системный диалог — ждём ответа дольше обычного. */
+/** Asking for access shows a system dialog, so wait longer than usual for an answer. */
 export async function requestCalendarAccess(): Promise<boolean> {
   const { code } = await run(['calendar-request'], {}, 70_000)
   return code === 0
@@ -81,10 +82,10 @@ export async function currentEvents(backMinutes = 20, forwardMinutes = 10): Prom
 }
 
 /**
- * Событие, к которому вероятнее всего относится начинающаяся запись.
+ * The event a starting recording most likely belongs to.
  *
- * Идущее сейчас важнее ближайшего будущего: если встреча уже началась,
- * записывают именно её.
+ * One happening now beats the nearest one ahead: if a meeting has already
+ * begun, that is the one being recorded.
  */
 export async function likelyEvent(): Promise<CalendarEvent | null> {
   const events = await currentEvents()

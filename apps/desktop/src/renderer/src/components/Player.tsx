@@ -12,17 +12,17 @@ const TRACK_LABELS: Record<PlayerTrack, string> = {
 }
 
 /**
- * Плеер записи с выбором дорожки.
+ * The recording player with a track selector.
  *
- * Дорожки хранятся раздельно, и это важно: если собеседника не было слышно,
- * на его дорожке тишина — без переключателя это выглядело бы как сломанный
- * плеер. «Всё» сводит обе дорожки в одну.
+ * The tracks are stored separately, and that matters: if the other side could
+ * not be heard, their track is silence, and without a selector that would look
+ * like a broken player. "All" mixes both tracks into one.
  */
 /**
- * Плеер записи: дорожка, скорость, перемотка.
+ * The recording player: track, speed, seeking.
  *
- * Управление с клавиатуры вынесено сюда же — пробел и стрелки должны работать
- * из любого места расшифровки, а не только когда фокус на кнопке.
+ * Keyboard control lives here as well: space and the arrows have to work from
+ * anywhere in the transcript, not only when a button has focus.
  */
 export function Player({
   meetingId,
@@ -35,7 +35,7 @@ export function Player({
   available: PlayerTrack[]
   seekTo: { at: number; n: number } | null
   onTime: (seconds: number) => void
-  /** Расшифровка едет за звуком только пока он играет. */
+  /** The transcript follows the audio only while it is playing. */
   onPlayingChange?: (playing: boolean) => void
 }) {
   const [track, setTrack] = useState<PlayerTrack>(available[0] ?? 'mix')
@@ -44,7 +44,7 @@ export function Player({
   const [playing, setPlaying] = useState(false)
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(0)
-  // Час разговора в реальном времени никто переслушивать не станет.
+  // Nobody is going to listen back to an hour of conversation in real time.
   const [speed, setSpeed] = useState(() => {
     try {
       return Number(localStorage.getItem('spyly.player.speed')) || 1
@@ -58,12 +58,13 @@ export function Player({
     try {
       localStorage.setItem('spyly.player.speed', String(speed))
     } catch {
-      // Приватный режим — скорость просто не переживёт перезапуск.
+      // Private mode: the speed simply will not survive a restart.
     }
   }, [speed, track])
 
-  // Номер последней исполненной просьбы. На первом отрисовывании просьбу не
-  // исполняем, а лишь запоминаем: иначе возврат на вкладку сам включал бы звук.
+  // The number of the last request carried out. On the first render the request
+  // is not carried out but only remembered: otherwise coming back to the tab
+  // would switch the audio on by itself.
   const seekDone = useRef<number | null>(null)
   useEffect(() => {
     if (!seekTo) return
@@ -79,9 +80,9 @@ export function Player({
     void audio.play().catch(() => setPlaying(false))
   }, [seekTo])
 
-  // При смене дорожки продолжаем с того же места, а не с начала.
-  // Позиция восстанавливается после загрузки метаданных новой дорожки:
-  // до этого момента currentTime присвоить нельзя, он сбрасывается.
+  // Switching tracks carries on from the same place rather than from the start.
+  // The position is restored once the new track's metadata has loaded: before
+  // that currentTime cannot be assigned, it gets reset.
   const [restore, setRestore] = useState<{ at: number; play: boolean } | null>(null)
 
   const switchTrack = (next: PlayerTrack) => {
@@ -90,8 +91,8 @@ export function Player({
     setTrack(next)
   }
 
-  // Пробел и стрелки — как в любом плеере: иначе переслушивание превращается
-  // в возню с мышью.
+  // Space and the arrows, as in any player: otherwise listening back turns into
+  // fiddling with the mouse.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null

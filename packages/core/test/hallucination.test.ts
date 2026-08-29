@@ -37,7 +37,7 @@ describe('isLikelyHallucination', () => {
   })
 })
 
-// Курируемый словарь: подписи ищутся подстрокой, концовки — только целиком.
+// A curated dictionary: credits are looked for as substrings, sign-offs only whole.
 describe('словарь выдумок', () => {
   it('ловит подписи авторов субтитров где угодно в строке', () => {
     for (const text of [
@@ -54,13 +54,13 @@ describe('словарь выдумок', () => {
   it('концовки роликов режет только целиком', () => {
     expect(isLikelyHallucination('Спасибо за просмотр')).toBe(true)
     expect(isLikelyHallucination('Thank you')).toBe(true)
-    // Та же фраза внутри живой реплики — настоящая речь, её трогать нельзя.
+    // The same phrase inside a live utterance is real speech and must not be touched.
     expect(isLikelyHallucination('Спасибо за просмотр этой страницы, я всё понял')).toBe(false)
     expect(isLikelyHallucination('Thank you for sending the file, I got it')).toBe(false)
   })
 
   it('слово «корректор» в живой речи не считает подписью', () => {
-    // В списке оно есть как подпись, но подстрокой ловить нельзя.
+    // It is in the list as a credit, but catching it as a substring will not do.
     expect(isLikelyHallucination('нам нужен корректор в команду')).toBe(false)
     expect(isLikelyHallucination('Корректор А.Егорова')).toBe(true)
   })
@@ -77,9 +77,9 @@ describe('словарь выдумок', () => {
 })
 
 /**
- * Подпись субтитров липнет к краю реплики. Раньше она утаскивала за собой всю
- * живую речь: на настоящей записи «Субтитры делал DimaTorzok» унесла тридцать
- * семь секунд разговора.
+ * Subtitle credits stick to the edge of an utterance. They used to drag all the
+ * live speech away with them: on a real recording "Subtitles by DimaTorzok"
+ * carried off thirty-seven seconds of conversation.
  */
 describe('вырезание подписи из реплики', () => {
   it('убирает подпись, оставляя речь', () => {

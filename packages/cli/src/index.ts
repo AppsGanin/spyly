@@ -124,8 +124,8 @@ async function main(): Promise<void> {
     }
 
     case 'mcp': {
-      // Сервер живёт отдельным модулем; поднимаем его как дочерний процесс,
-      // чтобы stdio достался ему целиком и без примесей.
+      // The server lives in a module of its own; it is started as a child process so
+      // that stdio goes to it whole and unmixed.
       const dirname = path.dirname(fileURLToPath(import.meta.url))
       const serverPath = path.resolve(dirname, '../../mcp-server/dist/index.js')
       const child = spawn(process.execPath, [serverPath], { stdio: 'inherit' })

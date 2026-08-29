@@ -1,9 +1,9 @@
 import { lang, t } from './i18n.js'
 import type { Meeting, Speaker, Utterance } from './types.js'
 
-/** мм:сс или ч:мм:сс — моноширинный таймкод для транскрипта. */
+/** mm:ss or h:mm:ss, a monospaced timestamp for the transcript. */
 export function timecode(seconds: number): string {
-  // Длительность из <audio> приходит Infinity, пока метаданные не загрузились.
+  // The duration from <audio> comes through as Infinity until the metadata has loaded.
   if (!Number.isFinite(seconds)) return '0:00'
   const s = Math.max(0, Math.floor(seconds))
   const h = Math.floor(s / 3600)
@@ -13,7 +13,7 @@ export function timecode(seconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`
 }
 
-/** «1 ч 24 мин» — для карточек и списков. */
+/** "1 h 24 min", for cards and lists. */
 export function humanDuration(seconds: number): string {
   const en = lang() === 'en'
   const sec = en ? 's' : 'сек'
@@ -30,7 +30,7 @@ export function humanDuration(seconds: number): string {
   return rem === 0 ? `${h} ${hour}` : `${h} ${hour} ${rem} ${min}`
 }
 
-/** Отображаемое имя: заданное имя, «Вы» для владельца, иначе номер кластера. */
+/** The display name: the name given, "You" for the owner, otherwise the cluster number. */
 export function speakerLabel(speaker: Speaker | undefined, fallbackId: string): string {
   if (!speaker) return fallbackId
   if (speaker.name) return speaker.name
@@ -44,13 +44,13 @@ function speakerMap(meeting: Meeting): Map<string, Speaker> {
 }
 
 export interface MarkdownOptions {
-  /** Таймкоды перед репликами — агенту обычно не нужны, человеку нужны. */
+  /** Timestamps before utterances: an agent usually does not need them, a person does. */
   timecodes?: boolean
   includeSummary?: boolean
   includeHeader?: boolean
 }
 
-/** Транскрипт в markdown — то, что читает и человек, и кодинг-агент. */
+/** The transcript in markdown, read by people and coding agents alike. */
 export function renderTranscriptMarkdown(meeting: Meeting, opts: MarkdownOptions = {}): string {
   const { timecodes = true, includeSummary = true, includeHeader = true } = opts
   const speakers = speakerMap(meeting)
@@ -118,7 +118,7 @@ export function renderTranscriptMarkdown(meeting: Meeting, opts: MarkdownOptions
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n'
 }
 
-/** Только саммари — отдельным файлом. */
+/** The summary alone, as a separate file. */
 export function renderSummaryMarkdown(meeting: Meeting): string {
   if (!meeting.summary) return `# ${meeting.title}\n\n_Саммари ещё не сделано._\n`
   return renderTranscriptMarkdown(meeting, { includeSummary: true, timecodes: false })
@@ -126,7 +126,7 @@ export function renderSummaryMarkdown(meeting: Meeting): string {
     .trimEnd() + '\n'
 }
 
-/** Простой текст без разметки — для буфера обмена и пайпов. */
+/** Plain text with no markup, for the clipboard and for pipes. */
 export function renderPlainText(meeting: Meeting): string {
   const speakers = speakerMap(meeting)
   return meeting.utterances
@@ -135,10 +135,11 @@ export function renderPlainText(meeting: Meeting): string {
 }
 
 /**
- * Реплика, ближайшая к моменту времени.
+ * The utterance nearest to a moment in time.
  *
- * Отметку человек ставит по ходу разговора, обычно на секунду-другую позже
- * сказанного, поэтому точное попадание в границы реплики не гарантировано.
+ * A person places a mark as the conversation goes, usually a second or two
+ * after the thing was said, so landing exactly inside an utterance's bounds is
+ * not guaranteed.
  */
 function nearestUtterance(utterances: readonly Utterance[], seconds: number): Utterance | undefined {
   let best: Utterance | undefined

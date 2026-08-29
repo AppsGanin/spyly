@@ -7,18 +7,18 @@ import { useStore } from '../lib/store'
 import { Button, Meter, Modal, Select, Switch } from '../ui'
 
 /**
- * Выбор источников перед записью.
+ * Choosing the sources before recording.
  *
- * Уровни идут вживую ещё до старта: на macOS поток может быть формально живым,
- * но пустым, и без этой проверки пользователь узнал бы о тишине только после
- * созвона.
+ * The levels run live before the start: on macOS a stream can be formally
+ * alive yet empty, and without this check the user would learn about the
+ * silence only after the call.
  */
 /**
- * Микрофоны глазами Chromium.
+ * Microphones as Chromium sees them.
  *
- * Названия появляются только после того, как разрешение на микрофон уже
- * выдано; до этого приходят пустые метки, и вместо них показываем понятное
- * «Микрофон 1».
+ * The names only appear once microphone permission has been granted; before
+ * that the labels come through empty, and a readable "Microphone 1" is shown
+ * instead.
  */
 async function browserMics(): Promise<{ id: string; name: string }[]> {
   try {
@@ -74,19 +74,19 @@ export function StartDialog({
       const engine = providers.find((p) => p.kind === 'asr')
       setAsrReady(engine ? { ready: engine.ready, hint: engine.hint } : null)
 
-      // Календарь знает название встречи и участников — это лучше, чем
-      // «Запись 27 августа» и «Участник 2» в архиве.
+      // The calendar knows the meeting name and the participants, which beats
+      // "Recording, 27 August" and "Speaker 2" in the archive.
       const found = await api.call('calendar:current')
       if (!cancelled) setEvent(found)
 
-      // На Windows и Linux списка микрофонов у главного процесса нет —
-      // нативного хелпера там не существует. Спрашиваем у самого браузера.
+      // On Windows and Linux the main process has no list of microphones, as no
+      // native helper exists there. We ask the browser itself.
       setMics(deviceList.length > 0 ? deviceList : await browserMics())
       setApps(appList)
       setPermissions(perms)
       setMicDevice((current) => current || deviceList[0]?.id || '')
-      // Выключаем источник, на который нет разрешения: иначе запись стартует
-      // и молча пишет тишину.
+      // A source without permission is switched off: otherwise the recording starts
+      // and silently writes silence.
       if (perms.microphone === 'denied') setMicOn(false)
       if (perms.systemAudio === 'denied') setSystemOn(false)
     })()
@@ -95,8 +95,8 @@ export function StartDialog({
     }
   }, [open])
 
-  // Проба слушает звук, пока диалог открыт, и обязательно останавливается
-  // при закрытии — иначе микрофон останется занятым.
+  // The probe listens while the dialog is open and always stops on close,
+  // otherwise the microphone stays busy.
   useEffect(() => {
     if (!open) return
     void api.call('audio:startProbe', {

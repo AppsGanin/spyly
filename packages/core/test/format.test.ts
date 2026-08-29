@@ -22,8 +22,8 @@ function meeting(marks: { at: number; note?: string }[]): Meeting {
 
 describe('разметка отмеченных мест', () => {
   /**
-   * Отметку человек ставит на секунду-другую позже сказанного, поэтому точного
-   * попадания в границы реплики нет — берётся ближайшая.
+   * A person places a mark a second or two after the thing was said, so there is
+   * no exact landing inside an utterance's bounds: the nearest one is taken.
    */
   it('к отметке подставляется ближайшая реплика', () => {
     const text = renderTranscriptMarkdown(meeting([{ at: 6 }]))

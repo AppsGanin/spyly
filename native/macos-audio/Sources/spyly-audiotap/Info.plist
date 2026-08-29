@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Описание встраивается прямо в бинарник.
+  These descriptions are embedded into the binary itself.
 
-  Хелпер — не приложение, а отдельный исполняемый файл, и без своего Info.plist
-  система не показывает по нему запрос доступа: EventKit просто отвечает
-  отказом, не спросив человека. Тексты должны быть здесь, а не только в
-  Info.plist приложения.
+  The helper is not an application but a standalone executable, and without an
+  Info.plist of its own the system shows no access request for it: EventKit
+  simply answers with a refusal, without asking the person. The texts have to be
+  here, not only in the application's Info.plist.
 -->
 <plist version="1.0">
 <dict>

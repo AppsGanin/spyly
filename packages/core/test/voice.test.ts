@@ -3,9 +3,10 @@ import { identifySpeakers } from '../src/voice.js'
 import type { VoiceProfile } from '../src/types.js'
 
 /**
- * Свой голос на своей же дорожке узнаём мягче: спутать там не с кем, а не
- * узнать себя легко — на коротких репликах слепок шумный. На настоящей записи
- * собственный голос набирал 0.52 при общем пороге 0.62 и оставался «В комнате 1».
+ * Recognising your own voice on your own track is gentler: there is nobody to
+ * confuse you with, while failing to recognise yourself is easy, as the print
+ * is noisy on short utterances. On a real recording the owner's own voice
+ * scored 0.52 against the general threshold of 0.62 and stayed "In the room 1".
  */
 describe('узнавание по голосу', () => {
   const me: VoiceProfile = {
@@ -19,7 +20,7 @@ describe('узнавание по голосу', () => {
   }
   const other: VoiceProfile = { ...me, id: 'v2', name: 'Мария', isMe: false }
 
-  // Похожесть около 0.52 — как на настоящей записи.
+  // A closeness of about 0.52, as on a real recording.
   const weak = [0.52, 0.854, 0]
   const strong = [0.95, 0.312, 0]
 
@@ -34,7 +35,7 @@ describe('узнавание по голосу', () => {
   })
 
   it('чужое имя по слабому совпадению не подставляет', () => {
-    // Подписать чужую реплику именем коллеги хуже, чем оставить «Участник 1».
+    // Signing somebody else's utterance with a colleague's name is worse than leaving "Speaker 1".
     const found = identifySpeakers([{ speakerId: 'mic:0', embedding: weak, ownTrack: true }], [other])
     expect(found.size).toBe(0)
   })
@@ -45,8 +46,8 @@ describe('узнавание по голосу', () => {
   })
 
   it('чужой слепок не достаётся двум участникам', () => {
-    // Два похожих голоса в одном разговоре — разные люди, и одно имя на двоих
-    // было бы враньём. Своя речь — другое дело, это проверяется ниже.
+    // Two similar voices in one conversation are different people, and one name for
+    // both would be a lie. Your own speech is another matter, and that is checked below.
     const found = identifySpeakers(
       [
         { speakerId: 'system:0', embedding: strong, ownTrack: false },
@@ -60,10 +61,11 @@ describe('узнавание по голосу', () => {
 })
 
 /**
- * Свой голос на своей дорожке — исключение из правила «один слепок на один
- * кластер». На настоящей записи разделение разбило речь человека на два
- * кластера: первый набрал 0.692 и забрал слепок, второй с 0.502 остался
- * безымянным и появился в списке отдельным участником «В комнате 6».
+ * Your own voice on your own track is the exception to the "one print per
+ * cluster" rule. On a real recording separation broke the person's speech into
+ * two clusters: the first scored 0.692 and took the print, the second at 0.502
+ * stayed nameless and appeared in the list as a separate participant, "In the
+ * room 6".
  */
 describe('свой голос в нескольких кластерах', () => {
   const like = (score: number): number[] => [score, Math.sqrt(1 - score * score), 0, 0]

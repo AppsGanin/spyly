@@ -22,7 +22,7 @@ describe('разбиение живого текста на фразы', () => {
   })
 
   it('не режет по одному слову', () => {
-    // «Да.» отдельной строкой выглядит рвано — покажем вместе с продолжением.
+    // "Yes." on a line of its own looks ragged, so it is shown with what follows.
     expect(closedSentenceEnd('Да. Конечно')).toBeNull()
   })
 
@@ -43,9 +43,9 @@ describe('отступ уже показанного текста', () => {
   })
 
   /**
-   * Здесь была ошибка: отступ прибавлялся к разнице длин, которая его уже
-   * включала. Начало второй фразы съедалось — «Бывает, конечно. С выпу…»
-   * превращалось в «сками обычно так».
+   * There was a bug here: the offset was added to the difference in lengths,
+   * which already included it. The start of the second phrase was eaten:
+   * «Бывает, конечно. С выпу…» turned into «сками обычно так».
    */
   it('вторая фраза не съедает начало третьей', () => {
     const whole = 'Первое предложение. Второе предложение. Третье'
@@ -59,7 +59,7 @@ describe('отступ уже показанного текста', () => {
 
   it('отпускать нечего, пока предложение не закончено', () => {
     expect(releaseSentence('и вот тогда мы', 0)).toBeNull()
-    // Точка есть, но следующего слова ещё нет — предложение могло не кончиться.
+    // There is a full stop, but no next word yet, so the sentence may not have ended.
     expect(releaseSentence('Первое предложение.', 0)).toBeNull()
   })
 

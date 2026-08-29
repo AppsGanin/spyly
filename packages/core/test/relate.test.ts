@@ -37,8 +37,8 @@ function meeting(id: string, lines: string[], people: string[] = []): Meeting {
   })
 }
 
-// Каждое характерное слово должно прозвучать дважды: одиночные отбрасываются
-// как вероятная ослышка распознавателя.
+// Every characteristic word has to be spoken twice: singletons are discarded
+// as a likely mishearing by the recogniser.
 const billing = [
   'обсудили биллинг и тарификацию подписок',
   'биллинг надо переделать, тарификация подписок сломана',
@@ -96,7 +96,7 @@ describe('meetingTerms', () => {
   })
 
   it('на длинном разговоре одиночные слова отбрасывает', () => {
-    // Восемь повторяющихся слов — этого достаточно, чтобы не брать всё подряд.
+    // Eight repeated words, which is enough not to take everything indiscriminately.
     const lines = Array.from({ length: 4 }, () => 'релиз миграция биллинг тестирование деплой конфигурация мониторинг документация')
     const terms = meetingTerms(meeting('x', [...lines, 'кубернетес упал однажды']))
     expect([...terms.values()]).not.toContain('кубернетес')

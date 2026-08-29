@@ -1,21 +1,21 @@
 import type { Meeting, Utterance, Word } from './types.js'
 
 /**
- * Правка расшифровки: разделить, объединить, вырезать.
+ * Editing the transcript: split, join, cut out.
  *
- * Разделение по голосам ошибается предсказуемо: на перебивках две фразы
- * слипаются в одну, а одна длинная разваливается надвое. Чинить это должен
- * человек, и чинить быстро — поэтому операции живут здесь, отдельно от
- * интерфейса, и покрыты тестами.
+ * Voice separation goes wrong predictably: on interruptions two phrases stick
+ * together into one, and one long phrase falls apart into two. A person has to
+ * be the one to fix that, and to fix it quickly, so the operations live here,
+ * apart from the interface, and are covered by tests.
  */
 
-/** Момент внутри реплики по позиции символа — пропорционально длине текста. */
+/** A moment inside an utterance by character position, in proportion to the text length. */
 function timeAt(utterance: Utterance, charIndex: number): number {
   const { start, end, text, words } = utterance
 
-  // Если есть слова с таймкодами, берём начало первого слова, уходящего во
-  // вторую половину: линейная прикидка по символам врёт тем сильнее, чем
-  // длиннее реплика.
+  // When there are words with timestamps, we take the start of the first word
+  // that falls into the second half: a linear estimate by characters lies more
+  // the longer the utterance is.
   if (words.length > 0) {
     let at = 0
     for (const word of words) {
@@ -30,11 +30,11 @@ function timeAt(utterance: Utterance, charIndex: number): number {
 }
 
 /**
- * Свободный идентификатор на основе исходного.
+ * A free identifier based on the original.
  *
- * Простой суффикс не годится: разделив реплику дважды, мы получили бы два
- * одинаковых `u1b`, а дальше правка попадала бы не в ту реплику, и React
- * рисовал бы список с повторяющимися ключами.
+ * A plain suffix will not do: splitting an utterance twice would give two
+ * identical `u1b`, after which an edit would land on the wrong utterance and
+ * React would render the list with duplicate keys.
  */
 export function uniqueId(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base
@@ -45,10 +45,10 @@ export function uniqueId(base: string, taken: ReadonlySet<string>): string {
 }
 
 /**
- * Разделение реплики в указанном месте.
+ * Splitting an utterance at the given place.
  *
- * Возвращает null, если резать нечего: пустая половина хуже, чем отказ.
- * `taken` — идентификаторы, которые уже заняты в этой записи.
+ * Returns null when there is nothing to cut: an empty half is worse than a
+ * refusal. `taken` are the identifiers already in use in this recording.
  */
 export function splitUtterance(
   utterance: Utterance,
@@ -70,10 +70,10 @@ export function splitUtterance(
 }
 
 /**
- * Склейка двух соседних реплик.
+ * Joining two neighbouring utterances.
  *
- * Говорящий берётся у первой: объединяют обычно потому, что вторая половина
- * ошибочно приписана другому.
+ * The speaker is taken from the first: joining usually happens because the
+ * second half was attributed to somebody else by mistake.
  */
 export function mergeUtterances(first: Utterance, second: Utterance): Utterance {
   return {
@@ -86,10 +86,10 @@ export function mergeUtterances(first: Utterance, second: Utterance): Utterance 
 }
 
 /**
- * Реплики, попавшие в вырезаемый промежуток.
+ * The utterances that fall inside the stretch being cut out.
  *
- * Задевшие край удаляются целиком: обрезать фразу по секундам — значит
- * оставить в расшифровке половину слова.
+ * Ones that only touch the edge are removed whole: trimming a phrase by seconds
+ * means leaving half a word in the transcript.
  */
 export function utterancesInRange(meeting: Meeting, from: number, to: number): Utterance[] {
   const [a, b] = from <= to ? [from, to] : [to, from]
@@ -97,12 +97,13 @@ export function utterancesInRange(meeting: Meeting, from: number, to: number): U
 }
 
 /**
- * Порог сомнения для конкретной записи.
+ * The doubt threshold for a particular recording.
  *
- * Абсолютное число здесь не работает: на чистой записи модель уверена почти
- * везде, на шумной — нигде, и фиксированный порог либо не подчеркнёт ничего,
- * либо подчеркнёт весь текст. Берём нижние проценты этой записи — подсветка
- * всегда указывает на худшее из того, что есть, и остаётся редкой.
+ * An absolute number does not work here: on a clean recording the model is
+ * confident almost everywhere, on a noisy one nowhere, and a fixed threshold
+ * either underlines nothing or underlines the whole text. We take the bottom
+ * few per cent of this recording, so the highlighting always points at the
+ * worst of what is there and stays rare.
  */
 export function doubtThreshold(meeting: Pick<Meeting, 'utterances'>): number {
   const values: number[] = []
@@ -115,12 +116,12 @@ export function doubtThreshold(meeting: Pick<Meeting, 'utterances'>): number {
 
   values.sort((a, b) => a - b)
   const at = values[Math.floor(values.length * 0.05)] ?? 0.6
-  // Ниже 0.5 сомнение и так очевидно, выше 0.9 подчёркивать бессмысленно:
-  // там модель уверена, и ошибки другого рода.
+  // Below 0.5 the doubt is obvious anyway, above 0.9 underlining is pointless:
+  // the model is confident there, and the mistakes are of another kind.
   return Math.min(0.9, Math.max(0.5, at))
 }
 
-/** Слова, в которых модель сомневалась. */
+/** The words the model was unsure about. */
 export function doubtfulWords(utterance: Utterance, threshold = 0.6): Set<number> {
   const out = new Set<number>()
   utterance.words.forEach((word, index) => {
@@ -130,11 +131,11 @@ export function doubtfulWords(utterance: Utterance, threshold = 0.6): Set<number
 }
 
 /**
- * Насколько модель была уверена в реплике целиком.
+ * How confident the model was about a whole utterance.
  *
- * Нужна, чтобы показать список сомнительных мест, не перебирая слова в
- * интерфейсе. Возвращает null, когда уверенности нет вовсе — у черновиков
- * live-режима и у правленого руками текста.
+ * Needed to show a list of doubtful places without walking the words in the
+ * interface. Returns null when there is no confidence at all, which is the case
+ * for live-mode drafts and for text edited by hand.
  */
 export function utteranceConfidence(utterance: Utterance): number | null {
   const values = utterance.words.map((w) => w.confidence).filter((v): v is number => typeof v === 'number')

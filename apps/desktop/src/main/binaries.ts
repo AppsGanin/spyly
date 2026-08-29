@@ -4,19 +4,19 @@ import os from 'node:os'
 import path from 'node:path'
 
 /**
- * Поиск команд, установленных пользователем.
+ * Finding commands the user has installed.
  *
- * Приложение, запущенное из Dock, получает от системы куцый PATH: в нём нет ни
- * homebrew, ни npm-global, ни менеджеров версий node. Поэтому `codex`,
- * поставленный через `npm install -g`, для приложения просто не существует —
- * хотя в терминале работает.
+ * An application started from the Dock gets a threadbare PATH from the system:
+ * no homebrew, no npm-global, none of the node version managers. So `codex`
+ * installed through `npm install -g` simply does not exist as far as the app
+ * is concerned, even though it works in a terminal.
  *
- * Спрашиваем PATH у самой оболочки пользователя и отдельно обходим известные
- * места установки: nvm и fnm держат бинарники в папке конкретной версии, а её
- * имя заранее неизвестно.
+ * We ask the user's own shell for its PATH and separately walk the known
+ * install locations: nvm and fnm keep their binaries in a folder named after a
+ * particular version, and that name is not known in advance.
  */
 
-/** PATH из оболочки входа: считается один раз, дальше берётся отсюда. */
+/** PATH from the login shell: computed once, then taken from here. */
 let shellPath: string[] | null = null
 
 async function loadShellPath(): Promise<string[]> {
@@ -28,8 +28,8 @@ async function loadShellPath(): Promise<string[]> {
   }
 
   shellPath = await new Promise<string[]>((resolve) => {
-    // Интерактивная оболочка входа читает .zshrc и .bash_profile — именно там
-    // менеджеры версий дописывают свои пути.
+    // An interactive login shell reads .zshrc and .bash_profile, which is exactly
+    // where version managers add their paths.
     const child = execFile(
       shell,
       ['-ilc', 'printf %s "$PATH"'],
@@ -47,7 +47,7 @@ async function loadShellPath(): Promise<string[]> {
   return shellPath
 }
 
-/** Папки версий node: имя версии заранее неизвестно, поэтому смотрим все. */
+/** Node version folders: the version name is not known in advance, so look at all of them. */
 function versionManagerDirs(): string[] {
   const home = os.homedir()
   const out: string[] = []
@@ -63,11 +63,11 @@ function versionManagerDirs(): string[] {
   for (const [root, toBin] of roots) {
     if (!existsSync(root)) continue
     try {
-      // Свежие версии вперёд: если стоит несколько, команда обычно в последней.
+      // Newer versions first: with several installed, the command is usually in the last one.
       const versions = readdirSync(root).sort().reverse()
       for (const version of versions) out.push(toBin(path.join(root, version)))
     } catch {
-      // Папку могли снести прямо сейчас — не повод падать.
+      // The folder may have been removed just now, which is no reason to fail.
     }
   }
   return out
@@ -94,10 +94,10 @@ function fixedDirs(): string[] {
 const cache = new Map<string, string | null>()
 
 /**
- * Путь к команде или null.
+ * The path to a command, or null.
  *
- * Результат запоминаем: поиск идёт по десяткам папок, а спрашивают о командах
- * на каждом открытии настроек.
+ * The result is remembered: the search walks dozens of folders, and commands
+ * are asked about every time settings are opened.
  */
 export async function findBinary(name: string): Promise<string | null> {
   const hit = cache.get(name)
@@ -125,13 +125,13 @@ export async function findBinary(name: string): Promise<string | null> {
 }
 
 /**
- * PATH для дочернего процесса.
+ * PATH for a child process.
  *
- * Мало найти команду — её ещё надо суметь запустить. `codex` начинается с
- * `#!/usr/bin/env node`, и если в PATH дочернего процесса нет самого node,
- * запуск падает с «env: node: No such file or directory». У приложения из Dock
- * такого PATH как раз и нет, поэтому собираем его сами — из тех же папок, где
- * искали команду.
+ * Finding the command is not enough, it also has to be possible to run it.
+ * `codex` starts with `#!/usr/bin/env node`, and if node itself is not in the
+ * child's PATH the launch fails with "env: node: No such file or directory".
+ * An app started from the Dock has no such PATH, so we assemble one ourselves,
+ * out of the same folders the command was looked for in.
  */
 export async function enrichedPath(): Promise<string> {
   const dirs = [
@@ -143,7 +143,7 @@ export async function enrichedPath(): Promise<string> {
   return [...new Set(dirs)].join(path.delimiter)
 }
 
-/** Забыть найденное — после установки команды искать надо заново. */
+/** Forget what was found: after a command is installed it has to be looked for again. */
 export function forgetBinaries(): void {
   cache.clear()
   shellPath = null

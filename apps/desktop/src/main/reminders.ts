@@ -4,24 +4,24 @@ import { listMeetingIds, readMeeting } from './store/meetings.js'
 import { showMainWindow } from './index.js'
 
 /**
- * Напоминание о задачах со сроком.
+ * Reminders about tasks with a deadline.
  *
- * Задача, произнесённая голосом, теряется даже когда записана: в список задач
- * надо ещё зайти. Раз в день смотрим, не подошёл ли срок, и говорим об этом
- * сами — ради этого приложение и нужно.
+ * A task said out loud gets lost even when it is written down: the task list
+ * still has to be visited. Once a day we look for deadlines coming up and say
+ * so ourselves, which is what the application is for.
  */
 const HOUR = 3_600_000
 
 let timer: NodeJS.Timeout | null = null
-/** В какой день уже напоминали: два уведомления об одном и том же раздражают. */
+/** Which day we last reminded on: two notifications about the same thing annoy. */
 let lastRunDay = ''
 
 export function startReminders(): void {
   stopReminders()
-  // Первую проверку делаем не сразу: при запуске приложения человек и так
-  // смотрит на экран, а уведомление поверх него — шум.
-  // Напоминание — удобство, и сорваться оно не должно: битый файл в архиве
-  // не повод сыпать необработанными отказами каждый час.
+  // The first check does not happen straight away: at startup a person is
+  // looking at the screen anyway, and a notification over it is noise.
+  // A reminder is a convenience and must not break: a damaged file in the
+  // archive is no reason to spill unhandled rejections every hour.
   const safeCheck = () => void check().catch(() => undefined)
   timer = setInterval(safeCheck, HOUR)
   setTimeout(safeCheck, 60_000)
@@ -39,7 +39,7 @@ interface Pending {
   state: 'overdue' | 'today'
 }
 
-/** Незакрытые задачи, у которых срок сегодня или уже прошёл. */
+/** Open tasks whose deadline is today or already past. */
 export async function pendingTasks(now = new Date()): Promise<Pending[]> {
   const out: Pending[] = []
   for (const id of await listMeetingIds()) {
@@ -59,8 +59,8 @@ export async function pendingTasks(now = new Date()): Promise<Pending[]> {
 async function check(): Promise<void> {
   const now = new Date()
   const day = now.toDateString()
-  // Раз в сутки и только в рабочее время: ночное уведомление о задаче — это
-  // не забота, а помеха.
+  // Once a day and only during working hours: a task notification at night is
+  // not care, it is a nuisance.
   if (day === lastRunDay || now.getHours() < 9 || now.getHours() > 21) return
 
   const pending = await pendingTasks(now)
@@ -78,8 +78,9 @@ async function check(): Promise<void> {
         : `${first.text}${overdue > 0 ? t(' · просрочено: {overdue}', { overdue: overdue }) : ''}`,
     silent: true
   })
-  // Экрана задач в приложении нет: задачи живут в конспектах записей и в
-  // ответах агента. Открываем окно — дальше человек идёт в нужную запись.
+  // There is no task screen in the application: tasks live in the summaries of
+  // recordings and in an agent's answers. We open the window; from there the
+  // person goes to the recording they need.
   notification.on('click', () => showMainWindow())
   notification.show()
 }

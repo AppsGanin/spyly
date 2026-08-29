@@ -1,6 +1,6 @@
-/* Основа: сброс, типографика, примитивы Geist.
-   Границы рисуются тенью, а не border — так элементы не прыгают на пиксель,
-   когда рамка появляется, и это фирменная черта самой системы. */
+/* The base: reset, typography, the Geist primitives.
+   Borders are drawn with a shadow rather than a border, so elements do not jump
+   by a pixel when one appears, and that is a hallmark of the system itself. */
 
 *,
 *::before,
@@ -76,7 +76,7 @@ kbd,
   border-radius: var(--radius-sm);
 }
 
-/* ── полосы прокрутки ─────────────────────────────────────────── */
+/* ── scrollbars ───────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -87,7 +87,7 @@ kbd,
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--ds-gray-alpha-500); background-clip: content-box; }
 
-/* ── кнопки ───────────────────────────────────────────────────── */
+/* ── buttons ──────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -139,7 +139,7 @@ kbd,
 .btn--icon { width: var(--control-sm); height: var(--control-sm); padding: 0; }
 .btn--block { width: 100%; }
 
-/* ── поля ─────────────────────────────────────────────────────── */
+/* ── fields ───────────────────────────────────────────────────── */
 .input,
 .select,
 .textarea {
@@ -180,7 +180,7 @@ kbd,
 .field__label { font-size: var(--text-sm); color: var(--ds-gray-900); font-weight: 500; }
 .field__hint { font-size: var(--text-sm); color: var(--ds-gray-700); line-height: var(--leading-tight); }
 
-/* ── карточки и панели ────────────────────────────────────────── */
+/* ── cards and panels ─────────────────────────────────────────── */
 .card {
   background: var(--ds-background-100);
   border-radius: var(--radius-lg);
@@ -198,7 +198,7 @@ kbd,
 
 .divider { height: 1px; background: var(--ds-gray-alpha-300); border: none; }
 
-/* ── бейджи ───────────────────────────────────────────────────── */
+/* ── badges ───────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -221,7 +221,7 @@ kbd,
 .badge--teal { background: var(--ds-teal-100); color: var(--ds-teal-900); box-shadow: none; }
 .badge--pink { background: var(--ds-pink-100); color: var(--ds-pink-900); box-shadow: none; }
 
-/* ── вспомогательное ──────────────────────────────────────────── */
+/* ── helpers ──────────────────────────────────────────────────── */
 .muted { color: var(--ds-gray-900); }
 .dim { color: var(--ds-gray-700); }
 .row { display: flex; align-items: center; gap: var(--space-2); }
@@ -251,7 +251,7 @@ kbd,
   }
 }
 
-/* Ссылка-кнопка внутри подсказок. */
+/* A link styled as a button, inside hints. */
 .linklike {
   background: none;
   border: none;
@@ -262,6 +262,6 @@ kbd,
   text-decoration: underline;
 }
 
-/* Тег как кнопка — для быстрого выбора имени. */
+/* A tag as a button, for picking a name quickly. */
 button.chip { cursor: pointer; font: inherit; }
 button.chip:hover { background: var(--ds-gray-200); }

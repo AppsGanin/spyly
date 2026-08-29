@@ -3,14 +3,16 @@ import { EventEmitter } from 'node:events'
 import { getMainWindow } from '../index.js'
 
 /**
- * Захват звука руками renderer — путь для Windows и Linux.
+ * Capturing audio through the renderer, the path for Windows and Linux.
  *
- * Интерфейс тот же, что у нативного захвата на macOS: сессия записи не должна
- * знать, откуда берётся звук. Разница только в том, что PCM приходит не из
- * stdout дочернего процесса, а из окна через IPC.
+ * The interface is the same as for native capture on macOS: a recording
+ * session must not know where the audio comes from. The only difference is
+ * that PCM arrives over IPC from the window rather than from a child
+ * process's stdout.
  *
- * Слабое место такого пути — окно: если его закрыть, захват прервётся. Поэтому
- * при закрытии окна во время записи мы не даём ему уничтожиться (см. main).
+ * The weak spot of this path is the window: closing it interrupts the
+ * capture. So a window closed while recording is not allowed to be destroyed
+ * (see main).
  */
 export const SAMPLE_RATE = 16000
 
@@ -19,22 +21,22 @@ export interface RendererCaptureOptions {
   micDeviceId?: string
 }
 
-/** Кто сейчас ждёт куски по каждой дорожке. */
+/** Who is currently waiting for chunks on each track. */
 const listeners = new Map<'mic' | 'system', (samples: Float32Array) => void>()
 
-/** Вызывается из обработчика IPC, когда renderer прислал очередной кусок. */
+/** Called from the IPC handler when the renderer has sent another chunk. */
 export function deliverSamples(track: 'mic' | 'system', samples: Float32Array): void {
   listeners.get(track)?.(samples)
 }
 
-/** Ошибка захвата со стороны renderer — например, человек отменил выбор источника. */
+/** A capture failure on the renderer side, someone cancelling the source picker for instance. */
 const failures = new Map<'mic' | 'system', (message: string) => void>()
 
 export function deliverCaptureError(track: 'mic' | 'system', message: string): void {
   failures.get(track)?.(message)
 }
 
-/** Столько же для пути через окно: детектору всё равно, кто именно держит микрофон. */
+/** The same count for the window path: the detector does not care who holds the microphone. */
 let openMicCaptures = 0
 
 export function rendererUsesMicrophone(): boolean {
@@ -59,8 +61,8 @@ export class RendererCapture extends EventEmitter {
 
     listeners.set(track, (samples) => {
       if (this.stopped) return
-      // Уровень считаем здесь, а не в renderer: так он приходит из одного
-      // места для обоих способов захвата.
+      // The level is computed here rather than in the renderer, so that it comes
+      // from one place for both ways of capturing.
       let sum = 0
       for (const value of samples) sum += value * value
       this.lastLevel = Math.sqrt(sum / Math.max(1, samples.length))
@@ -74,7 +76,7 @@ export class RendererCapture extends EventEmitter {
 
     const window = getMainWindow()
     if (!window || window.isDestroyed()) {
-      // Без окна на этих платформах записывать нечем — честнее сказать сразу.
+      // Without a window there is nothing to record with on these platforms, so say so at once.
       queueMicrotask(() => this.emit('error', t('окно приложения закрыто, запись невозможна')))
       return
     }
@@ -84,7 +86,7 @@ export class RendererCapture extends EventEmitter {
       micDeviceId: this.options.micDeviceId
     })
 
-    // Готовность подтверждает сам renderer, когда поток действительно открыт.
+    // The renderer confirms readiness itself, once the stream is really open.
     const onReady = (id: 'mic' | 'system') => {
       if (id === track && !this.stopped) this.emit('ready')
     }
@@ -113,11 +115,11 @@ export function deliverCaptureReady(track: 'mic' | 'system'): void {
 }
 
 /**
- * На этих платформах звук берёт Chromium, нативного хелпера нет.
+ * On these platforms Chromium takes the audio; there is no native helper.
  *
- * Переменная окружения нужна проверкам: на macOS этот путь не используется, но
- * прогнать его хотя бы на микрофоне надо — иначе код для Windows и Linux
- * останется вовсе непроверенным.
+ * The environment variable is there for the checks: this path is not used on
+ * macOS, but it has to be exercised at least on the microphone, otherwise the
+ * code for Windows and Linux stays entirely untested.
  */
 export function usesRendererCapture(): boolean {
   if (process.env.SPYLY_FORCE_RENDERER_CAPTURE === '1') return true

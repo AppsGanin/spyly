@@ -1,32 +1,34 @@
 import type { Utterance } from './types.js'
 
 /**
- * Разделение «я» и «собеседник» по громкости дорожек.
+ * Telling "me" from "the other side" by the levels of the tracks.
  *
- * Всё разделение по голосам стоит на допущении: микрофон — это тот, кто сидит
- * за компьютером, системный звук — удалённые участники. Допущение рушится,
- * едва человек снимает наушники: динамики играют собеседника, микрофон его
- * записывает, и его реплики появляются в расшифровке дважды — вторым разом от
- * вашего имени.
+ * All voice separation rests on one assumption: the microphone is whoever sits
+ * at the computer, the system audio is the remote participants. The assumption
+ * collapses the moment a person takes their headphones off: the speakers play
+ * the other side, the microphone records them, and their utterances appear in
+ * the transcript twice, the second time under your name.
  *
- * Сравнение текстов эту беду лечит плохо: распознавание двух дорожек расходится
- * настолько, что на реальной записи по тексту узнавалось лишь три эха из пяти.
- * Зато физика надёжна. Путь «динамики → микрофон» ослабляет звук в разы, и на
- * настоящей записи отношение громкостей держалось около 0.20 с разбросом в
- * сотые доли. Когда человек говорит сам, его микрофон громче того, что играет
- * в динамиках, — разница не в процентах, а в разы.
+ * Comparing the texts is a poor cure: recognition of the two tracks diverges so
+ * far that on a real recording only three echoes out of five were recognised by
+ * text. The physics, though, is reliable. The path from speakers to microphone
+ * weakens the sound several times over, and on a real recording the ratio of
+ * levels held around 0.20 with a spread in the hundredths. When a person speaks
+ * themselves, their microphone is louder than what plays through the speakers,
+ * and the difference is not in percent but in multiples.
  */
 
 /**
- * Во сколько раз микрофон должен быть громче системного звука, чтобы реплику
- * можно было считать своей.
+ * How many times louder than the system audio the microphone has to be for an
+ * utterance to count as your own.
  *
- * Порог с большим запасом: эхо давало 0.2, живая речь даёт заметно больше
- * единицы. Промежуток между ними широкий, и попасть в него случайно трудно.
+ * The threshold has a wide margin: echo gave 0.2, live speech gives markedly
+ * more than one. The gap between them is wide, and landing in it by accident is
+ * hard.
  */
 export const MIC_OVER_SYSTEM_RATIO = 0.6
 
-/** Ниже этого уровня под словом нет речи — там тишина. */
+/** Below this level there is no speech under a word, only silence. */
 export const SPEECH_RMS_THRESHOLD = 0.006
 
 export interface LevelWindow {
@@ -35,7 +37,7 @@ export interface LevelWindow {
   rms: number
 }
 
-/** Средняя громкость дорожки на отрезке. */
+/** The average level of a track over a stretch. */
 export function levelAt(windows: readonly LevelWindow[], start: number, end: number): number {
   let sum = 0
   let count = 0
@@ -48,10 +50,10 @@ export function levelAt(windows: readonly LevelWindow[], start: number, end: num
 }
 
 /**
- * Слышал ли микрофон человека, а не динамики.
+ * Whether the microphone heard a person rather than the speakers.
  *
- * Если системная дорожка в этот момент молчит, сравнивать не с чем — значит,
- * говорили в микрофон.
+ * If the system track is silent at that moment there is nothing to compare
+ * against, which means someone was speaking into the microphone.
  */
 export function micIsOwnVoice(micRms: number, systemRms: number): boolean {
   if (systemRms < 0.01) return true
@@ -59,11 +61,12 @@ export function micIsOwnVoice(micRms: number, systemRms: number): boolean {
 }
 
 /**
- * Слышит ли микрофон только динамики.
+ * Whether the microphone hears the speakers and nothing else.
  *
- * Считаем по всей записи: если ни в один момент своей речи микрофон не
- * оказался громче системного звука, человек всё это время молчал, а дорожка
- * содержит одно эхо. Тогда её вклад в расшифровку — только вред.
+ * Computed over the whole recording: if at no moment of its own speech the
+ * microphone was louder than the system audio, the person was silent
+ * throughout and the track holds pure echo. Its contribution to the transcript
+ * is then nothing but harm.
  */
 export function micIsOnlyEcho(
   micWindows: readonly LevelWindow[],
@@ -73,21 +76,22 @@ export function micIsOnlyEcho(
   if (speaking.length === 0) return true
 
   const own = speaking.filter((w) => micIsOwnVoice(w.rms, levelAt(systemWindows, w.start, w.end)))
-  // Единичные всплески бывают от стука по столу: нужна доля, а не факт.
+  // Isolated spikes happen from a knock on the desk: a proportion is needed, not a single fact.
   return own.length / speaking.length < 0.05
 }
 
 /**
- * Срезать чужой хвост в начале своей реплики.
+ * Trim someone else's tail from the start of your own utterance.
  *
- * Куски двух дорожек нарезаются по-разному, и последнее слово собеседника
- * нередко попадает в начало вашей реплики: «…но тогда я, конечно, готов» —
- * и следом ваше «готов прикольно прикольно». Выбрасывать реплику целиком
- * нельзя, она ваша; надо снять ровно приклеившиеся слова.
+ * The two tracks are cut into pieces differently, and the other side's last
+ * word often lands at the start of your utterance: "...but then I am certainly
+ * ready" followed by your own "ready, nice, nice". Throwing the utterance away
+ * whole will not do, it is yours; exactly the words that stuck have to come off.
  *
- * Слово снимаем, только если совпали оба признака: оно есть в конце соседней
- * чужой реплики и микрофон в этот момент был тише динамиков. Одного текста
- * мало — человек и правда может повторить чужое слово, и терять его обидно.
+ * A word is removed only when both signs agree: it is present at the end of the
+ * neighbouring utterance from the other side, and the microphone was quieter
+ * than the speakers at that moment. Text alone is not enough, as a person may
+ * genuinely repeat someone else's word, and losing it would be a shame.
  */
 export function trimEchoedStart(
   utterance: Utterance,
@@ -102,7 +106,7 @@ export function trimEchoedStart(
   if (utterance.start - previousRemote.end > gapSec) return utterance
 
   const normalize = (word: string): string => word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')
-  // Хвост чужой реплики: приклеиться может только он.
+  // The tail of the other side's utterance: only that can stick.
   const tail = new Set(
     previousRemote.text
       .split(/\s+/)
@@ -116,10 +120,10 @@ export function trimEchoedStart(
     const word = utterance.words[drop]!
     if (!tail.has(normalize(word.text))) break
 
-    // Второй признак — звук под словом. Либо микрофон в этот момент слышал
-    // динамики, либо под словом вообще тишина: распознавание расставляет
-    // времена приблизительно, и приклеившееся слово нередко оказывается там,
-    // где человек молчал. Своё слово так выглядеть не может.
+    // The second sign is the audio under the word. Either the microphone was
+    // hearing the speakers at that moment, or there is no sound under the word at
+    // all: recognition places times approximately, and a word that stuck often ends
+    // up where the person was silent. A word of your own cannot look like that.
     const micLevel = levels.mic(word.start, word.end)
     const systemLevel = levels.system(word.start, word.end)
     const silent = micLevel < SPEECH_RMS_THRESHOLD
@@ -138,16 +142,17 @@ export function trimEchoedStart(
 }
 
 /**
- * Оставить в реплике только то, что человек сказал сам.
+ * Keep only what the person said themselves in an utterance.
  *
- * Реплика микрофона нередко склеивается из двух половин: сначала эхо
- * собеседника из динамиков, следом собственная речь. Судить о ней целиком по
- * средней громкости нельзя — на реальной записи такая реплика дала отношение
- * 0.52 и была отброшена вся, хотя вторая её половина звучала при полной тишине
- * в динамиках и принадлежала человеку.
+ * A microphone utterance is often glued from two halves: first the other
+ * side's echo from the speakers, then speech of your own. Judging it whole by
+ * the average level will not do: on a real recording such an utterance gave a
+ * ratio of 0.52 and was discarded entirely, even though its second half was
+ * spoken in complete silence from the speakers and belonged to the person.
  *
- * Поэтому решение принимается по каждому слову: остаются те, под которыми
- * микрофон громче динамиков. Возвращается `null`, если своей речи не осталось.
+ * So the decision is made per word: the ones kept are those under which the
+ * microphone is louder than the speakers. Returns `null` if no speech of your
+ * own is left.
  */
 export function keepOwnVoice(
   utterance: Utterance,
@@ -162,10 +167,10 @@ export function keepOwnVoice(
       : null
   }
 
-  // Уровень динамиков смотрим с запасом по краям слова: между словами
-  // собеседника есть короткие провалы, и по одному слову они выглядят как
-  // тишина — тогда эхо проходит за собственную речь. Своя речь тянется
-  // секундами, и запас ей не мешает.
+  // The speaker level is measured with a margin either side of the word: there
+  // are short dips between the other side's words, and over a single word those
+  // look like silence, letting echo pass for speech of your own. Your own speech
+  // runs for seconds, and the margin does it no harm.
   const around = 0.5
   const mine = utterance.words.filter((word) =>
     micIsOwnVoice(
@@ -176,9 +181,10 @@ export function keepOwnVoice(
   if (mine.length === 0) return null
   if (mine.length === utterance.words.length) return utterance
 
-  // Огрызок посреди чужой речи — шум распознавания, а не реплика: показывать
-  // «да все нас» отдельной строкой хуже, чем не показывать вовсе. Смотрим и на
-  // число слов, и на длительность: три слова за полсекунды — это не речь.
+  // A scrap in the middle of someone else's speech is recognition noise rather
+  // than an utterance: three garbled words on a line of their own are worse than
+  // nothing. We look at both the word count and the duration: three words in half
+  // a second is not speech.
   const spoken = mine[mine.length - 1]!.end - mine[0]!.start
   if (mine.length < 3 || spoken < 1) return null
 

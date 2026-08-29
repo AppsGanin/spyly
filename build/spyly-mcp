@@ -1,8 +1,8 @@
 #!/bin/sh
-# Запускалка MCP-сервера Spyly.
+# The launcher for the Spyly MCP server.
 #
-# Electron умеет работать как обычный Node, поэтому отдельный Node в системе
-# не нужен: агент получает рабочий сервер сразу после установки приложения.
+# Electron can run as an ordinary Node, so a separate Node in the system is not
+# needed: an agent gets a working server as soon as the application is installed.
 here=$(cd "$(dirname "$0")" && pwd)
 app=$(cd "$here/../.." && pwd)
 exec env ELECTRON_RUN_AS_NODE=1 "$app/MacOS/Spyly" "$here/../mcp-server/bundle.mjs" "$@"

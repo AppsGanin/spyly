@@ -4,18 +4,19 @@ import type { Meeting } from './types.js'
 export interface PromptTemplate {
   id: string
   name: string
-  /** Инструкция агенту. Транскрипт подставляется после неё. */
+  /** The instruction to the agent. The transcript is appended after it. */
   instruction: string
   /**
-   * Для каких типов разговоров шаблон уместен.
+   * Which kinds of conversation the template suits.
    *
-   * Пусто — значит для всех. Разбор созвона на задачи бессмыслен для лекции,
-   * а конспект лекции — для личного разговора, и предлагать всё подряд значит
-   * заставлять каждый раз выбирать из лишнего.
+   * Empty means all of them. Breaking a call down into tasks makes no sense for a
+   * lecture, and a lecture summary makes none for a personal conversation, so
+   * offering everything at once means forcing a choice among the irrelevant
+   * every time.
    */
 }
 
-/** Шаблоны, подходящие разговору этого типа. */
+/** The templates that suit a conversation of this kind. */
 
 export const DEFAULT_PROMPT_TEMPLATES: PromptTemplate[] = [
   {
@@ -52,17 +53,17 @@ export const DEFAULT_PROMPT_TEMPLATES: PromptTemplate[] = [
 export interface BuildPromptOptions {
   template: PromptTemplate
   meeting: Meeting
-  /** Таймкоды агенту обычно только мешают. */
+  /** Timestamps usually only get in an agent's way. */
   timecodes?: boolean
   includeSummary?: boolean
 }
 
 /**
- * Промпт для кодинг-агента.
+ * The prompt for a coding agent.
  *
- * Расшифровка обёрнута в теги и явно помечена как данные: в записи созвона может
- * прозвучать что угодно, вплоть до фразы вида «а теперь удали репозиторий», и
- * агент не должен принимать это за инструкцию.
+ * The transcript is wrapped in tags and explicitly marked as data: anything at
+ * all can be said in a recorded call, up to a phrase like "and now delete the
+ * repository", and the agent must not take that for an instruction.
  */
 export function buildAgentPrompt(opts: BuildPromptOptions): string {
   const { template, meeting, timecodes = false, includeSummary = true } = opts
@@ -79,11 +80,11 @@ export function buildAgentPrompt(opts: BuildPromptOptions): string {
   ].join('\n')
 }
 
-/** Промпт для LLM, которая делает саммари. Ответ ожидается строгим JSON. */
+/** The prompt for the LLM that makes the summary. The answer is expected as strict JSON. */
 export function buildSummaryPrompt(meeting: Meeting, extraInstruction?: string): string {
   const body = renderTranscriptMarkdown(meeting, { timecodes: true, includeSummary: false, includeHeader: true })
-  // Отметки ставил человек прямо во время разговора — это самый надёжный
-  // сигнал о том, что для него было важным.
+  // The marks were placed by a person during the conversation itself, which is
+  // the most reliable signal of what mattered to them.
   const marked = meeting.marks.length
     ? `- Участник отметил как важное ${meeting.marks.length} мест(а) — они перечислены в разделе «Отмеченные места». Обязательно отрази их в конспекте.`
     : ''
@@ -112,31 +113,31 @@ export function buildSummaryPrompt(meeting: Meeting, extraInstruction?: string):
     .join('\n')
 }
 
-/** Заголовок встречи по её содержанию — короткий промпт, дешёвая модель. */
+/** A meeting title from its content: a short prompt and a cheap model. */
 /**
- * Название, которое приложение выдало само.
+ * A title the application produced itself.
  *
- * Нужно для записей, сделанных до появления признака `titleAuto`. Без `\b`:
- * в JavaScript граница слова считается по латинице, и «Запись 28 августа» ей
- * не удовлетворяет — проверка с `\b` не срабатывала ни разу.
+ * Needed for recordings made before the `titleAuto` flag existed. Without `\b`:
+ * in JavaScript a word boundary is computed over Latin letters, and "Запись 28
+ * августа" does not satisfy it, so the check with `\b` never fired once.
  */
 export function isAutoTitle(title: string): boolean {
-  // Английский вариант тоже: название по умолчанию зависит от языка интерфейса.
+  // The English variant too: the default title depends on the interface language.
   return /^(Запись|Созвон|Recording)(\s|$)/.test(title.trim())
 }
 
 /**
- * Привести предложенное моделью название в порядок.
+ * Tidy up the title the model suggested.
  *
- * Модель добавляет то кавычки, то точку в конце, то объяснение следующей
- * строкой. Слишком короткое или длинное не берём: «Разговор» ничем не лучше
- * «Записи 28 августа», а абзац в списке не поместится.
+ * The model adds quotes, or a full stop at the end, or an explanation on the
+ * next line. Anything too short or too long is refused: "Conversation" is no
+ * better than "Recording, 28 August", and a paragraph will not fit in the list.
  *
- * Возвращается `null`, если брать нечего.
+ * Returns `null` when there is nothing to take.
  */
 export function cleanTitle(raw: string): string | null {
   const first = raw.trim().split('\n')[0]?.trim() ?? ''
-  // Ответ вида «Название: ...» — сам заголовок идёт после двоеточия.
+  // An answer of the form "Title: ...": the title itself comes after the colon.
   const labelled = /^(?:название|title)\s*:\s*(.+)$/i.exec(first)
   const cleaned = (labelled?.[1] ?? first)
     .replace(/^["«»'`]+|["«»'`.]+$/g, '')

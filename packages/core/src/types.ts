@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
-/** Дорожка записи. Микрофон и системный звук пишутся раздельно и никогда не микшируются. */
+/** A recording track. The microphone and the system audio are written separately and never mixed. */
 export const TrackId = z.enum(['mic', 'system'])
 export type TrackId = z.infer<typeof TrackId>
 
-/** Этапы обработки. Каждый живёт своей жизнью и перезапускается отдельно:
- *  упавшая расшифровка не должна требовать перезаписи созвона. */
+/** Processing stages. Each lives its own life and is restarted on its own:
+ *  a failed transcription must not require recording the call again. */
 export const Stage = z.enum(['recording', 'transcribing', 'diarizing', 'identifying', 'summarizing', 'done'])
 export type Stage = z.infer<typeof Stage>
 
@@ -14,7 +14,7 @@ export type StageState = z.infer<typeof StageState>
 
 export const Word = z.object({
   text: z.string(),
-  /** Секунды от начала записи. Общая шкала для обеих дорожек. */
+  /** Seconds from the start of the recording. A shared scale for both tracks. */
   start: z.number(),
   end: z.number(),
   confidence: z.number().optional()
@@ -36,8 +36,8 @@ export const AsrResult = z.object({
 })
 export type AsrResult = z.infer<typeof AsrResult>
 
-/** Отрезок речи одного кластера внутри одной дорожки.
- *  Нумерация кластеров локальна для дорожки: system:0 и mic:0 — разные люди. */
+/** A stretch of speech from one cluster within one track.
+ *  Cluster numbering is local to a track: system:0 and mic:0 are different people. */
 export const SpeakerTurn = z.object({
   start: z.number(),
   end: z.number(),
@@ -46,30 +46,30 @@ export const SpeakerTurn = z.object({
 export type SpeakerTurn = z.infer<typeof SpeakerTurn>
 
 export const Speaker = z.object({
-  /** Глобальный идентификатор вида `mic:0` / `system:1`. */
+  /** A global identifier of the form `mic:0` / `system:1`. */
   id: z.string(),
   track: TrackId,
   cluster: z.number().int().nonnegative(),
   /**
-   * Номер для подписи: «Участник 2».
+   * The number for the caption: "Speaker 2".
    *
-   * Отдельно от кластера, потому что кластер — внутренний номер разделения по
-   * голосам, и он же нужен, чтобы снять слепок. У человека в разговоре из двух
-   * собеседников кластеры вполне могут оказаться 0 и 3, и «Участник 4» его
-   * только запутает.
+   * Kept apart from the cluster, because the cluster is voice separation's
+   * internal number and is also what a voice print is taken by. In a
+   * conversation with two other people the clusters may well come out as 0 and 3,
+   * and "Speaker 4" would only confuse the person.
    */
   number: z.number().int().positive().optional(),
   name: z.string().optional(),
-  /** Совпал с профилем голоса владельца приложения. */
+  /** Matched the voice profile of the application's owner. */
   isMe: z.boolean().default(false),
-  /** Откуда взялось имя: подставлено по слепку голоса или введено руками. */
+  /** Where the name came from: filled in from a voice print or entered by hand. */
   nameSource: z.enum(['manual', 'voice-match', 'none']).default('none'),
-  /** Косинусная близость к профилю из реестра, если имя подставлено автоматически. */
+  /** Cosine closeness to the profile in the registry, if the name was filled in automatically. */
   matchScore: z.number().optional()
 })
 export type Speaker = z.infer<typeof Speaker>
 
-/** Реплика после слияния дорожек — единица, которую видит пользователь. */
+/** An utterance after the tracks are merged, the unit the user sees. */
 export const Utterance = z.object({
   id: z.string(),
   speakerId: z.string(),
@@ -78,20 +78,20 @@ export const Utterance = z.object({
   end: z.number(),
   text: z.string(),
   words: z.array(Word).default([]),
-  /** Черновик из live-режима, будет заменён финальным проходом. */
+  /** A draft from live mode, to be replaced by the final pass. */
   provisional: z.boolean().default(false)
 })
 export type Utterance = z.infer<typeof Utterance>
 
 export const ActionItem = z.object({
   text: z.string(),
-  /** Идентификатор спикера или свободное имя — LLM не всегда попадает в реестр. */
+  /** A speaker identifier or a free-form name: the LLM does not always hit the registry. */
   assignee: z.string().optional(),
   due: z.string().optional(),
   /**
-   * Сделана ли. Живёт в самом конспекте, а не рядом с ним: галочку ставит и
-   * человек в приложении, и агент через MCP, и обе стороны должны видеть одно
-   * и то же.
+   * Whether it is done. It lives in the summary itself rather than beside it:
+   * the box is ticked by a person in the application and by an agent over MCP,
+   * and both sides have to see the same thing.
    */
   done: z.boolean().default(false)
 })
@@ -108,10 +108,10 @@ export const Summary = z.object({
 })
 export type Summary = z.infer<typeof Summary>
 
-/** Отметка «это важно», поставленная по ходу разговора. */
+/** A "this matters" mark, placed during the conversation. */
 export const Mark = z.object({
   id: z.string(),
-  /** Секунда от начала записи. */
+  /** The second from the start of the recording. */
   at: z.number(),
   note: z.string().default('')
 })
@@ -121,10 +121,10 @@ export const MeetingMeta = z.object({
   id: z.string(),
   title: z.string(),
   /**
-   * Название придумано приложением, а не человеком.
+   * The title was invented by the application rather than by a person.
    *
-   * Такое название можно заменить осмысленным, когда разговор расшифрован.
-   * Название, данное человеком, не трогаем никогда.
+   * Such a title can be replaced with a meaningful one once the conversation has
+   * been transcribed. A title given by a person is never touched.
    */
   titleAuto: z.boolean().default(false),
   startedAt: z.string(),
@@ -135,38 +135,38 @@ export const MeetingMeta = z.object({
     mic: z.boolean().default(true),
     system: z.boolean().default(true),
     micDeviceLabel: z.string().optional(),
-    /** Приложение, чей звук писали, если захват был не общесистемным. */
+    /** The application whose audio was recorded, if the capture was not system-wide. */
     systemScope: z.string().optional()
   }),
   stages: z.partialRecord(Stage, StageState).default({}),
-  /** Человекочитаемая причина, если какой-то этап упал. */
+  /** A human-readable reason, if some stage failed. */
   errors: z.record(z.string(), z.string()).default({}),
   providers: z.object({
     asr: z.string().optional(),
     diarization: z.string().optional(),
     llm: z.string().optional()
   }).default({}),
-  /** Папка проекта, в которую этот созвон отдают кодинг-агенту. */
+  /** The project folder this call is handed to a coding agent in. */
   projectPath: z.string().optional(),
   /**
-   * Сколько человек было в разговоре, если известно.
+   * How many people were in the conversation, when that is known.
    *
-   * Само разделение по голосам угадывает это плохо: на получасовой записи
-   * троих человек оно нашло полсотни «участников». Когда число известно, оно
-   * задаётся жёстко — и ответ становится точным.
+   * Voice separation itself guesses this badly: on a half-hour recording of three
+   * people it found fifty "participants". When the number is known it is set
+   * firmly, and the answer becomes exact.
    */
   speakerCount: z.number().int().min(1).max(20).optional(),
-  /** Отметки важных мест, поставленные во время записи. */
+  /** Marks on important moments, placed during the recording. */
   marks: z.array(Mark).default([]),
-  /** Событие календаря, из которого взялись название и участники. */
+  /** The calendar event the title and the participants came from. */
   calendarEventId: z.string().optional(),
-  /** Кого календарь ждал на встрече — подсказка при назывании участников. */
+  /** Who the calendar expected at the meeting, a hint when naming participants. */
   calendarParticipants: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([])
 })
 export type MeetingMeta = z.infer<typeof MeetingMeta>
 
-/** Полный созвон: мета + расшифровка. Лежит на диске как набор файлов. */
+/** A whole call: the meta plus the transcript. Kept on disk as a set of files. */
 export const Meeting = MeetingMeta.extend({
   speakers: z.array(Speaker).default([]),
   utterances: z.array(Utterance).default([]),
@@ -174,16 +174,16 @@ export const Meeting = MeetingMeta.extend({
 })
 export type Meeting = z.infer<typeof Meeting>
 
-/** Слепок голоса известного человека. Биометрия — только локально. */
+/** The voice print of a known person. Biometrics, so local only. */
 export const VoiceProfile = z.object({
   id: z.string(),
   name: z.string(),
   isMe: z.boolean().default(false),
-  /** Усреднённый embedding; длина зависит от модели. */
+  /** The averaged embedding; its length depends on the model. */
   embedding: z.array(z.number()),
   createdAt: z.string(),
   updatedAt: z.string(),
-  /** Сколько раз профиль подтверждали — чем больше, тем надёжнее среднее. */
+  /** How many times the profile has been confirmed: the more, the steadier the average. */
   samples: z.number().int().default(1)
 })
 export type VoiceProfile = z.infer<typeof VoiceProfile>

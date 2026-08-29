@@ -4,11 +4,11 @@ import { IconCopy } from '../lib/icons'
 import { useStore } from '../lib/store'
 
 /**
- * Копирование выделенного куска расшифровки.
+ * Copying a selected piece of the transcript.
  *
- * Выделение обычное, мышью — так человек уже умеет. Кнопка появляется рядом с
- * выделенным и отдаёт текст с таймкодами и именами, а не голую строку без
- * контекста, как это сделал бы браузер.
+ * An ordinary mouse selection, which people already know how to use. A button
+ * appears next to the selection and hands over the text with timestamps and
+ * names rather than the bare string without context the browser would give.
  */
 export function TranscriptSelection({ meeting }: { meeting: Meeting }) {
   const { notify } = useStore()

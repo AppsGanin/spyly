@@ -119,8 +119,8 @@ describe('buildDigest', () => {
   })
 
   it('запись без расшифровки недоделанной не считает', () => {
-    // Пустая запись — это просто звук, который ещё не обрабатывали;
-    // упрекать за неё человека не за что.
+    // An empty recording is just audio that has not been processed yet; there is
+    // nothing to reproach a person for.
     const digest = buildDigest([meeting('пустая', 1, { utterances: 0 })], from, to, now)
     expect(digest.unprocessed).toHaveLength(0)
   })

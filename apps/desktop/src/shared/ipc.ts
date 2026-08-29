@@ -7,15 +7,15 @@ import type {
   VoiceProfile
 } from '@spyly/core'
 
-/** Что показывает индикатор уровня и пилюля записи. */
+/** What the level meter and the recording pill show. */
 export interface RecordingState {
   status: 'idle' | 'starting' | 'recording' | 'paused' | 'stopping'
   meetingId: string | null
   startedAt: number | null
-  /** Секунды чистой записи без учёта пауз. */
+  /** Seconds of actual recording, pauses excluded. */
   elapsedSec: number
   levels: { mic: number; system: number }
-  /** Дорожки, которые реально пишутся: пользователь мог выключить одну. */
+  /** The tracks that are really being written: the user may have switched one off. */
   tracks: { mic: boolean; system: boolean }
   error: string | null
 }
@@ -41,15 +41,15 @@ export interface Permissions {
 }
 
 export interface StartRecordingOptions {
-  /** Встреча из календаря, если запись относится к ней. */
+  /** The calendar meeting, if the recording belongs to one. */
   calendarEventId?: string
   calendarParticipants?: string[]
-  /** Дописать к этой записи вместо создания новой. */
+  /** Append to this recording instead of creating a new one. */
   continueMeetingId?: string
   mic: boolean
   system: boolean
   micDeviceId?: string
-  /** Пусто — весь системный звук; иначе только эти приложения. */
+  /** Empty means all system audio; otherwise only these applications. */
   systemApps?: string[]
   title?: string
 }
@@ -78,36 +78,36 @@ export interface ProviderInfo {
   name: string
   kind: 'asr' | 'diarization' | 'llm'
   local: boolean
-  /** Готов к работе: модель скачана или ключ введён. */
+  /** Ready to work: the model downloaded or the key entered. */
   ready: boolean
-  /** Почему не готов — показывается прямо в настройках. */
+  /** Why it is not ready, shown right in the settings. */
   hint?: string
 }
 
 export interface Settings {
   language: string
   theme: 'dark' | 'light' | 'system'
-  /** Язык интерфейса. Меняется перезагрузкой окна: он влияет на каждую надпись. */
+  /** The interface language. Changed by reloading the window: it affects every caption. */
   uiLang: 'ru' | 'en'
-  /** Какую модель распознавания использовать; пусто — берём крупнейшую скачанную. */
+  /** Which recognition model to use; empty means the largest one downloaded. */
   asrModel: string
-  /** Имена, термины и названия проектов — подсказка распознаванию. */
+  /** Names, terms and project names, a hint for recognition. */
   vocabulary: string[]
   diarizationProvider: string
   llmProvider: string
   /**
-   * Сервис с API как у OpenAI: OpenRouter, Groq, локальный vLLM и подобные.
-   * Ключ хранится отдельно и в зашифрованном виде — здесь его нет.
+   * A service with an API like OpenAI's: OpenRouter, Groq, a local vLLM and the
+   * like. The key is stored separately and encrypted, so it is not here.
    */
   openAiCompatible: { baseUrl: string; model: string }
-  /** Порог тишины, ниже которого дорожка считается пустой. */
+  /** The silence threshold below which a track counts as empty. */
   liveTranscription: boolean
   autoSummarize: boolean
   autoDetectCalls: 'off' | 'notify' | 'auto'
   storageDir: string
   promptTemplates: PromptTemplate[]
   onboardingDone: boolean
-  /** Записывать системный звук по умолчанию только из выбранных приложений. */
+  /** Record system audio from the chosen applications only, by default. */
   preferredApps: string[]
 }
 
@@ -116,18 +116,18 @@ export interface ModelInfo {
   name: string
   sizeBytes: number
   downloaded: boolean
-  /** 0..1, пока идёт скачивание. */
+  /** 0..1 while the download runs. */
   progress?: number
-  /** Загрузка остановлена, но скачанное сохранено — можно продолжить. */
+  /** The download is stopped but what was downloaded is kept, so it can be resumed. */
   paused?: boolean
-  /** Сколько байт уже лежит в недокачанном куске. */
+  /** How many bytes are already in the partial file. */
   resumableBytes?: number
   purpose: 'asr' | 'diarization' | 'embedding' | 'vad'
-  /** Человеческое название варианта: пользователь выбирает качество, а не файл. */
+  /** A human name for the variant: the user chooses quality, not a file. */
   tier?: string
-  /** Чем вариант отличается на практике. */
+  /** What the variant does differently in practice. */
   tradeoff?: string
-  /** Разумный выбор по умолчанию. */
+  /** A sensible default. */
   recommended?: boolean
 }
 
@@ -135,18 +135,18 @@ export interface StageProgress {
   meetingId: string
   stage: string
   state: 'running' | 'done' | 'failed'
-  /** 0..1, если этап умеет отчитываться. */
+  /** 0..1, if the stage can report progress. */
   progress?: number
   message?: string
 }
 
-/** Запросы renderer → main. Ответ — то, что справа. */
+/** Requests from the renderer to main. The answer is what stands on the right. */
 export interface IpcRequests {
   'app:permissions': () => Permissions
   'app:requestPermission': (which: 'microphone' | 'systemAudio') => Permissions
   'app:openPrivacySettings': (which: 'microphone' | 'systemAudio' | 'calendar') => void
   'app:version': () => { app: string; electron: string; platform: string }
-  /** Проверка обновлений по просьбе человека. */
+  /** Checking for updates at a person's request. */
   'app:checkUpdates': () =>
     | { state: 'current'; version: string }
     | { state: 'found'; version: string }
@@ -155,12 +155,12 @@ export interface IpcRequests {
 
   'calendar:status': () => { supported: boolean; granted: boolean }
   'calendar:request': () => { granted: boolean; needsSettings: boolean }
-  /** Событие, к которому вероятнее всего относится начинающаяся запись. */
+  /** The event a starting recording most likely belongs to. */
   'calendar:current': () => CalendarEventInfo | null
 
   'audio:listMics': () => AudioDevice[]
   'audio:listApps': () => AudioApp[]
-  /** Пробный запуск обеих дорожек для экрана «Проверка звука». */
+  /** A trial run of both tracks for the "Sound check" screen. */
   'audio:startProbe': (opts: { micDeviceId?: string; systemApps?: string[] }) => void
   'audio:stopProbe': () => void
 
@@ -169,9 +169,9 @@ export interface IpcRequests {
   'rec:pause': () => RecordingState
   'rec:resume': () => RecordingState
   'rec:state': () => RecordingState
-  /** Отметить текущий момент записи как важный. */
+  /** Mark the current moment of the recording as important. */
   'rec:mark': (note?: string) => { id: string; at: number } | null
-  /** Дописать пояснение к уже поставленной отметке. */
+  /** Add a note to a mark that has already been placed. */
   'rec:markNote': (id: string, note: string) => void
 
   'meetings:list': () => MeetingMeta[]
@@ -181,10 +181,10 @@ export interface IpcRequests {
   'meetings:update': (id: string, patch: Partial<MeetingMeta>) => MeetingMeta
   'meetings:renameSpeaker': (id: string, speakerId: string, name: string, remember: boolean) => Meeting
   /**
-   * Отмена и возврат правок записи.
+   * Undo and redo of edits to a recording.
    *
-   * История живёт в памяти главного процесса и не переживает перезапуск —
-   * так же, как в любом редакторе.
+   * History lives in the main process's memory and does not survive a restart,
+   * the same as in any editor.
    */
   'edit:history': (id: string) => { canUndo: boolean; canRedo: boolean }
   'edit:undo': (id: string) => { meeting: Meeting; label: string } | null
@@ -194,21 +194,21 @@ export interface IpcRequests {
     utteranceId: string,
     text: string
   ) => { meeting: Meeting; terms: string[] }
-  /** Пополнение словаря терминов; возвращает получившийся список. */
+  /** Adding to the term dictionary; returns the resulting list. */
   'vocab:add': (terms: string[]) => string[]
-  /** Разделить реплику в указанном символе. */
+  /** Split an utterance at the given character. */
   'meetings:splitUtterance': (id: string, utteranceId: string, charIndex: number) => Meeting
-  /** Склеить реплику со следующей. */
+  /** Join an utterance with the next one. */
   'meetings:mergeUtterance': (id: string, utteranceId: string) => Meeting
-  /** Приписать реплику другому участнику. */
+  /** Reassign an utterance to another participant. */
   'meetings:reassignUtterance': (id: string, utteranceId: string, speakerId: string) => Meeting
-  /** Черновая расшифровка, которая была видна во время записи. */
+  /** The draft transcript that was visible during the recording. */
   'meetings:live': (id: string) => { track: 'mic' | 'system'; text: string; start: number; end: number }[]
-  /** Записи на ту же тему — по общим словам и участникам. */
+  /** Recordings on the same subject, by shared words and participants. */
   'meetings:related': (id: string) => Related[]
-  /** Заглушить промежуток и убрать попавшие в него реплики. */
+  /** Silence a stretch and remove the utterances that fall inside it. */
   'meetings:removeRange': (id: string, from: number, to: number) => { meeting: Meeting; removed: number }
-  /** Правка конспекта руками: машина ошибается, и это надо чинить. */
+  /** Editing the summary by hand: the machine makes mistakes, and they have to be fixable. */
   'meetings:updateSummary': (id: string, summary: Summary) => Meeting
   'meetings:reprocess': (id: string, from: 'transcribing' | 'diarizing' | 'summarizing') => void
   'meetings:audioPath': (id: string, track: 'mic' | 'system' | 'mix') => string | null
@@ -223,7 +223,7 @@ export interface IpcRequests {
   'settings:get': () => Settings
   'settings:set': (patch: Partial<Settings>) => Settings
   'settings:providers': () => ProviderInfo[]
-  /** Ключ доступа: наружу отдаём только факт наличия, не само значение. */
+  /** An API key: only the fact that one exists is handed out, never the value. */
   'settings:hasKey': (id: string) => { present: boolean; encrypted: boolean }
   'settings:setKey': (id: string, value: string) => void
 
@@ -235,16 +235,16 @@ export interface IpcRequests {
 
   'voices:list': () => VoiceProfile[]
   'voices:delete': (id: string) => void
-  /** Готова ли модель слепков: без неё запоминать голос нечем. */
+  /** Whether the print model is ready: without it there is nothing to remember a voice with. */
   'voices:ready': () => { ready: boolean; hint?: string }
   'voices:enrollStart': () => void
   'voices:enrollStop': (name: string) => VoiceProfile | null
 
   /**
-   * Звук из renderer — путь для Windows и Linux.
+   * Audio from the renderer, the path for Windows and Linux.
    *
-   * Сэмплы идут как ArrayBuffer: копировать их в обычный массив на каждом
-   * куске значило бы гонять мусор сорок раз в секунду.
+   * The samples come as an ArrayBuffer: copying them into an ordinary array on
+   * every chunk would mean churning garbage forty times a second.
    */
   'capture:samples': (track: 'mic' | 'system', pcm: ArrayBuffer) => void
   'capture:ready': (track: 'mic' | 'system') => void
@@ -259,16 +259,16 @@ export interface LiveUtterance {
   start: number
   end: number
   /**
-   * Фраза договорена.
+   * The phrase is finished.
    *
-   * Потоковая модель уточняет текст по ходу речи и присылает одну и ту же
-   * фразу много раз с одним `id`: пока `final` не выставлен, показанное ещё
-   * может измениться.
+   * The streaming model refines the text as speech goes on and sends the same
+   * phrase many times under one `id`: until `final` is set, what has been shown
+   * can still change.
    */
   final: boolean
 }
 
-/** События main → renderer. */
+/** Events from main to the renderer. */
 export interface IpcEvents {
   'live:utterance': LiveUtterance
   'rec:state': RecordingState
@@ -278,12 +278,12 @@ export interface IpcEvents {
   'models:progress': ModelInfo
   'call:detected': { app: string; at: number }
   'toast': { kind: 'info' | 'success' | 'error'; text: string }
-  /** Открыть конкретную запись — например, по клику на уведомление. */
+  /** Open a particular recording, on a click on a notification for instance. */
   'view:meeting': { id: string }
-  /** Просьба к renderer открыть или закрыть поток захвата. */
+  /** A request to the renderer to open or close a capture stream. */
   'capture:start': { track: 'mic' | 'system'; micDeviceId?: string }
   'capture:stop': { track: 'mic' | 'system' }
-  /** Открыть экран без кликов — нужно проверочным прогонам. */
+  /** Open a screen without clicking, which test runs need. */
   'debug:view': { kind: 'home' | 'settings' | 'record' | 'meeting'; tab?: string }
 }
 

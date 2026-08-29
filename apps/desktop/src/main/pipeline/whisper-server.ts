@@ -9,10 +9,11 @@ import { modelPath } from './models.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
 
 /**
- * Долгоживущий whisper.cpp для live-режима.
+ * A long-lived whisper.cpp for live mode.
  *
- * Запускать `whisper-cli` на каждый кусок нельзя: модель грузится по секунде и
- * дольше, и весь бюджет задержки уходит на это. Сервер держит её в памяти.
+ * Running `whisper-cli` per chunk will not do: the model takes a second or
+ * more to load, and the whole latency budget goes on that. The server keeps it
+ * in memory.
  */
 
 let child: ChildProcess | null = null
@@ -55,7 +56,7 @@ async function waitForReady(targetPort: number, timeoutMs = 60_000): Promise<voi
       const response = await fetch(`http://127.0.0.1:${targetPort}/`, { signal: AbortSignal.timeout(800) })
       if (response.status < 500) return
     } catch {
-      // сервер ещё поднимается — это нормально первые секунды
+      // the server is still coming up, which is normal for the first seconds
     }
     await new Promise((r) => setTimeout(r, 300))
   }
@@ -105,20 +106,20 @@ export function stopWhisperServer(): void {
   port = 0
   if (!dying) return
   dying.kill('SIGTERM')
-  // Модель весит гигабайты, и сервер не всегда успевает закрыться сам:
-  // оставшийся жить процесс держит их в памяти до перезагрузки.
+  // The model weighs gigabytes, and the server does not always manage to shut
+  // down by itself: a process left alive holds them in memory until a reboot.
   setTimeout(() => {
     if (!dying.killed) dying.kill('SIGKILL')
   }, 2000).unref?.()
 }
 
 /**
- * Убрать серверы, оставшиеся от прошлых запусков.
+ * Remove servers left over from earlier runs.
  *
- * Если приложение сняли принудительно или оно упало, дочерний процесс остаётся
- * жить с родителем `1` — и держит модель в оперативной памяти. За несколько
- * таких запусков набирается десяток серверов и десятки гигабайт: живая
- * расшифровка после этого просто перестаёт успевать.
+ * If the application was force-quit or crashed, the child process stays alive
+ * with parent `1`, holding a model in memory. Over a few such runs a dozen
+ * servers and tens of gigabytes pile up, and live transcription simply stops
+ * keeping up after that.
  */
 export async function killOrphanServers(): Promise<number> {
   if (process.platform === 'win32') return 0
@@ -136,14 +137,14 @@ export async function killOrphanServers(): Promise<number> {
     if (!match) continue
     const [, pid, ppid, command] = match
     if (!command?.includes('whisper-server')) continue
-    // Только осиротевшие: у живого приложения свой сервер, и его трогать нельзя.
+    // Only the orphaned ones: a live application has its own server, which must not be touched.
     if (ppid !== '1') continue
     if (Number(pid) === process.pid) continue
     try {
       process.kill(Number(pid), 'SIGKILL')
       killed++
     } catch {
-      // Процесс мог закончиться сам, пока мы читали список.
+      // The process may have ended by itself while we were reading the list.
     }
   }
   return killed
@@ -154,10 +155,11 @@ interface InferenceSegment {
 }
 
 /**
- * Расшифровать кусок в уже поднятом сервере.
+ * Transcribe a chunk in a server that is already up.
  *
- * Возвращается только текст: точные таймкоды даст финальный проход по целому
- * файлу, а склеивать их из кусков — заведомо хуже.
+ * Only the text comes back: exact timestamps will come from the final pass
+ * over the whole file, and gluing them together out of chunks is bound to be
+ * worse.
  */
 export async function transcribeChunk(wav: Buffer, language: string): Promise<string> {
   if (!child || !port) throw new Error(t('whisper-server не запущен'))

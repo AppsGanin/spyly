@@ -1,5 +1,5 @@
-/* Geist Sans и Geist Mono — SIL OFL, поставляются в npm-пакете `geist`.
-   Берём вариативные начертания: один файл на семейство вместо десятка. */
+/* Geist Sans and Geist Mono, SIL OFL, shipped in the npm package `geist`.
+   The variable faces are used: one file per family instead of a dozen. */
 @font-face {
   font-family: 'Geist';
   src: url('../assets/fonts/Geist-Variable.woff2') format('woff2-variations');

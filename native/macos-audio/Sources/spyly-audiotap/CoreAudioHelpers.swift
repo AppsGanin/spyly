@@ -2,7 +2,7 @@ import AppKit
 import CoreAudio
 import Foundation
 
-/// Селекторы CoreAudio, для которых в Swift нет готовых констант.
+/// CoreAudio selectors that Swift has no ready-made constants for.
 enum Sel {
     static func fourCC(_ s: String) -> AudioObjectPropertySelector {
         var r: UInt32 = 0
@@ -53,7 +53,7 @@ func objectList(_ object: AudioObjectID, _ selector: AudioObjectPropertySelector
     return ids
 }
 
-/// CATapDescription принимает не PID, а идентификаторы аудиообъектов процессов.
+/// CATapDescription takes audio object identifiers of processes rather than PIDs.
 func processObjectID(forPID pid: pid_t) -> AudioObjectID? {
     var addr = address(Sel.translatePIDToProcessObject)
     var input = pid
@@ -75,11 +75,11 @@ func defaultOutputDevice() -> (id: AudioObjectID, uid: String)? {
     return (device, uid)
 }
 
-/// Приложение как его видит пользователь.
+/// An application as the user sees it.
 ///
-/// Звук браузерных созвонов (Meet, Телемост в Chrome) идёт не от основного
-/// процесса, а от хелперов, поэтому процессы одного приложения схлопываются
-/// в одну запись со списком PID — при захвате нужны все они.
+/// The audio of browser calls (Meet, Telemost in Chrome) comes not from the
+/// main process but from helpers, so the processes of one application are
+/// collapsed into a single entry with a list of PIDs: capture needs all of them.
 struct AudioApp: Encodable {
     let key: String
     let name: String
@@ -106,9 +106,10 @@ private func baseAppName(_ name: String) -> String {
 func listAudioApps() -> [AudioApp] {
     let objects = objectList(AudioObjectID(kAudioObjectSystemObject), Sel.processObjectList)
 
-    // Показываем только приложения с иконкой в Dock. Это надёжнее списка
-    // исключений: отсекает демоны вроде loginwindow и Пункта управления,
-    // но оставляет Safari и FaceTime, в которых тоже созваниваются.
+    // Only applications with an icon in the Dock are shown. That is more
+    // reliable than a list of exclusions: it cuts out daemons such as
+    // loginwindow and Control Centre while leaving Safari and FaceTime, which
+    // people also make calls in.
     let userApps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
     let userAppBundles = Set(userApps.compactMap { $0.bundleIdentifier })
     let userAppNames = Set(userApps.compactMap { $0.localizedName })
@@ -136,15 +137,15 @@ func listAudioApps() -> [AudioApp] {
         let displayName = baseAppName(rawName ?? base ?? "PID \(pid)")
         guard !displayName.isEmpty else { continue }
 
-        // Хелперы браузера сами по себе в Dock не значатся, поэтому проверяем
-        // не сам процесс, а приложение, которому он принадлежит.
+        // Browser helpers do not appear in the Dock by themselves, so what is
+        // checked is not the process but the application it belongs to.
         let belongsToUserApp = (base.map(userAppBundles.contains) ?? false) || userAppNames.contains(displayName)
         guard belongsToUserApp else { continue }
         let key = base ?? displayName
         let playing = (objectUInt32(object, Sel.processIsRunningOutput) ?? 0) != 0
 
         var acc = groups[key] ?? Accumulator(name: displayName, bundleID: base)
-        // Более короткое имя обычно и есть имя основного приложения.
+        // The shorter name is usually the name of the main application.
         if displayName.count < acc.name.count { acc.name = displayName }
         acc.pids.append(pid)
         acc.isPlaying = acc.isPlaying || playing
@@ -157,12 +158,12 @@ func listAudioApps() -> [AudioApp] {
         .sorted { ($0.isPlaying ? 0 : 1, $0.name.lowercased()) < ($1.isPlaying ? 0 : 1, $1.name.lowercased()) }
 }
 
-/// Кто-то другой сейчас пишет с микрофона.
+/// Somebody else is recording from the microphone right now.
 ///
-/// Главный признак того, что идёт созвон: он ловит и браузерные звонки
-/// (Meet, Телемост в Chrome), где имя процесса ничего не говорит.
-/// Оговорка: Bluetooth-гарнитуры на macOS стабильно сообщают, что не
-/// используются, поэтому одного этого признака мало.
+/// The main sign that a call is under way: it also catches browser calls
+/// (Meet, Telemost in Chrome), where the process name says nothing.
+/// A caveat: Bluetooth headsets on macOS reliably report that they are not in
+/// use, so this sign alone is not enough.
 func microphoneInUse() -> (busy: Bool, apps: [String]) {
     var apps: [String] = []
     let objects = objectList(AudioObjectID(kAudioObjectSystemObject), Sel.processObjectList)
@@ -176,7 +177,7 @@ func microphoneInUse() -> (busy: Bool, apps: [String]) {
         let name = NSRunningApplication(processIdentifier: pid)?.localizedName
         let bundle = objectString(object, Sel.processBundleID)
         let base = bundle.map { $0.split(separator: ".").prefix(3).joined(separator: ".") }
-        // Себя в список не включаем: мы и сами пишем с микрофона.
+        // We leave ourselves out of the list: we record from the microphone too.
         if pid == ProcessInfo.processInfo.processIdentifier { continue }
         let belongsToUserApp = (base.map(userAppBundles.contains) ?? false) || name != nil
         if belongsToUserApp, let display = name ?? bundle {
@@ -184,7 +185,7 @@ func microphoneInUse() -> (busy: Bool, apps: [String]) {
         }
     }
 
-    // Запасной признак: устройство ввода занято кем-то в системе.
+    // A fallback sign: the input device is busy with somebody in the system.
     var deviceBusy = false
     var addr = address(kAudioHardwarePropertyDefaultInputDevice)
     var size = UInt32(MemoryLayout<AudioObjectID>.size)

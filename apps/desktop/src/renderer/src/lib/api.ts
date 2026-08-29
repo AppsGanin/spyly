@@ -10,7 +10,7 @@ export const api = {
   }
 }
 
-/** Подписка на событие из main без утечки слушателей при перерисовке. */
+/** Subscribing to an event from main without leaking listeners on re-render. */
 export function useIpcEvent<E extends IpcEventName>(event: E, listener: (payload: IpcEvents[E]) => void): void {
   const ref = useRef(listener)
   ref.current = listener
@@ -24,10 +24,11 @@ interface AsyncState<T> {
 }
 
 /**
- * Загрузка данных из main.
+ * Loading data from main.
  *
- * Ответ на устаревший запрос отбрасывается: при быстрой смене встреч ответы
- * приходят вразнобой, и без этого в интерфейс попадала бы чужая расшифровка.
+ * The answer to a stale request is discarded: when meetings are switched
+ * quickly the answers arrive out of order, and without this somebody else's
+ * transcript would land in the interface.
  */
 export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncState<T> & { reload: () => void } {
   const [state, setState] = useState<AsyncState<T>>({ data: null, loading: true, error: null })

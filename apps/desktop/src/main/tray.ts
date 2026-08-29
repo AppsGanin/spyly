@@ -9,7 +9,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 let tray: Tray | null = null
 let lastState: RecordingState | null = null
 
-/** Хендлеры ставит слой IPC — трей не должен знать о записи ничего лишнего. */
+/** The handlers are installed by the IPC layer: the tray should know nothing extra about recording. */
 export const trayActions: {
   onToggleRecording?: () => void
   onShowWindow?: () => void
@@ -50,7 +50,7 @@ export function createTray(): void {
   tray.on('click', () => trayActions.onShowWindow?.())
 }
 
-/** Иконка меняется на залитую во время записи — приложение не должно быть незаметным. */
+/** The icon turns solid while recording: the application must not be inconspicuous. */
 export function updateTray(state: RecordingState): void {
   lastState = state
   if (!tray) return

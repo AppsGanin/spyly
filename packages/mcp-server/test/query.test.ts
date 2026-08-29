@@ -29,7 +29,7 @@ const meeting = (patch: Partial<Meeting> = {}): Meeting =>
     ...patch
   }) as Meeting
 
-/** Границы периода считаются по местному дню — человек думает в своём поясе. */
+/** Period bounds are computed by the local day: a person thinks in their own time zone. */
 const localDay = (date: Date | null): string =>
   date
     ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`

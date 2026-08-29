@@ -8,9 +8,9 @@ let package = Package(
         .executableTarget(
             name: "spyly-audiotap",
             path: "Sources/spyly-audiotap",
-            // Info.plist встраивается в сам бинарник: без него система не
-            // показывает запрос доступа к календарю по отдельному
-            // исполняемому файлу — EventKit молча отвечает отказом.
+            // The Info.plist is embedded into the binary itself: without it
+            // the system shows no calendar access request for a standalone
+            // executable, and EventKit silently answers with a refusal.
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

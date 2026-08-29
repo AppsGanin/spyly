@@ -7,19 +7,20 @@ import { LLM_PROVIDERS, getLlmProvider } from './llm/index.js'
 import type { AsrProvider, DiarizationProvider, LlmProvider } from './types.js'
 
 /**
- * Распознавание — только whisper.cpp.
+ * Recognition is whisper.cpp only.
  *
- * Раньше движков было три, и выбор между ними человек делать не может: чтобы
- * сравнить их осмысленно, нужен замер на своих записях. Оставили один и
- * лучший, а выбор свели к качеству модели внутри него.
+ * There used to be three engines, and choosing between them is not something a
+ * person can do: comparing them sensibly needs a measurement on their own
+ * recordings. We kept one, the best, and reduced the choice to the quality of
+ * the model inside it.
  */
 export const ASR_PROVIDERS: AsrProvider[] = [whisperCppProvider, ...SHERPA_ASR_PROVIDERS]
 
 /**
- * Какой движок расшифровывает выбранной моделью.
+ * Which engine transcribes with the chosen model.
  *
- * Человек выбирает качество, а не движок: движок — это деталь реализации, и
- * сравнить их на глаз всё равно нельзя.
+ * A person chooses quality, not an engine: the engine is an implementation
+ * detail, and comparing them by eye is not possible anyway.
  */
 export function providerForModel(modelId: string): AsrProvider {
   return sherpaProviderFor(modelId) ?? whisperCppProvider
@@ -36,7 +37,7 @@ export function getDiarizationProvider(id: string): DiarizationProvider {
 
 export { getLlmProvider }
 
-/** Список для настроек: что доступно и чего не хватает для готовности. */
+/** The list for settings: what is available and what is missing for it to be ready. */
 export async function listProviders(): Promise<ProviderInfo[]> {
   const out: ProviderInfo[] = []
   const collect = async (

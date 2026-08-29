@@ -1,21 +1,22 @@
 /**
- * Отсев выдумок распознавания.
+ * Filtering out text the recogniser invented.
  *
- * Whisper обучался в том числе на субтитрах, и на тишине выдаёт самую вероятную
- * строку из обучающих данных — титры вроде «Субтитры сделал DimaTorzok» или
- * «Thanks for watching». Ни порогом `no-speech`, ни подавлением неречевых
- * токенов это не лечится: проверено на whisper.cpp large-v3, фраза пролезает
- * при любых значениях.
+ * Whisper was trained partly on subtitles, and on silence it emits the most
+ * likely string from that training data: credits along the lines of "Subtitles
+ * by DimaTorzok" or "Thanks for watching". Neither the `no-speech` threshold
+ * nor suppressing non-speech tokens cures this: checked on whisper.cpp
+ * large-v3, the phrase gets through at any values.
  *
- * Список разделён на две части, и это важно. Подписи и имена ищутся подстрокой:
- * встретиться в живой речи они не могут. Концовки роликов вроде «спасибо за
- * просмотр» сверяются со всей строкой целиком — человек и правда может так
- * сказать, и вырезать такую реплику из середины разговора нельзя.
+ * The list is split in two, and that matters. Credits and names are looked for
+ * as substrings: they cannot occur in live speech. Video sign-offs such as
+ * "thanks for watching" are matched against the whole string, because a person
+ * really can say that, and such an utterance must not be cut out of the middle
+ * of a conversation.
  */
 
-/** Подписи и имена: ищутся подстрокой, ложных срабатываний не дают. */
+/** Credits and names: looked for as substrings, they produce no false positives. */
 const SIGNATURES: string[] = [
-  // Русский: подписи авторов субтитров
+  // Russian: subtitle author credits
   'dimatorzok',
   'dima torzok',
   'субтитры сделал',
@@ -32,14 +33,14 @@ const SIGNATURES: string[] = [
   'субтитры от amara',
   'алексей дубровский',
 
-  // Английский
+  // English
   'subtitles by',
   'amara.org',
   'transcription by',
   'subtitled by',
   'captions by',
 
-  // Тот же баг на других языках — своё имя в каждом
+  // The same bug in other languages, each with a name of its own
   'altyazı',
   'titulky vytvořil',
   'johnyx',
@@ -52,10 +53,10 @@ const SIGNATURES: string[] = [
 ]
 
 /**
- * Концовки роликов: сверяются со всей строкой целиком.
+ * Video sign-offs: matched against the whole string.
  *
- * «Спасибо» или «to be continued» человек может сказать и всерьёз — вырезать
- * их из середины разговора нельзя, поэтому только полное совпадение.
+ * A person can say "thanks" or "to be continued" and mean it, so these must not
+ * be cut out of the middle of a conversation: only a full match counts.
  */
 const CLOSINGS: string[] = [
   'продолжение следует',
@@ -87,10 +88,10 @@ const CLOSINGS: string[] = [
   'kiitos kun katsoit'
 ]
 
-/** То, что списком не выразить: имя с инициалом, пустая строка, служебные метки. */
+/** What a list cannot express: a name with an initial, an empty string, housekeeping markers. */
 const PATTERNS: RegExp[] = [
-  // «Корректор А.Егорова» — само слово «корректор» в речи законно, поэтому
-  // ловим только подпись целиком, с инициалом.
+  // "Proofreader A. Egorova": the word "proofreader" on its own is legitimate in
+  // speech, so only the whole credit is caught, initial included.
   /^корректор\s+[а-яё]\.?\s*[а-яё]*$/i,
   /^редактор\s+[а-яё]\.\s*[а-яё]*$/i,
   /^\[?\s*(music|applause|silence|blank[_\s]audio|музыка|аплодисменты)\s*\]?\.?$/i,
@@ -98,7 +99,7 @@ const PATTERNS: RegExp[] = [
   /^(и|а|э|ы|the)\.?$/i
 ]
 
-/** Строка без обрамляющей пунктуации и в нижнем регистре — для сверки со списками. */
+/** A string without surrounding punctuation and in lower case, for matching against the lists. */
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -106,7 +107,7 @@ function normalize(text: string): string {
     .trim()
 }
 
-/** Похожа ли реплика на выдумку модели, а не на реальную речь. */
+/** Whether an utterance looks like something the model invented rather than real speech. */
 export function isLikelyHallucination(text: string): boolean {
   const trimmed = text.trim()
   if (!trimmed) return true
@@ -122,15 +123,15 @@ export function isLikelyHallucination(text: string): boolean {
 }
 
 /**
- * Вырезать подпись субтитров, оставив живую речь.
+ * Cut out subtitle credits, keeping the live speech.
  *
- * Подпись прилипает к началу или концу реплики, а вместе с ней уходил и весь
- * остальной текст: на реальной записи «Субтитры делал DimaTorzok» утащила за
- * собой тридцать семь секунд разговора. Ищем подпись до конца предложения и
- * убираем только её.
+ * The credit sticks to the start or the end of an utterance, and all the rest
+ * of the text used to go with it: on a real recording "Subtitles by DimaTorzok"
+ * carried off thirty-seven seconds of conversation. We look for the credit up
+ * to the end of the sentence and remove only that.
  *
- * Возвращается очищенный текст или `null`, если после вырезания не остаётся
- * ничего осмысленного — такую реплику показывать незачем.
+ * Returns the cleaned text, or `null` if nothing meaningful is left after the
+ * cut: there is no reason to show such an utterance.
  */
 export function stripHallucination(text: string): string | null {
   let out = text.trim()
@@ -140,8 +141,8 @@ export function stripHallucination(text: string): string | null {
     for (;;) {
       const at = normalize(out).indexOf(needle)
       if (at === -1) break
-      // Границы ищем по исходной строке: сравнение идёт по нормализованной,
-      // но резать нужно то, что человек увидит.
+      // The bounds are found in the original string: matching goes over the
+      // normalised one, but what has to be cut is what a person will see.
       const span = matchSpan(out, needle)
       if (!span) break
       out = (out.slice(0, span.from) + ' ' + out.slice(span.to)).replace(/\s+/g, ' ').trim()
@@ -149,18 +150,19 @@ export function stripHallucination(text: string): string | null {
   }
 
   if (!out) return null
-  // Осталась пара слов — почти наверняка обрывок подписи, а не речь.
+  // A couple of words left is almost certainly a scrap of the credit, not speech.
   if (out.split(/\s+/).length < 3) return null
   return out
 }
 
 /**
- * Границы подписи в исходной строке.
+ * The bounds of a credit in the original string.
  *
- * Сравнение идёт по нормализованному тексту, а резать нужно исходный, поэтому
- * конец совпадения ищется наращиванием: берём кратчайший кусок, который после
- * нормализации совпадает с подписью целиком. Вырезаем ровно его — обрывать до
- * конца предложения нельзя, там уже живая речь.
+ * Matching goes over the normalised text while the original is what has to be
+ * cut, so the end of the match is found by growing: we take the shortest piece
+ * that, once normalised, matches the credit whole. Exactly that is cut out;
+ * running to the end of the sentence will not do, as live speech is already
+ * there.
  */
 function matchSpan(text: string, needle: string): { from: number; to: number } | null {
   for (let from = 0; from < text.length; from++) {
@@ -173,15 +175,15 @@ function matchSpan(text: string, needle: string): { from: number; to: number } |
 }
 
 /**
- * Зацикленный вывод модели.
+ * Looping output from the model.
  *
- * Whisper иногда сваливается в повтор одной фразы: «Я не знаю, что это значит.»
- * тридцать раз подряд там, где человек ничего подобного не говорил. На реальной
- * получасовой записи так получилось больше половины расшифровки.
+ * Whisper sometimes falls into repeating one phrase: "I don't know what that
+ * means." thirty times in a row where nobody said anything of the kind. On a
+ * real half-hour recording that made up more than half the transcript.
  *
- * Ищем самую короткую повторяющуюся группу слов: если из неё состоит почти весь
- * текст, это залипание, а не речь. Люди повторяются, но не десять раз подряд
- * слово в слово.
+ * We look for the shortest repeating group of words: if nearly the whole text
+ * consists of it, this is the model stuck rather than speech. People do repeat
+ * themselves, but not ten times in a row word for word.
  */
 export function isRepetitionLoop(text: string): boolean {
   const words = text
@@ -193,7 +195,7 @@ export function isRepetitionLoop(text: string): boolean {
   if (words.length < 6) return false
   if (new Set(words).size <= 2) return true
 
-  // До 60% длины: фраза с оборванным повтором занимает чуть больше половины.
+  // Up to 60% of the length: a phrase with a cut-off repeat takes a little over half.
   for (let unit = 1; unit <= Math.min(12, Math.floor(words.length * 0.6)); unit++) {
     const head = words.slice(0, unit)
     const headText = head.join(' ')
@@ -206,21 +208,21 @@ export function isRepetitionLoop(text: string): boolean {
     }
     if (repeats < 1) continue
 
-    // Хвост часто оборван на середине: модель останавливается посреди фразы.
+    // The tail is often cut off halfway: the model stops in the middle of a phrase.
     const tail = words.slice(covered)
     const tailIsStart = tail.length > 0 && tail.every((word, i) => word === head[i])
     if (tailIsStart) covered += tail.length
 
     const share = covered / words.length
     if (repeats >= 3 && share > 0.7) return true
-    // Два полных повтора и оборванный третий — тоже залипание, но только для
-    // длинных групп: «да, да» и «хорошо, хорошо» люди говорят и всерьёз.
+    // Two full repeats and a cut-off third is also a loop, but only for long
+    // groups: "yes, yes" and "all right, all right" are things people say and mean.
     if (repeats === 2 && tailIsStart && unit >= 3 && share > 0.85) return true
-    // Фраза и её оборванный повтор: «…что это значит. …что это».
+    // A phrase and its cut-off repeat: "...what that means. ...what that".
     if (repeats === 1 && tailIsStart && unit >= 4 && tail.length >= 3 && share > 0.95) return true
   }
   return false
 }
 
-/** Порог энергии, ниже которого участок считается тишиной, а текст — выдумкой. */
+/** The energy threshold below which a stretch counts as silence and the text as invention. */
 export const SILENCE_RMS_THRESHOLD = 0.006

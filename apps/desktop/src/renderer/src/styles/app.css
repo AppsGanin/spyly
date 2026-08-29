@@ -1,4 +1,4 @@
-/* Раскладка приложения и экраны. */
+/* The application layout and the screens. */
 
 .app {
   display: grid;
@@ -7,7 +7,7 @@
   background: var(--ds-background-200);
 }
 
-/* Область перетаскивания окна под светофором macOS. */
+/* The window drag region under the macOS traffic lights. */
 .titlebar {
   position: fixed;
   top: 0;
@@ -19,7 +19,7 @@
   pointer-events: none;
 }
 
-/* ── боковая панель ───────────────────────────────────────────── */
+/* ── the sidebar ──────────────────────────────────────────────── */
 .sidebar {
   display: flex;
   flex-direction: column;
@@ -53,8 +53,8 @@
   flex: none;
 }
 
-/* Поиск — такая же плоская строка, как остальные: рамка вокруг поля делала
-   из него отдельный блок и ломала спокойный строй панели. */
+/* Search is the same flat row as the rest: a border around the field made it a
+   block of its own and broke the quiet order of the panel. */
 .search {
   position: relative;
 }
@@ -92,9 +92,9 @@
   line-height: var(--leading-relaxed);
 }
 
-/* Главное действие и разделы — одинаковые плоские строки во всю ширину.
-   Рамок и карточек здесь нет: панель должна читаться как спокойный список,
-   а не как набор блоков. */
+/* The main action and the sections are the same full-width flat rows. There
+   are no borders or cards here: the panel has to read as a quiet list rather
+   than as a set of blocks. */
 .sidebar__action {
   display: flex;
   align-items: center;
@@ -119,8 +119,9 @@
 .sidebar__action--stop:hover:not(:disabled) { background: var(--ds-red-200); }
 .sidebar__action--stop svg { color: currentColor; }
 
-/* Разделы стоят внизу, отделённые от списка тонкой чертой: список записей
-   длинный и прокручивается, а переход в настройки должен быть на месте. */
+/* The sections sit at the bottom, separated from the list by a thin rule: the
+   list of recordings is long and scrolls, while the way to settings has to stay
+   where it is. */
 .sidebar__nav {
   display: flex;
   flex-direction: column;
@@ -149,12 +150,12 @@
 .navitem:hover { background: var(--ds-gray-alpha-200); color: var(--ds-gray-1000); }
 .navitem--active { background: var(--ds-gray-alpha-300); color: var(--ds-gray-1000); }
 
-/* ── фильтры списка ────────────────────────────────────────────── */
+/* ── the list filters ──────────────────────────────────────────── */
 .filters { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 4px; }
 .filter {
   height: 24px;
-  /* Четыре фильтра должны умещаться в строку: перенос последнего на свою
-     строку рвал спокойный строй панели. */
+  /* Four filters have to fit on one line: wrapping the last one onto a line of
+     its own broke the quiet order of the panel. */
   padding: 0 7px;
   font-size: 12px;
   border: none;
@@ -169,7 +170,7 @@
 .filter:hover { background: var(--ds-gray-alpha-200); color: var(--ds-gray-1000); }
 .filter--active { background: var(--ds-gray-alpha-300); color: var(--ds-gray-1000); }
 
-/* ── постоянный индикатор записи ───────────────────────────────── */
+/* ── the persistent recording indicator ────────────────────────── */
 .recpill {
   display: flex;
   align-items: center;
@@ -196,8 +197,8 @@
 }
 .recpill__time { font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* Подпись раздела: тихая, с воздухом сверху — она разделяет дни, а не
-   спорит за внимание с самими записями. */
+/* A section caption: quiet, with air above it. It separates the days rather
+   than competing for attention with the recordings themselves. */
 .group__label {
   display: flex;
   align-items: center;
@@ -209,10 +210,10 @@
 }
 .group__count { color: var(--ds-gray-600); font-variant-numeric: tabular-nums; }
 
-/* Запись — одна строка: точка состояния, название, время. Подпись из времени,
-   длительности и состояния занимала вторую строку под каждой записью, и на
-   экран помещалась половина списка. Всё, что ушло из строки, осталось в
-   подсказке при наведении. */
+/* A recording is one row: a state dot, the title, the time. A caption made of
+   the time, the duration and the state took a second line under every recording
+   and half the list fit on screen. Everything that left the row stayed in the
+   tooltip on hover. */
 .item {
   display: block;
   width: 100%;
@@ -234,8 +235,8 @@
   gap: var(--space-2);
   min-width: 0;
 }
-/* Полая точка у обычной записи почти не видна и держит выключку названий;
-   заливка появляется, только когда есть что сказать о состоянии. */
+/* A hollow dot on an ordinary recording is barely visible and keeps the titles
+   aligned; the fill appears only when there is something to say about the state. */
 .item__dot {
   width: 6px;
   height: 6px;
@@ -272,8 +273,8 @@
   font-size: var(--text-sm);
   color: var(--ds-gray-700);
 }
-/* Каждый кусок переносится целиком: иначе разделители «·» уезжают на
-   отдельные строки и строка превращается в кашу. */
+/* Each piece wraps whole: otherwise the "·" separators end up on lines of
+   their own and the row turns into a mess. */
 .item__meta > * {
   white-space: nowrap;
 }
@@ -302,7 +303,7 @@
   overflow: hidden;
 }
 
-/* ── основная область ─────────────────────────────────────────── */
+/* ── the main area ────────────────────────────────────────────── */
 .main {
   min-width: 0;
   min-height: 0;
@@ -324,8 +325,8 @@
   flex: none;
 }
 
-/* Сведения о записи идут отдельной строкой под заголовком и кнопками —
-   там им хватает всей ширины окна. */
+/* The details of a recording go on a line of their own under the title and the
+   buttons, where they have the full width of the window. */
 .main__header--stacked {
   flex-direction: column;
   align-items: stretch;
@@ -333,8 +334,8 @@
 }
 .main__header--stacked .item__meta { margin-top: 0; }
 
-/* Длинный заголовок обрезаем на второй строке: полное название всегда видно
-   в подсказке и в поле редактирования. */
+/* A long title is cut off on the second line: the full one is always visible
+   in the tooltip and in the edit field. */
 .main__header h1 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -355,7 +356,7 @@
   padding: 0 var(--space-6) var(--space-8);
 }
 
-/* ── пустое состояние ─────────────────────────────────────────── */
+/* ── the empty state ──────────────────────────────────────────── */
 .empty {
   flex: 1;
   display: flex;
@@ -379,7 +380,7 @@
 .empty__title { font-size: var(--text-md); font-weight: 600; }
 .empty__text { color: var(--ds-gray-700); max-width: 380px; line-height: var(--leading-relaxed); }
 
-/* ── индикатор уровня ─────────────────────────────────────────── */
+/* ── the level meter ──────────────────────────────────────────── */
 .level {
   display: flex;
   align-items: center;
@@ -410,7 +411,7 @@
 }
 .meter__fill--silent { background: var(--ds-gray-500); }
 
-/* ── пилюля записи ────────────────────────────────────────────── */
+/* ── the recording pill ───────────────────────────────────────── */
 .recbar {
   display: flex;
   align-items: center;
@@ -439,7 +440,7 @@
   font-weight: 500;
 }
 
-/* ── расшифровка ──────────────────────────────────────────────── */
+/* ── the transcript ───────────────────────────────────────────── */
 .transcript {
   display: flex;
   flex-direction: column;
@@ -487,7 +488,7 @@
 }
 .utterance--provisional .utterance__text { color: var(--ds-gray-900); font-style: italic; }
 
-/* Фраза ещё произносится: текст дописывается, и его видно по курсору. */
+/* The phrase is still being spoken: the text is being extended, and the cursor shows it. */
 .utterance__cursor {
   display: inline-block;
   width: 2px;
@@ -509,14 +510,14 @@
   flex: none;
 }
 
-/* ── вкладки ──────────────────────────────────────────────────── */
+/* ── tabs ─────────────────────────────────────────────────────── */
 .tabs {
   display: flex;
   gap: var(--space-1);
   padding: 0 var(--space-6);
   box-shadow: inset 0 -1px 0 var(--ds-gray-alpha-300);
-  /* Фон обязателен: без него прокручиваемый текст просвечивает сквозь
-     полосу вкладок и обрезанные строки выглядят как сбой отрисовки. */
+  /* The background is mandatory: without it the scrolling text shows through the
+     tab strip and the clipped lines look like a rendering fault. */
   background: var(--ds-background-100);
   position: relative;
   z-index: 1;
@@ -546,14 +547,14 @@
   background: var(--ds-gray-1000);
 }
 
-/* ── конспект ─────────────────────────────────────────────────── */
+/* ── the summary ──────────────────────────────────────────────── */
 .summary { max-width: 720px; display: flex; flex-direction: column; gap: var(--space-6); }
 .summary__tldr { font-size: var(--text-md); line-height: var(--leading-relaxed); }
 .summary__section h4 { margin-bottom: var(--space-2); color: var(--ds-gray-900); }
 .task { display: flex; gap: var(--space-2); align-items: flex-start; line-height: var(--leading-relaxed); }
 .task input { margin-top: 4px; accent-color: var(--ds-blue-700); }
 
-/* ── онбординг ────────────────────────────────────────────────── */
+/* ── onboarding ───────────────────────────────────────────────── */
 .onboarding {
   height: 100%;
   display: grid;
@@ -595,7 +596,7 @@
 .check__title { font-weight: 500; }
 .check__hint { font-size: var(--text-sm); color: var(--ds-gray-700); margin-top: 2px; line-height: var(--leading-tight); }
 
-/* ── настройки ────────────────────────────────────────────────── */
+/* ── settings ─────────────────────────────────────────────────── */
 .settings { max-width: 720px; display: flex; flex-direction: column; gap: var(--space-8); }
 .settings__group { display: flex; flex-direction: column; gap: var(--space-4); }
 .settings__groupTitle {
@@ -612,8 +613,8 @@
   align-items: center;
 }
 .settings__row--stack { grid-template-columns: 1fr; }
-/* Переключатели остаются рядом с подписью на любой ширине: они узкие, и
-   растягивать их в отдельную строку незачем. */
+/* Switches stay next to their caption at any width: they are narrow, and there
+   is no reason to stretch them onto a line of their own. */
 .settings__row--inline { grid-template-columns: 1fr auto; align-items: center; }
 
 .switch {
@@ -641,7 +642,7 @@
 .switch--on { background: var(--ds-blue-700); }
 .switch--on::after { transform: translateX(16px); background: #fff; }
 
-/* ── всплывашки ───────────────────────────────────────────────── */
+/* ── pop-ups ──────────────────────────────────────────────────── */
 .toasts {
   position: fixed;
   right: var(--space-5);
@@ -675,10 +676,10 @@
 .toast--error .toast__mark { background: var(--ds-red-700); }
 .toast--info .toast__mark { background: var(--ds-blue-700); }
 
-/* ── диалоги ──────────────────────────────────────────────────── */
+/* ── dialogs ──────────────────────────────────────────────────── */
 dialog.modal {
-  /* Нативный <dialog> центрируется через margin: auto, а общий сброс полей
-     его снимает — без этой строки окно прилипает к левому верхнему углу. */
+  /* A native <dialog> is centred through margin: auto, and the general margin
+     reset takes that away; without this line the window sticks to the top left. */
   margin: auto;
   border: none;
   padding: 0;
@@ -701,7 +702,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .modal__body { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
 .modal__actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 
-/* ── прогресс обработки ───────────────────────────────────────── */
+/* ── processing progress ──────────────────────────────────────── */
 .stages { display: flex; flex-direction: column; gap: var(--space-2); }
 .stage { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-base); }
 .stage__mark {
@@ -712,7 +713,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   flex: none;
   transition: color var(--duration-popover) var(--ease-swift);
 }
-/* Готовый этап отмечается галочкой — она появляется, а не возникает. */
+/* A finished stage is marked with a tick, and it fades in rather than snapping in. */
 .stage--done .stage__mark svg { animation: mark-in var(--duration-popover) var(--ease-swift); }
 @keyframes mark-in {
   from { opacity: 0; transform: scale(0.6); }
@@ -721,7 +722,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .stage--pending { color: var(--ds-gray-700); }
 .stage--failed { color: var(--ds-red-900); }
 
-/* ── список приложений для захвата ────────────────────────────── */
+/* ── the list of applications to capture ──────────────────────── */
 .applist { display: flex; flex-direction: column; gap: var(--space-1); max-height: 240px; overflow-y: auto; }
 .appitem {
   display: flex;
@@ -735,7 +736,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .appitem:hover { background: var(--ds-gray-alpha-200); }
 .appitem input { accent-color: var(--ds-blue-700); }
 
-/* ── плеер ────────────────────────────────────────────────────── */
+/* ── the player ───────────────────────────────────────────────── */
 .player {
   display: flex;
   align-items: center;
@@ -766,10 +767,10 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   color: var(--ds-gray-900);
 }
 
-/* ── узкое окно ───────────────────────────────────────────────── */
+/* ── a narrow window ──────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  /* Заголовок и кнопки перестают помещаться в строку задолго до предела
-     ширины окна, поэтому складываем их раньше, чем начнётся наложение. */
+  /* The title and the buttons stop fitting on one line well before the window
+     runs out of width, so they are folded before any overlap begins. */
   .main__header {
     flex-direction: column;
     align-items: stretch;
@@ -791,9 +792,9 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   .recbar { flex-wrap: wrap; }
 }
 
-/* Подписи на кнопках экспорта прячем раньше, чем сжимается боковая панель:
-   в шапке записи их шесть, и на 900–1000 px строка успевает развалиться
-   на три ряда до того, как места станет мало у списка. */
+/* The captions on the export buttons are hidden before the sidebar shrinks:
+   there are six of them in a recording's header, and at 900 to 1000 px the row
+   falls apart into three before the list starts running out of room. */
 @media (max-width: 1040px) {
   .btn--collapsible span { display: none; }
   .btn--collapsible { width: var(--control-sm); padding: 0; }
@@ -803,7 +804,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   .app { grid-template-columns: 180px 1fr; }
 }
 
-/* ── переключатель дорожек ─────────────────────────────────────── */
+/* ── the track selector ────────────────────────────────────────── */
 .segmented {
   display: inline-flex;
   padding: 2px;
@@ -832,7 +833,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   box-shadow: var(--ds-shadow-border-small);
 }
 
-/* ── составная кнопка: действие + выбор ────────────────────────── */
+/* ── a split button: action plus choice ────────────────────────── */
 .split { display: inline-flex; }
 .split__main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .split__more {
@@ -843,11 +844,11 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   margin-left: 1px;
 }
 
-/* Карточка-выбор: у движка может быть несколько моделей. */
+/* A choice card: an engine can have several models. */
 .check--selected { box-shadow: 0 0 0 1px var(--ds-blue-700); }
 .check--selected:hover { box-shadow: 0 0 0 1px var(--ds-blue-700); }
 
-/* ── выбор варианта (качество распознавания) ───────────────────── */
+/* ── picking a variant (recognition quality) ───────────────────── */
 .options {
   display: flex;
   flex-direction: column;
@@ -875,7 +876,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .option--selected:hover { background: var(--ds-blue-100); }
 
-/* Кружок-переключатель: рисуем сами, чтобы он жил в общей системе цветов. */
+/* The radio circle is drawn here, so that it lives in the shared colour system. */
 .option__mark {
   width: 16px;
   height: 16px;
@@ -910,7 +911,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .option__status { font-size: var(--text-sm); color: var(--ds-gray-900); }
 
-/* ── служебные модели: наличие, без выбора ─────────────────────── */
+/* ── support models: presence, no choice ───────────────────────── */
 .support {
   display: flex;
   align-items: center;
@@ -928,7 +929,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   .option__side { grid-column: 2; justify-content: flex-start; margin-top: var(--space-2); }
 }
 
-/* Подсветка совпадений в расшифровке. */
+/* Highlighting matches in the transcript. */
 .hl {
   background: var(--ds-amber-300);
   color: var(--ds-amber-1000);
@@ -936,7 +937,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   padding: 0 2px;
 }
 
-/* ── карточка задачи ───────────────────────────────────────────── */
+/* ── the task card ─────────────────────────────────────────────── */
 .task-card {
   display: flex;
   align-items: flex-start;
@@ -950,13 +951,13 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .task-card__text { line-height: var(--leading-relaxed); }
 .task-card__text--done { color: var(--ds-gray-700); text-decoration: line-through; }
 
-/* Отмеченная во время разговора реплика. */
+/* An utterance marked during the conversation. */
 .utterance--marked {
   box-shadow: inset 2px 0 0 var(--ds-amber-700);
   padding-left: calc(var(--space-2) + 4px);
 }
 
-/* ── теги словаря ──────────────────────────────────────────────── */
+/* ── dictionary tags ───────────────────────────────────────────── */
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chip {
   display: inline-flex;
@@ -983,7 +984,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .chip__remove:hover { color: var(--ds-gray-1000); }
 
-/* ── справка по клавишам ───────────────────────────────────────── */
+/* ── the shortcut help ─────────────────────────────────────────── */
 .keys { display: flex; flex-direction: column; gap: var(--space-2); }
 .keys__row { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-base); }
 .keys kbd {
@@ -1001,7 +1002,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   flex: none;
 }
 
-/* Поле пояснения к отметке — появляется сразу под полосой записи. */
+/* The note field for a mark, appearing right under the recording strip. */
 .recwarn {
   display: flex;
   align-items: center;
@@ -1029,7 +1030,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .marknote__at { color: var(--ds-amber-900); font-weight: 600; flex: none; }
 
-/* ── редактируемые строки конспекта ────────────────────────────── */
+/* ── editable summary rows ─────────────────────────────────────── */
 .editline {
   display: flex;
   align-items: flex-start;
@@ -1048,7 +1049,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   word-break: break-word;
 }
 .editline__text:focus { box-shadow: var(--ds-focus-ring); }
-/* Пустая строка иначе схлопывается и по ней нельзя попасть курсором. */
+/* An empty row otherwise collapses and the caret cannot be placed in it. */
 .editline__text:empty::before {
   content: attr(data-placeholder);
   color: var(--ds-gray-700);
@@ -1078,7 +1079,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   .taskrow__remove { grid-area: remove; }
 }
 
-/* ── доли говорения ────────────────────────────────────────────── */
+/* ── speaking shares ───────────────────────────────────────────── */
 .shares { display: flex; flex-direction: column; gap: var(--space-2); }
 .shares__bar {
   display: flex;
@@ -1090,13 +1091,13 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .shares__part {
   height: 100%;
   min-width: 2px;
-  /* Доли пересчитываются после правок: полоса переезжает, а не прыгает. */
+  /* The shares are recomputed after edits: the bar moves rather than jumping. */
   transition: width var(--duration-overlay) var(--ease-swift);
 }
 .shares__legend { display: flex; flex-wrap: wrap; gap: var(--space-3); font-size: var(--text-sm); }
 .shares__item { display: inline-flex; align-items: center; gap: 6px; }
 
-/* Кнопка копирования выделенного — всплывает над текстом. */
+/* The button for copying a selection, floating above the text. */
 .selcopy {
   position: fixed;
   z-index: var(--z-tooltip);
@@ -1119,7 +1120,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .filter--tag { color: var(--ds-purple-900); }
 .filter--tag.filter--active { background: var(--ds-purple-100); color: var(--ds-purple-900); }
 
-/* ── шаблоны промпта ───────────────────────────────────────────── */
+/* ── prompt templates ──────────────────────────────────────────── */
 .tmpl-list { display: flex; flex-direction: column; gap: var(--space-2); }
 .tmpl {
   display: flex;
@@ -1130,7 +1131,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   box-shadow: var(--ds-shadow-border);
   background: var(--ds-background-100);
 }
-/* Текст шаблона длинный — показываем начало, целиком видно при правке. */
+/* A template's text is long, so the start is shown; it is visible whole while editing. */
 .tmpl__text {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1148,7 +1149,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .chip--toggle { cursor: pointer; border: none; font: inherit; opacity: 0.55; }
 .chip--toggle.chip--on { opacity: 1; background: var(--ds-blue-200); color: var(--ds-blue-900); }
 
-/* ── список для выбора одной записи ────────────────────────────── */
+/* ── the list for picking one recording ────────────────────────── */
 .picklist { display: flex; flex-direction: column; gap: var(--space-1); max-height: 280px; overflow-y: auto; }
 .picklist__item {
   display: flex;
@@ -1168,10 +1169,11 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .picklist__item--on { background: var(--ds-blue-200); color: var(--ds-blue-900); }
 .picklist__item--on:hover { background: var(--ds-blue-200); }
 
-/* ── меню действий ─────────────────────────────────────────────── */
+/* ── the action menu ───────────────────────────────────────────── */
 .menu { position: relative; display: inline-flex; }
-/* Список пунктов висит поверх окна: внутри своего места его обрезал бы край
-   прокручиваемого списка записей. Координаты считает сам компонент. */
+/* The list of items hangs over the window: in its own place it would be
+   clipped by the edge of the scrolling list of recordings. The component
+   computes the coordinates itself. */
 .menu__list {
   position: fixed;
   z-index: var(--z-menu);
@@ -1203,36 +1205,37 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .menu__item--danger { color: var(--ds-red-900); }
 .menu__item--danger:hover:not(:disabled) { background: var(--ds-red-100); }
 
-/* Только прозрачность: сдвиг занят выключкой относительно кнопки. */
+/* Opacity only: the transform is taken by the alignment against the button. */
 @keyframes menu-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-/* ── правка расшифровки ────────────────────────────────────────── */
-/* Действия у реплики появляются по наведению: постоянно видимые, они
-   превращают расшифровку в панель инструментов. */
+/* ── editing the transcript ────────────────────────────────────── */
+/* The actions on an utterance appear on hover: permanently visible, they turn
+   the transcript into a toolbar. */
 .utterance__actions { opacity: 0; transition: opacity var(--duration-fast) var(--ease-swift); }
 .utterance:hover .utterance__actions,
 .utterance--open .utterance__actions,
 .utterance__actions:focus-within { opacity: 1; }
 
-/* Слова, в которых модель сомневалась. Подчёркивание, а не цвет: цветом уже
-   размечены говорящие, и второй смысл на ту же краску не повесить. */
+/* The words the model was unsure about. An underline rather than colour:
+   colour already marks the speakers, and a second meaning cannot hang on the
+   same paint. */
 .doubt {
   text-decoration: underline wavy var(--ds-amber-700);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }
 
-/* Текущее совпадение поиска отличаем от остальных — иначе переход между
-   ними не виден. */
+/* The current search match is distinguished from the rest, or moving between
+   them is invisible. */
 .hl--current {
   background: var(--ds-amber-700);
   color: var(--ds-gray-1000);
 }
 
-/* ── переход между совпадениями поиска ─────────────────────────── */
+/* ── moving between search matches ─────────────────────────────── */
 .finder {
   display: inline-flex;
   align-items: center;
@@ -1247,16 +1250,16 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   text-align: right;
 }
 
-/* Значок «узнан по голосу»: подпись словами повторялась у каждой реплики. */
+/* The "recognised by voice" icon: a caption in words repeated on every utterance. */
 .voicemark {
   display: inline-flex;
   align-items: center;
   color: var(--ds-gray-700);
 }
 
-/* ── связанные записи ──────────────────────────────────────────── */
-/* Одной строкой в шапке: блоком посреди расшифровки они отодвигали вниз
-   то, ради чего страницу и открыли. */
+/* ── related recordings ────────────────────────────────────────── */
+/* One line in the header: as a block in the middle of the transcript they
+   pushed down the very thing the page was opened for. */
 .related {
   display: flex;
   flex-wrap: wrap;
@@ -1268,8 +1271,8 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .related__item { white-space: nowrap; }
 
 
-/* ── плавающая панель поверх окон ──────────────────────────────── */
-/* Окно прозрачное, поэтому фон рисует сама панель, а не body. */
+/* ── the floating panel above other windows ────────────────────── */
+/* The window is transparent, so the panel draws the background rather than body. */
 .is-overlay,
 .is-overlay body {
   background: transparent;
@@ -1281,14 +1284,14 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Ровно окно: любой зазор виден насквозь, окно прозрачное. */
+  /* Exactly the window: any gap shows straight through, as the window is transparent. */
   height: 100vh;
   padding: 0 8px 0 12px;
   border-radius: var(--radius-full);
   background: var(--ds-gray-100);
   box-shadow: var(--ds-shadow-border), var(--ds-shadow-menu);
-  /* Панель можно утащить в другое место экрана — кнопки при этом остаются
-     нажимаемыми. */
+  /* The panel can be dragged elsewhere on screen, and the buttons stay
+     clickable while it is. */
   -webkit-app-region: drag;
   user-select: none;
 }
@@ -1331,7 +1334,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .overlay__btn--done { color: var(--ds-green-900); }
 .overlay__btn--failed { color: var(--ds-red-900); }
 
-/* Теги в списке записей: мелкие, чтобы не спорить с названием. */
+/* Tags in the recording list: small, so as not to compete with the title. */
 .item__tags {
   margin-left: 14px;
   display: flex;

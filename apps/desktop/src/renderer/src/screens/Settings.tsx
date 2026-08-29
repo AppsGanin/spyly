@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'agents', label: t('Агенты') }
 ]
 
-/** Строка «подпись слева, контрол справа» — основная единица настроек. */
+/** A "caption on the left, control on the right" row, the basic unit of settings. */
 function Row({
   title,
   hint,
@@ -25,7 +25,7 @@ function Row({
 }: {
   title: string
   hint?: string
-  /** Узкий контрол вроде переключателя — не разносим по строкам на узком окне. */
+  /** A narrow control such as a switch: not split across lines in a narrow window. */
   inline?: boolean
   children: ReactNode
 }) {
@@ -112,7 +112,7 @@ export function SettingsScreen({ initialTab }: { initialTab?: string } = {}) {
   )
 }
 
-// ── общее ─────────────────────────────────────────────────────────────────
+// ── general ───────────────────────────────────────────────────────────────
 
 function GeneralTab({
   settings,
@@ -123,9 +123,9 @@ function GeneralTab({
   saveSettings: ReturnType<typeof useStore>['saveSettings']
   models: ModelInfo[]
 }) {
-  // Мгновенный текст даёт потоковая модель. Без неё живая расшифровка тоже
-  // работает, но показывает фразу целиком и только когда она договорена, —
-  // обещать секунду в этом случае нельзя.
+  // Instant text comes from the streaming model. Without it live transcription
+  // still works, but shows a phrase whole and only once it is finished, and a
+  // second cannot be promised in that case.
   const instant = models.find((m) => m.id === 'nemotron-3.5')?.downloaded ?? false
   return (
     <section className="settings__group">
@@ -137,7 +137,7 @@ function GeneralTab({
             try {
               localStorage.setItem('spyly.lang', next)
             } catch {
-              // Приватный режим — язык применится после перезапуска.
+              // Private mode: the language will take effect after a restart.
             }
             void saveSettings({ uiLang: next }).then(() => location.reload())
           }}
@@ -239,10 +239,10 @@ function GeneralTab({
 }
 
 /**
- * Версия и обновления.
+ * Version and updates.
  *
- * Проверка идёт и сама, раз в несколько часов, но человеку нужно место, где
- * видно версию и можно проверить сейчас.
+ * The check also runs by itself every few hours, but a person needs somewhere
+ * the version is visible and a check can be made now.
  */
 function Updates() {
   const { notify } = useStore()
@@ -278,16 +278,17 @@ function Updates() {
 }
 
 /**
- * Доступ к календарю.
+ * Calendar access.
  *
- * Без него запись называется «Запись 27 августа», а участники — «Участник 2»:
- * найти потом нужный разговор по такому архиву невозможно.
+ * Without it a recording is called "Recording, 27 August" and the participants
+ * "Speaker 2": finding the conversation you want in an archive like that is
+ * impossible.
  */
 function CalendarAccess() {
   const { notify } = useStore()
   const [state, setState] = useState<{ supported: boolean; granted: boolean } | null>(null)
   const [busy, setBusy] = useState(false)
-  /** Система уже отказала: диалог больше не покажут, остаются только настройки. */
+  /** The system has already refused: the dialog will not be shown again, only settings remain. */
   const [denied, setDenied] = useState(false)
 
   const refresh = async () => setState(await api.call('calendar:status'))
@@ -295,8 +296,8 @@ function CalendarAccess() {
     void refresh()
   }, [])
 
-  // Возвращаясь из системных настроек, человек ждёт, что приложение заметит
-  // выданный доступ само, а не после перезапуска.
+  // Coming back from the system settings, a person expects the application to
+  // notice the access granted by itself rather than after a restart.
   useEffect(() => {
     const recheck = () => void refresh()
     window.addEventListener('focus', recheck)
@@ -313,9 +314,9 @@ function CalendarAccess() {
       if (result.granted) {
         notify('success', t('Доступ к календарю разрешён'))
       } else {
-        // Своё окно система показывает один раз, а иногда не показывает вовсе.
-        // Поэтому не сообщаем об отказе, а сразу ведём туда, где доступ
-        // выдаётся руками и наверняка.
+        // The system shows its dialog once, and sometimes does not show it at all. So
+        // we do not report a refusal but lead straight to where access is granted by
+        // hand and for certain.
         notify('info', t('Открываю настройки. Включите Spyly в разделе «Календари»'))
         await api.call('app:openPrivacySettings', 'calendar')
       }
@@ -356,9 +357,9 @@ function CalendarAccess() {
   )
 }
 
-// ── расшифровка ───────────────────────────────────────────────────────────
+// ── transcription ─────────────────────────────────────────────────────────
 
-/** Модели распознавания, от быстрой к точной. Движок один — Whisper. */
+/** Recognition models, from the fast one to the accurate one. One engine: Whisper. */
 const ASR_MODELS = [
   'whisper-large-v3-turbo',
   'whisper-large-v3',
@@ -379,13 +380,13 @@ function TranscriptionTab({
   models: ModelInfo[]
 }) {
   const allowed = ASR_MODELS
-  // Список моделей иначе разрастается до девяти позиций вперемешку: показываем
-  // только те, что относятся к выбранному движку, плюс общие.
+  // The model list otherwise grows to nine entries all mixed together: only those
+  // belonging to the chosen engine are shown, plus the shared ones.
   const visible = models.filter((m) => m.purpose !== 'asr' || allowed.includes(m.id))
-  // Чего не хватает выбранному движку — это же предлагаем скачать одной кнопкой.
+  // Whatever the chosen engine is missing is what we offer to download in one click.
   const engineModels = models.filter((m) => allowed.includes(m.id))
-  // Если явный выбор не сделан или его модель удалили, показываем ту, что
-  // движок возьмёт сам — первую скачанную по убыванию точности.
+  // If no explicit choice was made, or its model was deleted, we show the one the
+  // engine will take by itself: the first downloaded one in descending accuracy.
   const downloadedOwn = engineModels.filter((m) => m.downloaded)
   const activeModel =
     downloadedOwn.find((m) => m.id === settings.asrModel)?.id ??
@@ -394,8 +395,8 @@ function TranscriptionTab({
     ''
 
   /**
-   * Выбор варианта — одно действие: недостающее скачивается и сразу
-   * становится рабочим, а не требует второго нажатия «Скачать».
+   * Choosing a variant is one action: what is missing downloads and becomes
+   * working straight away rather than needing a second press of "Download".
    */
   const chooseModel = async (model: ModelInfo) => {
     await saveSettings({ asrModel: model.id })
@@ -450,11 +451,12 @@ function TranscriptionTab({
 }
 
 /**
- * Выбор качества распознавания.
+ * Choosing recognition quality.
  *
- * Пользователь выбирает не файл, а компромисс «точнее / быстрее»: имена вроде
- * `large-v3-turbo` ему ничего не говорят. Скачивание — часть выбора, а не
- * отдельный шаг: нажал на вариант, он скачался и стал рабочим.
+ * The user is choosing a trade-off between accuracy and speed, not a file:
+ * names like `large-v3-turbo` mean nothing to them. Downloading is part of the
+ * choice rather than a separate step: press a variant, it downloads and becomes
+ * the working one.
  */
 function QualityOption({
   model,
@@ -550,7 +552,7 @@ function QualityOption({
   )
 }
 
-/** Служебные модели: выбирать нечего, важно только наличие. */
+/** Support models: there is nothing to choose, only presence matters. */
 function SupportModel({ model }: { model: ModelInfo }) {
   const downloading = model.progress !== undefined && !model.downloaded
   return (
@@ -572,11 +574,12 @@ function SupportModel({ model }: { model: ModelInfo }) {
 }
 
 /**
- * Словарь имён и терминов.
+ * A dictionary of names and terms.
  *
- * Распознавание не знает, что «биллинг» — это биллинг, а не «Беллинге», пока
- * не увидит слово в контексте. Список подставляется как подсказка к каждой
- * расшифровке; имена запомненных участников добавляются к нему сами.
+ * Recognition does not know that "billing" is billing rather than "Belling"
+ * until it sees the word in context. The list is passed as a hint to every
+ * transcription; the names of remembered participants are added to it
+ * automatically.
  */
 function VocabularyEditor({
   terms,
@@ -585,7 +588,7 @@ function VocabularyEditor({
 }: {
   terms: string[]
   onChange: (next: string[]) => void
-  /** Не все движки принимают подсказку. */
+  /** Not every engine accepts a hint. */
   supported: boolean
 }) {
   const [draft, setDraft] = useState('')
@@ -652,12 +655,12 @@ function VocabularyEditor({
 }
 
 /**
- * Что поставить, чтобы конспект собирался сам.
+ * What to install so that summaries are made automatically.
  *
- * Ключи из приложения убраны, поэтому все варианты — без оплаты по токенам:
- * уже авторизованный кодинг-агент или локальная модель. Если ничего не
- * установлено, конспект всё равно можно получить, попросив о нём Claude
- * Desktop, которому записи уже видны через MCP.
+ * API keys have been taken out of the application, so every option here comes
+ * without a per-token bill: a coding agent already authorised, or a local
+ * model. With nothing installed a summary can still be had by asking Claude
+ * Desktop for one, which already sees the recordings over MCP.
  */
 function SummarySetup({ onCopy }: { onCopy: (text: string) => void }) {
   const options = [
@@ -705,11 +708,11 @@ function SummarySetup({ onCopy }: { onCopy: (text: string) => void }) {
 }
 
 /**
- * Свой сервис с API как у OpenAI.
+ * A custom service with an API like OpenAI's.
  *
- * Через него подключается OpenRouter, Groq, локальный vLLM — всё, что говорит
- * на том же протоколе. Отдельный раздел, а не строчка в списке моделей: тут
- * есть чего вводить и о чём предупредить.
+ * This is how OpenRouter, Groq and a local vLLM connect, along with anything
+ * else speaking the same protocol. A section of its own rather than a line in
+ * the model list: there is something to enter here, and something to warn about.
  */
 function OpenAiCompatible({
   settings,
@@ -736,15 +739,15 @@ function OpenAiCompatible({
   const save = async () => {
     setBusy(true)
     try {
-      // Ключ пишем, только если его ввели: пустое поле означает «оставить как
-      // было», а не «стереть» — стереть можно отдельной кнопкой.
+      // The key is written only if one was entered: an empty field means "leave as it
+      // was" rather than "erase", and erasing has a button of its own.
       if (key.trim()) await api.call('settings:setKey', 'openai-compatible.key', key.trim())
       setKey('')
       await refresh()
       await onRefresh()
 
-      // Настраивают сервис ради того, чтобы им пользоваться: сразу делаем его
-      // выбранным, иначе после сохранения ничего видимо не меняется.
+      // A service is configured in order to be used: it is selected straight away,
+      // or nothing visibly changes after saving.
       const ready = (await api.call('settings:providers')).find((p) => p.id === 'openai-compatible')
       if (ready?.ready) {
         await saveSettings({ llmProvider: 'openai-compatible' })
@@ -850,7 +853,7 @@ function OpenAiCompatible({
   )
 }
 
-// ── голоса ────────────────────────────────────────────────────────────────
+// ── voices ────────────────────────────────────────────────────────────────
 
 function VoicesTab({ voices, onRefresh }: { voices: VoiceProfile[]; onRefresh: () => Promise<void> }) {
   const [ready, setReady] = useState<{ ready: boolean; hint?: string } | null>(null)
@@ -900,10 +903,10 @@ function VoicesTab({ voices, onRefresh }: { voices: VoiceProfile[]; onRefresh: (
 }
 
 /**
- * Запись собственного слепка голоса.
+ * Recording your own voice print.
  *
- * Без него в расшифровке невозможно отличить владельца от других людей в
- * комнате: обе дорожки микрофона выглядят одинаково.
+ * Without it the transcript cannot tell the owner from other people in the
+ * room: both microphone tracks look the same.
  */
 function VoiceEnroll({
   onDone,
@@ -912,7 +915,7 @@ function VoiceEnroll({
 }: {
   onDone: () => Promise<void>
   hasMine: boolean
-  /** Почему записать голос сейчас нельзя. */
+  /** Why a voice cannot be recorded right now. */
   blockedReason: string | null
 }) {
   const { notify } = useStore()
@@ -986,14 +989,14 @@ function VoiceEnroll({
   )
 }
 
-// ── агенты ────────────────────────────────────────────────────────────────
+// ── agents ────────────────────────────────────────────────────────────────
 
 /**
- * Подключение к агентам кнопкой.
+ * Connecting to agents with a button.
  *
- * Раньше здесь были команды для копирования в терминал — но человек, который
- * записывает разговоры, не обязан лезть в конфиги. Каждый агент хранит настройки
- * MCP по-своему, поэтому приложение правит их само.
+ * This used to be commands to copy into a terminal, but someone who records
+ * conversations should not have to go digging through config files. Each agent
+ * keeps its MCP settings its own way, so the application edits them itself.
  */
 function AgentsTab({
   providers,
@@ -1149,11 +1152,11 @@ function AgentsTab({
 
 
 /**
- * Свои формулировки задачи агенту.
+ * Your own wording of the task for an agent.
  *
- * Готовые четыре покрывают обычные случаи, но у каждого своя работа: кому-то
- * нужны тикеты в свой трекер, кому-то — письмо клиенту. Проще дать переписать
- * текст, чем угадывать.
+ * The four ready-made ones cover the usual cases, but everyone's work is
+ * different: one person needs tickets in their tracker, another a letter to a
+ * client. Letting the text be rewritten is easier than guessing.
  */
 
 function PromptTemplates() {
@@ -1180,8 +1183,8 @@ function PromptTemplates() {
   }
 
   const remove = async (id: string) => {
-    // Последний шаблон удалить нельзя: без него кнопка «Отдать агенту»
-    // осталась бы ни с чем.
+    // The last template cannot be deleted: without one the "Hand to an agent"
+    // button would have nothing to work with.
     if (templates.length <= 1) {
       notify('error', t('Нужен хотя бы один шаблон'))
       return

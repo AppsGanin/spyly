@@ -2,22 +2,23 @@ import type { Meeting } from '@spyly/core'
 import { updateMeeting } from './meetings.js'
 
 /**
- * Отмена и возврат правок записи.
+ * Undo and redo of edits to a recording.
  *
- * Хранятся снимки правимой части, а не обратные операции. Обратную операцию
- * пришлось бы писать под каждый вид правки отдельно — а их семь, и у разрезания
- * реплики с вырезанием фрагмента она совсем не очевидна. Снимок же одинаково
- * работает для всех и не может разойтись с тем, что случилось на самом деле.
+ * Snapshots of the edited part are stored rather than inverse operations. An
+ * inverse operation would have to be written for each kind of edit separately,
+ * and there are seven of them, with splitting an utterance and cutting out a
+ * fragment far from obvious. A snapshot works the same for all of them and
+ * cannot disagree with what actually happened.
  *
- * Снимается только то, что правит человек: этапы обработки, ошибки и сведения
- * о моделях в снимок не входят, поэтому отмена не откатит результат конвейера,
- * если он доработал уже после правки.
+ * Only what a person edits is captured: processing stages, errors and model
+ * details are not part of a snapshot, so undo will not roll back the
+ * pipeline's result if it finished after the edit.
  *
- * История живёт в памяти и не переживает перезапуск — так же, как в любом
- * редакторе.
+ * History lives in memory and does not survive a restart, the same as in any
+ * editor.
  */
 
-/** Правимая часть записи. */
+/** The editable part of a recording. */
 interface Snapshot {
   title: string
   tags: string[]
@@ -27,12 +28,12 @@ interface Snapshot {
 }
 
 interface Step {
-  /** Что именно сделали: показывается человеку при отмене. */
+  /** What exactly was done: shown to the person when undoing. */
   label: string
   snapshot: Snapshot
 }
 
-/** Глубже человек всё равно не помнит, а память не бесконечна. */
+/** A person will not remember deeper than this anyway, and memory is not infinite. */
 const DEPTH = 50
 
 const past = new Map<string, Step[]>()
@@ -53,17 +54,17 @@ function pushPast(id: string, label: string, snapshot: Snapshot): void {
   steps.push({ label, snapshot })
   if (steps.length > DEPTH) steps.shift()
   past.set(id, steps)
-  // Новая правка обрывает ветку возврата: возвращать больше некуда.
+  // A new edit cuts the redo branch off: there is nowhere left to redo to.
   future.delete(id)
 }
 
 /**
- * Правка записи с запоминанием того, что было до неё.
+ * An edit to a recording that remembers what came before it.
  *
- * Снимок делается внутри той же блокировки, что и сама правка, и с того самого
- * состояния, которое правится. Снимать заранее, отдельным чтением, нельзя: две
- * быстрые правки подряд успевали запомнить одно и то же состояние, и вторая
- * отмена возвращала не то.
+ * The snapshot is taken inside the same lock as the edit itself, and from the
+ * very state being edited. Taking it in advance, as a separate read, will not
+ * do: two quick edits in a row managed to remember the same state, and the
+ * second undo brought back the wrong thing.
  */
 export function editWithHistory(
   id: string,
@@ -71,20 +72,19 @@ export function editWithHistory(
   change: (meeting: Meeting) => Meeting
 ): Promise<Meeting> {
   return updateMeeting(id, (meeting) => {
-    // Обратный вызов исполняется ровно один раз и под блокировкой, поэтому
-    // менять здесь историю безопасно.
+    // The callback runs exactly once and under the lock, so changing history here is safe.
     pushPast(id, label, snapshotOf(meeting))
     return change(meeting)
   })
 }
 
 /**
- * Отметить необратимое действие.
+ * Mark an irreversible action.
  *
- * Вырезание фрагмента меняет и звук, а его снимок не вернёт. Молча отменять
- * после такого предыдущую правку — худшее из возможного: человек нажмёт
- * «отменить», ожидая вернуть вырезанное, и получит совсем другое. Поэтому
- * история просто обрывается.
+ * Cutting out a fragment changes the audio as well, and a snapshot will not
+ * bring it back. Silently undoing the previous edit after that is the worst
+ * thing possible: a person presses undo expecting the cut to come back and
+ * gets something else entirely. So history simply breaks off.
  */
 export function forgetHistory(id: string): void {
   past.delete(id)
@@ -99,12 +99,12 @@ export function historyState(id: string): { canUndo: boolean; canRedo: boolean }
 }
 
 /**
- * Шаг по истории: назад или вперёд.
+ * A step through history, back or forward.
  *
- * Снятие со стопки, запись на противоположную и применение снимка происходят
- * внутри одной блокировки — иначе между чтением текущего состояния и записью
- * могла вклиниться чужая правка, и на противоположную стопку попадало бы то,
- * чего на диске уже не было.
+ * Popping from the stack, pushing onto the opposite one and applying the
+ * snapshot all happen inside one lock: otherwise somebody else's edit could
+ * wedge itself between reading the current state and writing, and the opposite
+ * stack would get something that was no longer on disk.
  */
 async function stepThrough(
   id: string,

@@ -1,28 +1,30 @@
 /**
- * Модели распознавания на движке sherpa-onnx.
+ * Recognition models on the sherpa-onnx engine.
  *
- * Здесь живут все не-Whisper модели: GigaAM, Parakeet, Nemotron. Они устроены
- * по-разному — одна отдаёт текст целиком, другая работает потоком, — но с
- * точки зрения конвейера делают одно и то же, поэтому и код у них общий.
+ * Every non-Whisper model lives here: GigaAM, Parakeet, Nemotron. They are
+ * built differently, one returning text whole, another working as a stream,
+ * but from the pipeline's point of view they do the same thing, so their code
+ * is shared.
  *
- * Общая черта: ни одна не даёт таймкодов по словам. Дальше по конвейеру слова
- * нужно разложить по говорящим, поэтому времена расставляем сами.
+ * What they have in common: not one of them gives per-word timestamps. Further
+ * down the pipeline words have to be laid out by speaker, so the times are
+ * filled in here.
  */
 interface SherpaSpec {
   id: string
   name: string
   dir: string
-  /** Потоковая модель декодирует по мере поступления звука. */
+  /** A streaming model decodes as the audio arrives. */
   streaming: boolean
-  /** Один файл (CTC) или три (transducer). */
+  /** One file (CTC) or three (transducer). */
   files: { model: string } | { encoder: string; decoder: string; joiner: string }
   language: string
   /**
-   * Длина куска в секундах.
+   * The chunk length in seconds.
    *
-   * Подбирается замером: Parakeet на двухминутных кусках роняет процесс
-   * нативным сбоем, GigaAM их держит. Слишком мелкие куски тоже плохи —
-   * распознавание на стыках теряет слова.
+   * Chosen by measurement: Parakeet brings the process down with a native crash
+   * on two-minute chunks, GigaAM holds them. Chunks that are too small are bad
+   * as well, as recognition loses words at the seams.
    */
   chunkSeconds: number
 }

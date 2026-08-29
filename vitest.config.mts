@@ -1,9 +1,9 @@
 import { defineConfig } from 'vitest/config'
 
 /**
- * Тесты живут не только в ядре: у окна есть свои чистые функции — подписи дат,
- * например, — и они тоже должны проверяться. Раньше сюда не заглядывали, и
- * бесконечная рекурсия в выборе локали дошла до экрана.
+ * Tests do not live in the core alone: the window has pure functions of its own,
+ * date captions for instance, and those have to be checked too. This was not
+ * looked at before, and infinite recursion in the locale helper reached the screen.
  */
 export default defineConfig({
   test: {

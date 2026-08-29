@@ -1,16 +1,17 @@
 import { EN } from './i18n-en.js'
 
 /**
- * Перевод интерфейса.
+ * Translating the interface.
  *
- * Ключ перевода — сама русская строка. Так строки остаются читаемыми прямо в
- * коде, а не превращаются в `settings.audio.title`, по которому не понять, что
- * увидит человек. Незнакомая строка возвращается как есть: пропущенный перевод
- * показывает русский текст, а не пустоту и не имя ключа.
+ * The translation key is the Russian string itself. That keeps the strings
+ * readable right there in the code instead of turning them into
+ * `settings.audio.title`, which says nothing about what a person will see. An
+ * unknown string comes back as it is: a missing translation shows the Russian
+ * text rather than emptiness or the name of a key.
  *
- * Язык задаётся один раз при запуске и меняется перезагрузкой окна: он влияет
- * на каждую надпись, и перерисовывать половину приложения ради редкого действия
- * незачем.
+ * The language is set once at startup and changed by reloading the window: it
+ * affects every caption, and redrawing half the application for a rare action
+ * is pointless.
  */
 
 export type Lang = 'ru' | 'en'
@@ -26,10 +27,11 @@ export function lang(): Lang {
 }
 
 /**
- * Перевести строку интерфейса.
+ * Translate an interface string.
  *
- * Подстановки передаются словарём и заменяются по имени: `t('Найдено {n}', {n: 3})`.
- * Так перевод не зависит от порядка слов — в английском он часто другой.
+ * Substitutions are passed as a dictionary and replaced by name:
+ * `t('Найдено {n}', {n: 3})`. That way the translation does not depend on word
+ * order, which English often has differently.
  */
 export function t(ru: string, vars?: Record<string, string | number>): string {
   const text = current === 'ru' ? ru : (EN[ru] ?? ru)
@@ -39,7 +41,7 @@ export function t(ru: string, vars?: Record<string, string | number>): string {
   )
 }
 
-/** Строки, для которых перевода нет, — чтобы их было чем находить. */
+/** Strings with no translation, so that there is a way to find them. */
 export function missingTranslations(strings: readonly string[]): string[] {
   return strings.filter((s) => !(s in EN))
 }

@@ -4,12 +4,12 @@ import { CLI_LLM_PROVIDERS } from './cli.js'
 import { openAiCompatibleProvider } from './openai-compatible.js'
 
 /**
- * Модели для конспекта.
+ * Models for the summary.
  *
- * По умолчанию — то, что не требует ключа: уже авторизованные кодинг-агенты и
- * локальная Ollama. Отдельно есть OpenAI-совместимый вход — через него
- * подключается OpenRouter и всё остальное с тем же протоколом; там запись
- * уходит на чужой сервер, и в интерфейсе про это сказано прямо.
+ * By default, whatever needs no key: coding agents already authorised and a
+ * local Ollama. Separately there is an OpenAI-compatible entry, which is how
+ * OpenRouter and everything else on the same protocol connects; there a
+ * recording goes to somebody else's server, and the interface says so plainly.
  */
 
 async function postJson(url: string, body: unknown): Promise<unknown> {
@@ -25,7 +25,7 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
   return response.json()
 }
 
-/** Локальная модель через Ollama — без аккаунта и без отправки записи наружу. */
+/** A local model through Ollama, with no account and without sending a recording anywhere. */
 const ollamaProvider: LlmProvider = {
   id: 'ollama',
   name: t('Ollama (локально)'),

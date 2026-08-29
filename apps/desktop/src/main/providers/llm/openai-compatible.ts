@@ -4,11 +4,11 @@ import { loadSettings } from '../../store/settings.js'
 import type { LlmMessage, LlmProvider } from '../types.js'
 
 /**
- * Любой сервис с API как у OpenAI.
+ * Any service with an API like OpenAI's.
  *
- * Через него подключаются OpenRouter, Groq, Together, локальные vLLM и
- * LM Studio, да и сам OpenAI. Один провайдер вместо десятка: протокол у всех
- * один, различаются только адрес, ключ и название модели.
+ * This is how OpenRouter, Groq, Together, local vLLM and LM Studio connect,
+ * and OpenAI itself. One provider instead of a dozen: the protocol is the same
+ * for all of them, only the address, the key and the model name differ.
  */
 export const OPENAI_KEY = 'openai-compatible.key'
 
@@ -17,11 +17,11 @@ interface ChatResponse {
   error?: { message?: string }
 }
 
-/** Убираем хвостовой слэш и дописываем /v1, если его забыли. */
+/** Strip a trailing slash and add /v1 if it was forgotten. */
 export function normalizeBaseUrl(input: string): string {
   const trimmed = input.trim().replace(/\/+$/, '')
   if (!trimmed) return ''
-  // Люди копируют адрес с сайта как есть; у большинства сервисов путь /v1.
+  // People copy the address off a website as it is; most services have a /v1 path.
   return /\/v\d+$/.test(trimmed) ? trimmed : `${trimmed}/v1`
 }
 
@@ -45,10 +45,10 @@ export const openAiCompatibleProvider: LlmProvider = {
     const key = await getSecret(OPENAI_KEY)
     if (!baseUrl || !model || !key) throw new Error(t('OpenAI-совместимый сервис не настроен'))
 
-    // Ключ уходит в заголовок, а туда пускают только ASCII. Ключи такими и
-    // бывают, но при копировании со страницы легко прихватить неразрывный
-    // пробел или кавычку-ёлочку — и тогда fetch падает с невнятной ошибкой
-    // про ByteString вместо понятного «ключ испорчен».
+    // The key goes into a header, and only ASCII is allowed there. Keys usually
+    // are, but copying from a page easily brings along a non-breaking space or a
+    // typographic quote, and then fetch fails with an obscure error about
+    // ByteString instead of a plain "the key is damaged".
     if (!/^[\x20-\x7e]+$/.test(key)) {
       throw new Error(t('в ключе есть посторонние символы — скопируйте его заново, без пробелов и кавычек'))
     }
@@ -59,7 +59,7 @@ export const openAiCompatibleProvider: LlmProvider = {
       headers: {
         'content-type': 'application/json',
         authorization: `Bearer ${key}`,
-        // OpenRouter просит их для статистики; остальные заголовок игнорируют.
+        // OpenRouter asks for these for its statistics; the others ignore the header.
         'http-referer': 'https://github.com/spyly',
         'x-title': 'Spyly'
       },
@@ -71,21 +71,21 @@ export const openAiCompatibleProvider: LlmProvider = {
       }),
       signal: AbortSignal.timeout(180_000)
     }).catch((error: unknown) => {
-      // «fetch failed» человеку ничего не говорит: подставляем адрес, до
-      // которого не достучались, и причину, если она есть.
+      // "fetch failed" tells a person nothing: we add the address that could not be
+      // reached, and the reason if there is one.
       const cause = error instanceof Error && error.cause instanceof Error ? `: ${error.cause.message}` : ''
       throw new Error(`не удалось связаться с ${url}${cause}`)
     })
 
     if (!response.ok) {
-      // Текст ошибки от сервиса полезнее кода: в нём и «нет денег», и
-      // «такой модели нет», и «ключ не тот».
+      // The service's error text is more useful than the code: it covers "out of
+      // funds", "no such model" and "wrong key" alike.
       const detail = await response.text().catch(() => '')
       let message = detail.slice(0, 300)
       try {
         message = (JSON.parse(detail) as ChatResponse).error?.message ?? message
       } catch {
-        // Не JSON — оставляем как есть.
+        // Not JSON, so leave it as it is.
       }
       throw new Error(`${response.status}: ${message || response.statusText}`)
     }

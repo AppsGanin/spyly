@@ -6,13 +6,13 @@ import { readWavPcm16 } from '../../audio/wav.js'
 import { specById, type SherpaSpec } from './sherpa-specs.js'
 
 /**
- * Расшифровка моделями sherpa-onnx в отдельном процессе.
+ * Transcription with sherpa-onnx models in a separate process.
  *
- * Библиотека считает синхронно, кусками по 30–120 секунд звука. В главном
- * процессе каждый такой кусок замораживал приложение на секунды подряд — а он
- * же принимает звук, если параллельно идёт новая запись. Уступать поток между
- * кусками смысла нет: при 0.1× от реального времени блокировка занимает почти
- * всё время работы.
+ * The library computes synchronously, in chunks of 30 to 120 seconds of audio.
+ * In the main process every such chunk froze the application for seconds on
+ * end, and that same process takes in audio if a new recording is running
+ * alongside. Yielding the thread between chunks makes no difference: at 0.1x
+ * real time the blocking takes up almost all of the work.
  */
 
 const require = createRequire(import.meta.url)
@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url)
 export interface AsrJob {
   specId: string
   wavPath: string
-  /** Папка с моделями: `app.getPath` в дочернем процессе недоступен. */
+  /** The models folder: `app.getPath` is not available in a child process. */
   modelsDir: string
 }
 
@@ -52,16 +52,17 @@ function modelConfigFor(spec: SherpaSpec): Record<string, unknown> {
       decoder: fileIn(spec, spec.files.decoder),
       joiner: fileIn(spec, spec.files.joiner)
     },
-    // Тип нужен, чтобы движок выбрал верный декодер: у NeMo он свой.
+    // The type is needed so the engine picks the right decoder: NeMo has its own.
     ...(spec.streaming ? {} : { modelType: 'nemo_transducer' })
   }
 }
 
 /**
- * Загруженные распознаватели.
+ * The recognisers that are loaded.
  *
- * Модель весит сотни мегабайт и грузится секунды: держим её в памяти между
- * вызовами, но по одной — переключение модели должно освобождать прошлую.
+ * A model weighs hundreds of megabytes and takes seconds to load: it is kept
+ * in memory between calls, but only one at a time, as switching models has to
+ * release the previous one.
  */
 const loaded = new Map<string, unknown>()
 
@@ -69,7 +70,7 @@ function getEngine(spec: SherpaSpec): unknown {
   const hit = loaded.get(spec.id)
   if (hit) return hit
 
-  // Держим только текущую: две модели по полгигабайта в памяти — уже много.
+  // Only the current one is kept: two half-gigabyte models in memory is already a lot.
   loaded.clear()
 
   const { OfflineRecognizer, OnlineRecognizer } = require('sherpa-onnx-node') as {
@@ -98,14 +99,14 @@ interface OnlineEngine {
   getResult(stream: unknown): { text?: string }
 }
 
-/** Распознать один кусок — потоковой моделью или обычной. */
+/** Recognise one chunk, with a streaming model or an ordinary one. */
 function decodeChunk(spec: SherpaSpec, samples: Float32Array, sampleRate: number): string {
   const engine = getEngine(spec)
   if (spec.streaming) {
     const online = engine as OnlineEngine
     const stream = online.createStream()
     stream.acceptWaveform({ sampleRate, samples })
-    // Досказать больше нечего: кусок закончился, можно добирать остаток.
+    // There is nothing left to say: the chunk has ended, so the remainder can be collected.
     stream.inputFinished()
     while (online.isReady(stream)) online.decode(stream)
     return (online.getResult(stream).text ?? '').trim()
@@ -119,12 +120,12 @@ function decodeChunk(spec: SherpaSpec, samples: Float32Array, sampleRate: number
 }
 
 /**
- * Слова с равномерными таймкодами.
+ * Words with evenly spread timestamps.
  *
- * Модель отдаёт текст без разметки по времени, а дальше по конвейеру слова
- * нужно разложить по говорящим. Распределяем их по длине куска пропорционально
- * числу символов: точнее, чем поровну, и достаточно для сопоставления с
- * отрезками разделения по голосам.
+ * The model returns text with no timing, and further down the pipeline words
+ * have to be laid out by speaker. They are spread over the length of the chunk
+ * in proportion to their character count: more accurate than dividing equally,
+ * and good enough to match against the voice separation segments.
  */
 function spreadWords(text: string, start: number, end: number): Word[] {
   const parts = text.split(/\s+/).filter(Boolean)
@@ -143,12 +144,13 @@ function spreadWords(text: string, start: number, end: number): Word[] {
 }
 
 /**
- * Нарезка на куски прямо в памяти.
+ * Cutting into chunks in memory.
  *
- * Резать обязательно: получасовая запись, отданная модели целиком, кладёт
- * процесс — нативный сбой без всякого сообщения. Границу ищем в ближайшей
- * тихой точке, чтобы не рвать посреди слова, но если тишины нет, режем по
- * времени: испорченный стык лучше, чем упавшая расшифровка.
+ * Cutting is mandatory: half an hour of recording handed to the model whole
+ * takes the process down with a native crash and no message at all. The
+ * boundary is looked for at the nearest quiet point, so as not to break
+ * mid-word, but if there is no silence we cut by time: a spoilt seam beats a
+ * failed transcription.
  */
 function chunkSamples(
   samples: Float32Array,
@@ -158,7 +160,7 @@ function chunkSamples(
   const window = Math.round(sampleRate * chunkSeconds)
   if (samples.length <= window) return [{ from: 0, to: samples.length }]
 
-  // Тихую точку ищем в последних десяти секундах куска.
+  // The quiet point is looked for in the last ten seconds of the chunk.
   const searchSpan = Math.round(sampleRate * 10)
   const frame = Math.round(sampleRate * 0.05)
 
@@ -199,7 +201,7 @@ async function run(job: AsrJob): Promise<AsrReply> {
   const pieces = chunkSamples(samples, sampleRate, spec.chunkSeconds)
   const words: Word[] = []
   for (const [index, piece] of pieces.entries()) {
-    // Копия, а не подвыборка: нативный слой не должен видеть чужой буфер.
+    // A copy rather than a subarray: the native layer must not see someone else's buffer.
     const slice = samples.slice(piece.from, piece.to)
     if (slice.length === 0) continue
     const text = decodeChunk(spec, slice, sampleRate)

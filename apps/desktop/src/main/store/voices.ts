@@ -10,10 +10,10 @@ import { readMeeting } from './meetings.js'
 import { audioFile, ensureDir, speakersFile, storageRoot } from './paths.js'
 
 /**
- * Реестр голосов.
+ * The voice registry.
  *
- * Это биометрия, поэтому файл лежит только локально, ни в какой облачный
- * провайдер не отправляется, и его можно целиком удалить из настроек.
+ * This is biometrics, so the file stays local, goes to no cloud provider, and
+ * can be deleted in full from settings.
  */
 
 async function readAll(): Promise<VoiceProfile[]> {
@@ -33,12 +33,12 @@ async function writeAll(profiles: VoiceProfile[]): Promise<void> {
 }
 
 /**
- * Привести старое служебное имя к нынешнему.
+ * Bring the old default name into line with the current one.
  *
- * Раньше свой голос сохранялся под именем «Я», и это имя подставлялось
- * участнику в расшифровке — при том, что плеер и фильтр называют ту же речь
- * «Вы». Меняем только это значение по умолчанию: имя, выбранное человеком,
- * остаётся как есть, а переименовать обратно можно в настройках.
+ * Your own voice used to be saved under the name "Me", and that name was put
+ * against the participant in the transcript, while the player and the filter
+ * call the same speech "You". Only this default is changed: a name chosen by a
+ * person stays as it is, and it can be renamed back in settings.
  */
 async function renameLegacyOwnVoice(profiles: VoiceProfile[]): Promise<VoiceProfile[]> {
   const stale = profiles.filter((p) => p.isMe && p.name === 'Я')
@@ -66,7 +66,7 @@ export async function upsertVoice(
   const existing = profiles.find((p) => p.name.toLowerCase() === name.trim().toLowerCase())
 
   if (existing) {
-    // Усредняем со старым слепком: чем больше подтверждений, тем устойчивее профиль.
+    // Averaged with the old print: the more confirmations, the steadier the profile.
     const merged = averageEmbedding([existing.embedding, embedding])
     const next: VoiceProfile = {
       ...existing,
@@ -92,7 +92,7 @@ export async function upsertVoice(
   return created
 }
 
-/** Запомнить голос спикера встречи под введённым именем. */
+/** Remember a meeting speaker's voice under the name that was entered. */
 export async function rememberSpeaker(meetingId: string, speakerId: string, name: string): Promise<VoiceProfile | null> {
   if (!name.trim()) return null
   const meeting = await readMeeting(meetingId)
@@ -102,8 +102,8 @@ export async function rememberSpeaker(meetingId: string, speakerId: string, name
   const wav = audioFile(meetingId, speaker.track)
   if (!existsSync(wav)) return null
 
-  // Отрезки этого спикера восстанавливаем из готовых реплик: отдельно хранить
-  // результат диаризации нет смысла, он полностью выводится из транскрипта.
+  // This speaker's segments are rebuilt from the finished utterances: there is no
+  // point storing the diarization result separately, it follows entirely from the transcript.
   const turns = meeting.utterances
     .filter((u) => u.speakerId === speakerId)
     .map((u) => ({ start: u.start, end: u.end, cluster: speaker.cluster }))
@@ -115,7 +115,7 @@ export async function rememberSpeaker(meetingId: string, speakerId: string, name
   return upsertVoice(name, embedding, { isMe: speaker.isMe })
 }
 
-// ── запись профиля голоса в онбординге ──────────────────────────────────────
+// ── recording a voice profile during onboarding ─────────────────────────────
 
 interface Enrollment {
   capture: NativeCapture
@@ -146,7 +146,7 @@ async function stopEnrollment(): Promise<string | null> {
   return current.file
 }
 
-/** Завершить запись профиля и сохранить слепок под именем пользователя. */
+/** Finish recording a profile and save the print under the user's name. */
 export async function finishEnrollment(name: string): Promise<VoiceProfile | null> {
   const file = await stopEnrollment()
   if (!file || !existsSync(file)) return null

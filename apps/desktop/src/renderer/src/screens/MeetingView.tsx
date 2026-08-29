@@ -23,7 +23,7 @@ import { Transcript, countMatches, type SpeakerFilter } from '../components/Tran
 import { TranscriptSelection } from '../components/TranscriptSelection'
 
 
-/** Имена моделей: идентификатор вроде `whisper-large-v3-turbo` читается плохо. */
+/** Model names: an identifier like `whisper-large-v3-turbo` reads badly. */
 const MODEL_LABELS: Record<string, string> = {
   'whisper-large-v3-turbo': 'Whisper large-v3-turbo',
   'whisper-large-v3': 'Whisper large-v3',
@@ -46,12 +46,12 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   const { recording, progress, notify, setView, reloadMeetings, levels, live } = useStore()
   const [tab, setTab] = useState<'summary' | 'transcript' | 'live'>('summary')
   /**
-   * Просьба перемотать плеер.
+   * A request to seek the player.
    *
-   * Это событие, а не позиция: у него есть номер, потому что клик по той же
-   * самой реплике второй раз обязан снова перемотать. Раньше здесь лежало
-   * просто число — повторный клик не срабатывал вовсе, а плеер, смонтировавшись
-   * заново при возврате на вкладку, отматывал на старое место и включал звук.
+   * This is an event rather than a position: it carries a number, because
+   * clicking the same utterance a second time has to seek again. It used to be
+   * just a number, so a repeat click did nothing at all, while the player,
+   * remounting on return to the tab, rewound to the old spot and started playing.
    */
   const [seekTo, setSeekTo] = useState<{ at: number; n: number } | null>(null)
   const seek = useCallback((at: number) => setSeekTo((prev) => ({ at, n: (prev?.n ?? 0) + 1 })), [])
@@ -63,35 +63,36 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   const [currentTime, setCurrentTime] = useState(0)
   const [renaming, setRenaming] = useState<Speaker | null>(null)
   const [learned, setLearned] = useState<string[]>([])
-  // Изначально не ведём: при открытии записи список должен стоять на месте,
-  // а не подъезжать к первой реплике, пряча плеер.
+  // Not following to begin with: on opening a recording the list should stay
+  // where it is rather than scroll to the first utterance and hide the player.
   const [follow, setFollow] = useState(false)
   const { data: voicesReady } = useAsync(() => api.call('voices:ready'), [id])
   const isRecordingThis =
     recording.meetingId === id && (recording.status === 'recording' || recording.status === 'paused')
-  // Черновик дописывается до самой остановки, поэтому перечитываем его, когда
-  // запись закончилась. Без этого вкладка «Черновик» не появлялась всё время,
-  // пока идёт обработка, — а именно тогда она и нужна: расшифровки ещё нет.
+  // The draft is written up to the moment of stopping, so it is read again once
+  // the recording has ended. Without this the "Draft" tab never appeared for the
+  // whole time processing ran, which is exactly when it is needed: there is no
+  // transcript yet.
   const { data: draftLines } = useAsync(() => api.call('meetings:live', id), [id, isRecordingThis])
   const draft = draftLines ?? []
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [justAsked, setJustAsked] = useState(false)
-  /** Повтор запрошен, но первое событие конвейера ещё не пришло. */
+  /** A retry was asked for, but the first pipeline event has not arrived yet. */
   const [retrying, setRetrying] = useState(false)
   const [tracks, setTracks] = useState<PlayerTrack[]>([])
 
   const { data: meeting, loading, error, reload } = useAsync(() => api.call('meetings:get', id), [id])
-  // Кнопку сборки конспекта показываем, только если есть чем собирать.
+  // The summary button is shown only if there is something to build it with.
   const { data: providers } = useAsync(() => api.call('settings:providers'), [id])
   const canSummarize = (providers ?? []).some((p) => p.kind === 'llm' && p.ready)
   const stage = progress[id]
 
   /**
-   * Отмена и возврат правок: ⌘Z и ⌘⇧Z.
+   * Undo and redo of edits: ⌘Z and ⌘⇧Z.
    *
-   * Слой горячих клавиш не срабатывает, пока фокус в поле ввода, поэтому
-   * внутри редактируемого текста работает обычная отмена браузера — а эта
-   * отменяет уже сохранённую правку целиком.
+   * The shortcut layer does not fire while the focus is in an input field, so
+   * inside editable text the browser's own undo works, while this one undoes a
+   * saved edit whole.
    */
   const undoStep = useCallback(
     async (direction: 'undo' | 'redo') => {
@@ -118,19 +119,19 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   )
 
 
-  // Конспект действительно собирается: так говорит либо сама запись, либо
-  // событие конвейера.
+  // The summary really is being built: either the recording itself says so, or a
+  // pipeline event does.
   const reallyRunning =
     meeting?.stages.summarizing === 'running' ||
     (stage?.stage === 'summarizing' && stage.state === 'running')
 
-  // Как только конвейер подтвердил, что взялся, временный флаг снимаем:
-  // дальше состояние живёт в записи.
+  // As soon as the pipeline confirms it has taken the work, the temporary flag
+  // comes off: from there the state lives in the recording.
   useEffect(() => {
     if (reallyRunning) setJustAsked(false)
   }, [reallyRunning])
 
-  // Конвейер взялся за работу — временный флаг повтора больше не нужен.
+  // The pipeline has taken the work, so the temporary retry flag is no longer needed.
   const pipelineBusy = stage?.state === 'running'
   useEffect(() => {
     if (pipelineBusy) setRetrying(false)
@@ -142,8 +143,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
   useEffect(() => {
     void (async () => {
-      // Путь наружу не нужен: главный процесс сам знает, где лежит запись,
-      // и отдаёт её по собственной схеме.
+      // The outside path is not needed: the main process knows where a recording
+      // lies and serves it over its own scheme.
       const [mic, system] = await Promise.all([
         api.call('meetings:audioPath', id, 'mic'),
         api.call('meetings:audioPath', id, 'system')
@@ -156,9 +157,9 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     })()
   }, [id])
 
-  // Стрелки вверх-вниз — по репликам. Влево-вправо перематывают на секунды и
-  // живут в плеере; здесь именно шаг по расшифровке, когда нужно вернуться
-  // «на одну фразу назад», а не на пять секунд.
+  // Up and down arrows move by utterance. Left and right seek by seconds and
+  // live in the player; this is a step through the transcript, for when you need
+  // to go back one phrase rather than five seconds.
   useEffect(() => {
     if (!meeting || meeting.utterances.length === 0) return
     const handler = (event: KeyboardEvent) => {
@@ -175,7 +176,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       const list = meeting.utterances
       const index = list.findIndex((u) => currentTime < u.start - 0.05)
-      // Текущая — последняя начавшаяся; от неё и шагаем.
+      // The current one is the last that started; we step from there.
       const here = index === -1 ? list.length - 1 : Math.max(0, index - 1)
       const next = event.key === 'ArrowDown' ? Math.min(list.length - 1, here + 1) : Math.max(0, here - 1)
       setFollow(true)
@@ -185,8 +186,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     return () => window.removeEventListener('keydown', handler)
   }, [meeting, currentTime])
 
-  // Пока идёт обработка или запись, показываем расшифровку: там видно,
-  // как она наполняется.
+  // While processing or recording is under way the transcript is shown: there it
+  // is visible how it fills in.
   useEffect(() => {
     if (initialTab === 'transcript' || initialTab === 'summary') setTab(initialTab)
     else if (isRecordingThis) setTab('transcript')
@@ -221,10 +222,10 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   }
 
   const regenerate = async () => {
-    // Флаг нужен ровно до первого события от конвейера: дальше состояние
-    // берётся из самой записи. Раньше он снимался по таймеру на секунду с
-    // небольшим, и кнопка снова становилась активной, пока конспект ещё
-    // собирался, — можно было запустить сборку второй раз.
+    // The flag is needed exactly until the first pipeline event: after that the
+    // state comes from the recording itself. It used to come off on a timer after a
+    // second or so, and the button became active again while the summary was still
+    // being built, so it could be started a second time.
     setJustAsked(true)
     try {
       await api.call('meetings:reprocess', id, 'summarizing')
@@ -242,24 +243,24 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     notify('info', t('Запись удалена'))
   }
 
-  // Счёт совпадений держим здесь: он нужен и полю поиска, и списку.
+  // The match count is kept here: both the search field and the list need it.
   const matchCount = meeting ? countMatches(meeting, inMeetingQuery) : 0
   const step = (delta: number) => {
     if (matchCount === 0) return
     setMatchIndex((current) => (current + delta + matchCount) % matchCount)
   }
 
-  // Двум участникам можно дать одно имя — в шапке показываем его один раз.
+  // Two participants can be given the same name, so the header shows it once.
   const participants = [...new Set(meeting.speakers.map((s) => speakerLabel(s, s.id)))]
 
-  // Плюс короткий флаг «только что нажали»: первое событие приходит не мгновенно.
+  // Plus a short "just pressed" flag: the first event does not arrive instantly.
   const summarizing = reallyRunning || justAsked
 
   const stages = ['recording', 'transcribing', 'diarizing', 'identifying', 'summarizing'] as const
   const busy = stages.some((s) => meeting.stages[s] === 'running')
-  // Панель этапов занимает пол-экрана, поэтому показываем её только когда
-  // работа идёт или сломалось что-то существенное. Несобранный конспект
-  // объясняется прямо во вкладке «Конспект».
+  // The stage panel takes up half the screen, so it is shown only while work is
+  // under way or something substantial has broken. A summary that was never made
+  // is explained right on the "Summary" tab.
   const broken = meeting.stages.transcribing === 'failed' || meeting.stages.diarizing === 'failed'
   const anyFailed = broken
 
@@ -445,8 +446,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                         setInMeetingQuery('')
                         return
                       }
-                      // Enter ведёт к следующему совпадению, Shift+Enter — к
-                      // предыдущему: так работает поиск везде.
+                      // Enter goes to the next match, Shift+Enter to the previous one: that is how
+                      // search works everywhere.
                       if (e.key === 'Enter' && matchCount > 0) {
                         e.preventDefault()
                         step(e.shiftKey ? -1 : 1)
@@ -522,8 +523,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
               marks={meeting.marks}
               actions={{
                 onSeek: (seconds) => {
-                  // Клик по таймкоду — это и есть «веди снова»: человек сам
-                  // указал, куда смотреть.
+                  // A click on a timestamp is itself "follow again": the person has said where
+                  // to look.
                   setFollow(true)
                   seek(seconds)
                 },
@@ -591,34 +592,35 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 }
 
 /**
- * Кто сколько говорил.
+ * Who talked how much.
  *
- * Полоса вместо цифр: соотношение читается мгновенно, а точные секунды
- * интересны редко и живут в подсказке.
+ * A bar rather than numbers: the ratio reads instantly, while exact seconds
+ * are rarely interesting and live in the tooltip.
  */
 /**
- * Теги записи.
+ * Recording tags.
  *
- * Папок намеренно нет: один разговор часто относится сразу к нескольким темам,
- * и раскладывать его по одной папке пришлось бы с потерей.
+ * There are deliberately no folders: one conversation often belongs to several
+ * subjects at once, and filing it under a single folder would lose something.
  */
 /**
- * Предложение запомнить термин после правки расшифровки.
+ * An offer to remember a term after an edit to the transcript.
  *
- * Молча добавлять нельзя: в правку попадают и случайные слова, а словарь
- * влияет на распознавание всех следующих записей.
+ * Adding it silently will not do: stray words end up in edits too, and the
+ * dictionary affects recognition of every recording that follows.
  */
 /**
- * Приписать реплику другому участнику.
+ * Reassign an utterance to another participant.
  *
- * Разделение по голосам чаще всего ошибается на перебивках, и починить это
- * должен человек — за пару нажатий, не переслушивая запись целиком.
+ * Voice separation gets it wrong most often on interruptions, and a person has
+ * to be the one to fix that, in a couple of clicks and without listening to the
+ * whole recording again.
  */
 /**
- * Разговоры на ту же тему.
+ * Conversations on the same subject.
  *
- * Тема почти никогда не умещается в одну встречу: к биллингу возвращаются
- * трижды за месяц. Показываем связь прямо здесь, чтобы не искать руками.
+ * A subject almost never fits into one meeting: billing gets revisited three
+ * times a month. The link is shown right here, so nobody has to search by hand.
  */
 function RelatedMeetings({ meetingId }: { meetingId: string }) {
   const { setView } = useStore()
@@ -653,7 +655,7 @@ function RelatedMeetings({ meetingId }: { meetingId: string }) {
   )
 }
 
-/** «Сегодня в 14:05» для свежих записей, дата — для старых. */
+/** "Today at 14:05" for fresh recordings, a date for older ones. */
 function shortWhen(iso: string): string {
   const at = new Date(iso)
   const today = new Date()
@@ -667,18 +669,19 @@ function shortWhen(iso: string): string {
 }
 
 /**
- * Дописать к этой записи.
+ * Append to this recording.
  *
- * Разговор часто обрывается и продолжается через пару минут: связь упала,
- * перезвонили. Кнопка живёт на странице самой записи, а не в диалоге начала —
- * дописывают всегда к конкретному разговору, который перед глазами.
+ * A conversation often breaks off and resumes a couple of minutes later: the
+ * connection dropped, they called back. The button lives on the recording's own
+ * page rather than in the start dialog, because appending always goes to one
+ * particular conversation, the one in front of you.
  */
 /**
- * Черновая расшифровка, какой её было видно во время записи.
+ * The draft transcript as it looked during the recording.
  *
- * Финальная точнее, но черновик — это протокол происходившего: в нём остаётся
- * то, что человек читал по ходу разговора и на что реагировал. Отсюда и
- * отдельная вкладка, а не подмена основной расшифровки.
+ * The final one is more accurate, but the draft is a record of what happened:
+ * it keeps what a person was reading during the conversation and reacting to.
+ * Hence a tab of its own rather than replacing the main transcript.
  */
 function LiveDraft({
   lines,
@@ -689,8 +692,8 @@ function LiveDraft({
   speakers: Speaker[]
   onSeek: (seconds: number) => void
 }) {
-  // Имена берём из финальной расшифровки, если она уже есть: «Вы» и
-  // «Собеседник» точнее ничего, но имя лучше.
+  // The names come from the final transcript when there already is one: "You"
+  // and "The other side" beat nothing, but a name is better.
   const mine = speakers.find((s) => s.isMe)?.name
   const remote = speakers.find((s) => !s.isMe && s.name)?.name
 
@@ -734,8 +737,8 @@ function ContinueButton({ meeting }: { meeting: Meeting }) {
   const [busy, setBusy] = useState(false)
 
   const busyNow = recording.status !== 'idle'
-  // Дописывать в запись, которую ещё обрабатывают, нельзя: конвейер как раз
-  // сейчас перезаписывает её расшифровку.
+  // Appending to a recording still being processed will not do: the pipeline is
+  // rewriting its transcript right now.
   const processing = Object.values(meeting.stages).includes('running')
   const noSound = meeting.durationSec < 1
 
@@ -863,11 +866,11 @@ function ReassignDialog({
 }
 
 /**
- * Вырезание фрагмента.
+ * Cutting out a fragment.
  *
- * Звук заменяется тишиной, а не укорачивается: сдвиг длительности переломал бы
- * все таймкоды и отметки, а задача «здесь не должно быть слышно» решается и
- * так. Об этом честно написано прямо в диалоге.
+ * The audio is replaced with silence rather than shortened: a shift in duration
+ * would break every timestamp and mark, while "nothing should be audible here"
+ * is solved without that. The dialog says so plainly.
  */
 function CutDialog({
   meetingId,
@@ -1031,20 +1034,20 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (next: string
 }
 
 /**
- * Сколько человек было в разговоре.
+ * How many people were in the conversation.
  *
- * Разделение по голосам угадывает это плохо: на получасовой записи троих
- * человек оно нашло полсотни «участников». Когда число известно, оно задаётся
- * жёстко — и ответ становится точным. Предлагаем только тогда, когда результат
- * явно неправдоподобен: в обычном случае лишний вопрос ни к чему.
+ * Voice separation guesses this badly: on a half-hour recording of three people
+ * it found fifty "participants". When the number is known it is set firmly, and
+ * the answer becomes exact. We only offer this when the result is plainly
+ * implausible: in the ordinary case an extra question is pointless.
  */
 function SpeakerCount({ meeting, onDone }: { meeting: Meeting; onDone: () => void }) {
   const { notify } = useStore()
   const [busy, setBusy] = useState(false)
   const found = meeting.speakers.length
 
-  // Больше шести голосов на обычном созвоне почти всегда означает ошибку
-  // разделения, а не переговорную с восемью людьми.
+  // More than six voices on an ordinary call nearly always means a separation
+  // error rather than a meeting room with eight people in it.
   const suspicious = found > 6
   if (!suspicious && !meeting.speakerCount) return null
 
@@ -1137,13 +1140,13 @@ function RecordingStrip({
   error
 }: {
   levels: { mic: number; system: number }
-  /** Беда с источником звука: показываем прямо здесь, а не только тостом. */
+  /** Trouble with the audio source: shown right here, not only as a toast. */
   error: string | null
 }) {
   const { recording, notify } = useStore()
   const paused = recording.status === 'paused'
-  // Отметка ставится мгновенно, а пояснение печатается после: в момент, когда
-  // прозвучало важное, отвлекаться на набор текста нельзя.
+  // The mark is placed instantly and the note typed afterwards: at the moment
+  // something important is said there is no room for being distracted by typing.
   const [pending, setPending] = useState<{ id: string; at: number } | null>(null)
   const [note, setNote] = useState('')
   const noteRef = useRef<HTMLInputElement>(null)
@@ -1163,7 +1166,7 @@ function RecordingStrip({
     setNote('')
   }
 
-  // Кнопка «Отметить» доступна и с клавиатуры: событие приходит оттуда же.
+  // The "Mark" button also works from the keyboard: the event comes from the same place.
   useEffect(() => {
     const handler = () => void addMark()
     window.addEventListener('spyly:mark', handler)
@@ -1262,15 +1265,15 @@ function SpeakerDialog({
 }: {
   speaker: Speaker | null
   meeting: Meeting
-  /** Есть ли модель слепков: без неё запоминать голос нечем. */
+  /** Whether the print model is there: without it there is nothing to remember a voice with. */
   canRemember: boolean
   onClose: () => void
   onSave: (name: string, remember: boolean) => void
 }) {
   const [name, setName] = useState('')
   const [remember, setRemember] = useState(true)
-  // Слепки перечитываем на каждое открытие: голос могли запомнить только что,
-  // на соседней записи.
+  // Prints are read again on every open: a voice may have been remembered just
+  // now, on a neighbouring recording.
   const { data: voices } = useAsync(() => api.call('voices:list'), [speaker?.id])
 
   useEffect(() => {
@@ -1281,11 +1284,11 @@ function SpeakerDialog({
 
   if (!speaker) return null
   const where = speaker.track === 'mic' ? t('говорит рядом с вами') : t('на том конце звонка')
-  // Календарь уже знает, кого ждали на встрече: набирать имена руками незачем.
+  // The calendar already knows who was expected at the meeting, so there is no reason to type names.
   const taken = new Set(meeting.speakers.map((s) => s.name).filter(Boolean))
   const suggestions = meeting.calendarParticipants.filter((p) => !taken.has(p))
-  // Голоса, уже занятые другими участниками этой записи, не предлагаем: один
-  // человек не может говорить в двух местах одновременно.
+  // Voices already taken by other participants of this recording are not offered:
+  // one person cannot speak in two places at once.
   const known = (voices ?? []).filter((v) => v.name === speaker.name || !taken.has(v.name))
 
   return (

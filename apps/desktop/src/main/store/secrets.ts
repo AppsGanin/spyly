@@ -4,11 +4,11 @@ import path from 'node:path'
 import { app, safeStorage } from 'electron'
 
 /**
- * Ключи доступа — отдельно от настроек и в зашифрованном виде.
+ * API keys, kept apart from the settings and encrypted.
  *
- * Настройки лежат обычным JSON: их удобно смотреть и править руками. Ключ от
- * платного аккаунта там оказаться не должен, поэтому он шифруется системным
- * хранилищем (Keychain на macOS, DPAPI на Windows) и живёт в своём файле.
+ * Settings are ordinary JSON: convenient to look at and edit by hand. The key
+ * to a paid account has no business being there, so it is encrypted by the
+ * system store (Keychain on macOS, DPAPI on Windows) and lives in its own file.
  */
 interface Secrets {
   [key: string]: string
@@ -29,15 +29,15 @@ async function load(): Promise<Secrets> {
   }
   try {
     const raw = await readFile(file)
-    // Если система не умеет шифровать (Linux без ключницы), файл лежит открытым
-    // текстом — об этом честно сказано в интерфейсе.
+    // If the system cannot encrypt (Linux without a keyring), the file sits in
+    // plain text, and the interface says so honestly.
     const json = safeStorage.isEncryptionAvailable()
       ? safeStorage.decryptString(raw)
       : raw.toString('utf8')
     cache = JSON.parse(json) as Secrets
   } catch {
-    // Битый или зашифрованный чужим ключом файл — начинаем с чистого листа,
-    // иначе приложение не запустится вовсе.
+    // A file that is damaged or encrypted with somebody else's key means starting
+    // from scratch, otherwise the application will not launch at all.
     cache = {}
   }
   return cache
@@ -60,7 +60,7 @@ export async function setSecret(key: string, value: string): Promise<void> {
   await writeFile(secretsFile(), data)
 }
 
-/** Есть ли ключ — интерфейсу этого достаточно, само значение ему не нужно. */
+/** Whether there is a key: enough for the interface, which does not need the value itself. */
 export async function hasSecret(key: string): Promise<boolean> {
   return (await getSecret(key)).length > 0
 }

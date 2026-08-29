@@ -1,11 +1,11 @@
 import { lang, t } from '@spyly/core'
 
-/** Даты пишутся на языке интерфейса, а не всегда по-русски. */
+/** Dates are written in the language of the interface, not always in Russian. */
 export function uiLocale(): string {
   return lang() === 'en' ? 'en-US' : 'ru-RU'
 }
 
-/** Группировка встреч по дням — так список читается без дат у каждой строки. */
+/** Grouping meetings by day, so the list reads without a date on every row. */
 export function dayLabel(iso: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return t('Когда-то')

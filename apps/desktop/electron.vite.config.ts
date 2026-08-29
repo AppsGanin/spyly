@@ -10,8 +10,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
-          // Разделение по голосам считается в отдельном процессе: у него своя
-          // точка входа, и собирать её нужно рядом с главной.
+          // Voice separation is computed in a separate process: it has its own
+          // entry point, and it has to be built alongside the main one.
           'diarize-worker': resolve(__dirname, 'src/main/pipeline/diarize-worker.ts'),
           'sherpa-worker': resolve(__dirname, 'src/main/providers/asr/sherpa-worker.ts')
         }

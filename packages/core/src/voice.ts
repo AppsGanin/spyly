@@ -1,6 +1,6 @@
 import type { Speaker, VoiceProfile } from './types.js'
 
-/** Косинусная близость. Векторы разной длины сравнивать нельзя — это разные модели. */
+/** Cosine closeness. Vectors of different lengths cannot be compared: those are different models. */
 export function cosineSimilarity(a: readonly number[], b: readonly number[]): number {
   if (a.length === 0 || a.length !== b.length) return 0
   let dot = 0
@@ -17,7 +17,7 @@ export function cosineSimilarity(a: readonly number[], b: readonly number[]): nu
   return dot / (Math.sqrt(na) * Math.sqrt(nb))
 }
 
-/** Среднее нескольких слепков — профиль тем устойчивее, чем больше подтверждений. */
+/** The average of several prints: the more confirmations, the steadier the profile. */
 export function averageEmbedding(vectors: readonly (readonly number[])[]): number[] {
   const usable = vectors.filter((v) => v.length > 0)
   const first = usable[0]
@@ -35,19 +35,20 @@ export function averageEmbedding(vectors: readonly (readonly number[])[]): numbe
   return out
 }
 
-/** Порог, ниже которого имя не подставляем: лучше «Участник 2», чем чужое имя. */
+/** The threshold below which no name is filled in: "Speaker 2" beats somebody else's name. */
 export const VOICE_MATCH_THRESHOLD = 0.62
 
 /**
- * Порог для собственного голоса на своей же дорожке.
+ * The threshold for your own voice on your own track.
  *
- * Ниже общего намеренно. Спутать постороннего с вами тут почти невозможно: за
- * этим компьютером сидите вы, микрофон ваш, и слепок в реестре один. А вот не
- * узнать себя легко — на коротких репликах слепок шумный, и своя же запись
- * набирала 0.52 при пороге 0.62.
+ * Deliberately below the general one. Mistaking a stranger for you here is
+ * almost impossible: you are the one at this computer, the microphone is
+ * yours, and there is one print in the registry. Failing to recognise yourself,
+ * on the other hand, is easy: on short utterances the print is noisy, and a
+ * recording of the owner scored 0.52 against a threshold of 0.62.
  *
- * Для чужих имён порог остаётся строгим: подписать чужую реплику вашим именем
- * куда неприятнее, чем оставить «В комнате 1».
+ * For other people's names the threshold stays strict: signing somebody else's
+ * utterance with your name is far worse than leaving "In the room 1".
  */
 export const OWN_VOICE_MATCH_THRESHOLD = 0.42
 
@@ -58,11 +59,11 @@ export interface VoiceMatch {
 
 
 /**
- * Расставить именам спикеров совпадения из реестра.
+ * Fill in speaker names with matches from the registry.
  *
- * Один профиль не может достаться двум кластерам сразу: сначала берём пары с
- * наибольшей уверенностью, каждый профиль занимается один раз. Иначе два похожих
- * голоса в одном созвоне получили бы одно и то же имя.
+ * One profile cannot go to two clusters at once: the pairs with the highest
+ * confidence are taken first, and each profile is claimed once. Otherwise two
+ * similar voices in one call would get the same name.
  */
 export function identifySpeakers(
   clusters: readonly { speakerId: string; embedding: readonly number[]; ownTrack?: boolean }[],
@@ -73,7 +74,7 @@ export function identifySpeakers(
   for (const c of clusters) {
     for (const p of profiles) {
       const score = cosineSimilarity(c.embedding, p.embedding)
-      // Себя на своей дорожке узнаём мягче: спутать тут не с кем.
+      // Recognising yourself on your own track is gentler: there is nobody to confuse you with.
       const limit = p.isMe && c.ownTrack ? OWN_VOICE_MATCH_THRESHOLD : threshold
       if (score >= limit) pairs.push({ speakerId: c.speakerId, profile: p, score })
     }
@@ -85,12 +86,12 @@ export function identifySpeakers(
   const out = new Map<string, VoiceMatch>()
   for (const pair of pairs) {
     if (takenSpeakers.has(pair.speakerId)) continue
-    // Свой голос на своей дорожке — исключение из правила «один профиль на
-    // один кластер». Человек один, а разделение по голосам вполне может
-    // разбить его речь на несколько кластеров: часть сказана громче, часть
-    // поверх собеседника. На реальной записи второй кластер набрал 0.502 при
-    // пороге 0.42 и всё равно остался безымянным — потому что профиль уже
-    // забрал первый. Двум разным людям одно имя так по-прежнему не достаётся.
+    // Your own voice on your own track is the exception to the "one profile per
+    // cluster" rule. There is one person, and voice separation may well break their
+    // speech into several clusters: part said louder, part over the other side. On
+    // a real recording the second cluster scored 0.502 against a threshold of 0.42
+    // and still stayed nameless, because the first had already taken the profile.
+    // Two different people still cannot end up with one name this way.
     const own = pair.profile.isMe && clusters.find((c) => c.speakerId === pair.speakerId)?.ownTrack
     if (!own && takenProfiles.has(pair.profile.id)) continue
     takenSpeakers.add(pair.speakerId)
@@ -100,7 +101,7 @@ export function identifySpeakers(
   return out
 }
 
-/** Применить найденные совпадения к списку спикеров. */
+/** Apply the matches that were found to the list of speakers. */
 export function applyIdentification(speakers: readonly Speaker[], matches: Map<string, VoiceMatch>): Speaker[] {
   return speakers.map((s) => {
     const m = matches.get(s.id)

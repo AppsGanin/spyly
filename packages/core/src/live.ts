@@ -1,29 +1,28 @@
 /**
- * Разбиение живого текста на фразы.
+ * Breaking live text into phrases.
  *
- * Потоковое распознавание отдаёт растущую строку: пока человек говорит, она
- * дописывается с конца. Показывать её одним куском нельзя — на монологе
- * получается абзац на полминуты, который невозможно читать. Поэтому
- * договорённые предложения отпускаются отдельными строками, а растёт только
- * последнее.
+ * Streaming recognition hands back a growing string: while a person speaks it
+ * is extended from the end. Showing it as one lump will not do, as a monologue
+ * turns into a paragraph half a minute long that cannot be read. So finished
+ * sentences are released as lines of their own and only the last one grows.
  */
 
 /**
- * Конец договорённого предложения.
+ * The end of a finished sentence.
  *
- * Точка сама по себе ничего не гарантирует: за ней может оказаться сокращение
- * вроде «и т.д.» или инициал. Но если после неё уже прозвучало следующее
- * слово, предложение точно закончено.
+ * A full stop on its own guarantees nothing: an abbreviation or an initial may
+ * follow. But if the next word has already been spoken after it, the sentence
+ * is certainly finished.
  *
- * Возвращается позиция сразу после знака первого законченного предложения или
- * `null`, если таких пока нет. Именно первого: одна строка — одно предложение,
- * а остаток отпустится следующим шагом.
+ * Returns the position right after the mark of the first finished sentence, or
+ * `null` if there are none yet. The first one specifically: one line is one
+ * sentence, and the remainder is released on the next step.
  */
 export function closedSentenceEnd(text: string): number | null {
   for (const match of text.matchAll(/[.!?…]+(?=\s+\S)/g)) {
     const end = match.index + match[0].length
-    // Обрывок в одно слово отдельной строкой выглядит рвано: «Да.» лучше
-    // показать вместе с тем, что за ним последует.
+    // A one-word scrap on a line of its own looks ragged: "Yes." is better shown
+    // together with whatever follows it.
     if (text.slice(0, end).trim().split(/\s+/).length < 2) continue
     return end
   }
@@ -31,11 +30,12 @@ export function closedSentenceEnd(text: string): number | null {
 }
 
 /**
- * Отделить договорённую фразу от растущего текста.
+ * Separate a finished phrase from the growing text.
  *
- * `whole` — результат распознавания с начала отрезка, `released` — сколько его
- * символов уже показано отдельными фразами. Возвращается сама фраза и новое
- * значение `released`, либо `null`, если отпускать пока нечего.
+ * `whole` is the recognition result from the start of the stretch, `released`
+ * is how many of its characters have already been shown as separate phrases.
+ * Returns the phrase itself and the new value of `released`, or `null` if there
+ * is nothing to release yet.
  */
 export function releaseSentence(
   whole: string,
@@ -47,9 +47,9 @@ export function releaseSentence(
   if (cut === null) return null
   return {
     sentence: rest.slice(0, cut).trim(),
-    // Разница длин уже включает всё отданное раньше вместе с отброшенными
-    // пробелами, поэтому значение задаётся, а не прибавляется: прибавление
-    // считало отданное дважды и съедало начало следующей фразы.
+    // The difference in lengths already includes everything handed out earlier
+    // along with the spaces discarded, so the value is assigned rather than added:
+    // adding counted what was handed out twice and ate the start of the next phrase.
     released: whole.length - rest.length + cut
   }
 }

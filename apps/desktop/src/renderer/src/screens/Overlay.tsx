@@ -6,20 +6,20 @@ import { useStore } from '../lib/store'
 import { LevelMeter } from '../ui'
 
 /**
- * Плавающая панель поверх всех окон.
+ * The floating panel above every window.
  *
- * Во время созвона окно Spyly закрыто чужим — браузером, Zoom, редактором. А
- * именно тогда и нужно поставить отметку «вот это важно» или увидеть, что
- * запись всё ещё идёт. Панель маленькая, всегда сверху и делает ровно четыре
- * вещи.
+ * During a call the Spyly window is covered by somebody else's: a browser,
+ * Zoom, an editor. And that is exactly when a "this bit matters" mark has to be
+ * placed, or when it has to be visible that recording is still running. The
+ * panel is small, always on top, and does exactly four things.
  */
 export function Overlay() {
   const { recording, levels } = useStore()
   const [marked, setMarked] = useState<'ok' | 'fail' | null>(null)
   const paused = recording.status === 'paused'
 
-  // Подтверждение показываем прямо на кнопке: тостов в этом окне нет, а
-  // нажатие вслепую без ответа выглядит так, будто ничего не произошло.
+  // The confirmation is shown on the button itself: there are no toasts in this
+  // window, and pressing blind with no answer looks as though nothing happened.
   useEffect(() => {
     if (!marked) return
     const timer = setTimeout(() => setMarked(null), 1400)

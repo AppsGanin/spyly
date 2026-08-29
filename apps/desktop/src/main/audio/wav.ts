@@ -6,7 +6,7 @@ import path from 'node:path'
 
 const HEADER_BYTES = 44
 
-/** Заголовок WAV с нулевыми длинами — их допишем по ходу записи. */
+/** A WAV header with zero lengths; they are filled in as the recording goes. */
 function buildHeader(sampleRate: number, channels: number, bitsPerSample: number): Buffer {
   const header = Buffer.alloc(HEADER_BYTES)
   const byteRate = (sampleRate * channels * bitsPerSample) / 8
@@ -31,18 +31,18 @@ export interface WavWriterOptions {
   path: string
   sampleRate?: number
   channels?: number
-  /** Как часто дописывать длины в заголовок. */
+  /** How often to write the lengths into the header. */
   headerFlushMs?: number
-  /** Дописывать в существующий файл, а не начинать заново. */
+  /** Append to an existing file instead of starting over. */
   append?: boolean
 }
 
 /**
- * Потоковая запись WAV с периодическим обновлением заголовка.
+ * Streaming WAV writing with the header updated as it goes.
  *
- * Обычный WAV-писатель проставляет длины в самом конце, поэтому падение на
- * сороковой минуте оставляет файл, который не откроет ни один плеер. Здесь
- * длины дописываются каждые несколько секунд, и запись переживает краш.
+ * An ordinary WAV writer fills the lengths in at the very end, so a crash in
+ * the fortieth minute leaves a file no player will open. Here the lengths are
+ * written every few seconds and a recording survives a crash.
  */
 export class WavWriter {
   private stream: WriteStream
@@ -57,9 +57,9 @@ export class WavWriter {
     this.sampleRate = options.sampleRate ?? 16000
     this.channels = options.channels ?? 1
 
-    // Продолжение записи дописывает звук в конец существующего файла, а не
-    // заводит новый: разговор, прерванный и возобновлённый, для человека
-    // остаётся одним разговором.
+    // Resuming a recording appends audio to the end of the existing file rather
+    // than starting a new one: a conversation that was interrupted and picked up
+    // again is still one conversation to a person.
     const existing = options.append && existsSync(options.path) ? statSync(options.path).size : 0
     if (existing > HEADER_BYTES) {
       this.bytesWritten = existing - HEADER_BYTES
@@ -71,9 +71,9 @@ export class WavWriter {
   }
 
   async open(): Promise<void> {
-    // Файл создаёт поток записи, и делает это асинхронно. Открыть второй
-    // дескриптор для правки заголовка можно только после того, как файл
-    // действительно появился, иначе получаем ENOENT на первой же записи.
+    // The file is created by the write stream, and asynchronously at that. A
+    // second descriptor for editing the header can only be opened once the file
+    // has really appeared, otherwise the first write gets ENOENT.
     await new Promise<void>((resolve, reject) => {
       if ((this.stream as { pending?: boolean }).pending === false) {
         resolve()
@@ -90,7 +90,7 @@ export class WavWriter {
     this.headerTimer.unref?.()
   }
 
-  /** Float32 в диапазоне [-1, 1] → 16-bit PCM. Клиппинг вместо переполнения. */
+  /** Float32 in the [-1, 1] range to 16-bit PCM. Clipping rather than overflow. */
   writeFloat32(samples: Float32Array): void {
     if (this.closed) return
     const out = Buffer.alloc(samples.length * 2)
@@ -102,7 +102,7 @@ export class WavWriter {
     this.stream.write(out)
   }
 
-  /** Тишина заданной длины — чтобы дорожки не разъезжались при пропаже сэмплов. */
+  /** Silence of a given length, so the tracks do not drift apart when samples go missing. */
   writeSilence(seconds: number): void {
     if (this.closed || seconds <= 0) return
     const frames = Math.round(seconds * this.sampleRate)
@@ -129,7 +129,7 @@ export class WavWriter {
       sizes.writeUInt32LE(this.bytesWritten, 0)
       await handle.write(sizes, 0, 4, 40)
     } catch {
-      // Файл могли удалить из-под нас — запись важнее точности заголовка.
+      // The file may have been deleted from under us; recording matters more than an exact header.
     }
   }
 
@@ -157,7 +157,7 @@ export class WavWriter {
   }
 }
 
-/** Починить WAV, оставшийся от упавшей записи: длины берём из фактического размера. */
+/** Repair a WAV left over from a crashed recording: the lengths come from the actual size. */
 export async function repairWav(path: string): Promise<boolean> {
   const handle = await open(path, 'r+').catch(() => null)
   if (!handle) return false
@@ -183,12 +183,12 @@ export interface DecodedWav {
 }
 
 /**
- * Чтение WAV с 16-битным PCM.
+ * Reading a WAV with 16-bit PCM.
  *
- * Свой разбор, а не readWave из sherpa-onnx: аддон отдаёт Float32Array поверх
- * внешнего буфера, а Electron такие буферы запрещает
- * («External buffers are not allowed»). Формат мы пишем сами, так что разбор
- * тривиальный.
+ * Parsed here rather than with readWave from sherpa-onnx: the addon returns a
+ * Float32Array over an external buffer, and Electron forbids those
+ * ("External buffers are not allowed"). We write the format ourselves, so
+ * parsing it is trivial.
  */
 export async function readWavPcm16(file: string): Promise<DecodedWav> {
   const { readFile } = await import('node:fs/promises')
@@ -222,8 +222,8 @@ export async function readWavPcm16(file: string): Promise<DecodedWav> {
   if (dataStart < 0) throw new Error(t('в WAV нет данных: {file}', { file: file }))
   if (bitsPerSample !== 16) throw new Error(t('поддерживается только 16-битный PCM, здесь {bitsPerSample}', { bitsPerSample: bitsPerSample }))
 
-  // Длина из заголовка может быть меньше фактической, если запись оборвалась
-  // до последней правки заголовка — берём то, что реально есть на диске.
+  // The length in the header can be smaller than the real one if the recording
+  // broke off before the last header update, so take what is actually on disk.
   const available = Math.max(0, Math.min(dataLength || buf.length - dataStart, buf.length - dataStart))
   const frames = Math.floor(available / 2 / Math.max(1, channels))
   const samples = new Float32Array(frames)
@@ -234,10 +234,11 @@ export async function readWavPcm16(file: string): Promise<DecodedWav> {
 }
 
 /**
- * Свести дорожки в одну для прослушивания.
+ * Mix the tracks into one for listening.
  *
- * Раздельные дорожки нужны расшифровке, а человеку удобнее слушать разговор
- * целиком. Микс делается по требованию и кладётся рядом с записью.
+ * Transcription needs the tracks apart, but a person would rather hear the
+ * conversation whole. The mix is made on demand and kept next to the
+ * recording.
  */
 export async function mixTracks(micPath: string, systemPath: string, outPath: string): Promise<void> {
   const parts: DecodedWav[] = []
@@ -251,14 +252,14 @@ export async function mixTracks(micPath: string, systemPath: string, outPath: st
   const mixed = new Float32Array(length)
 
   /*
-   * Пока говорит собеседник, микрофон приглушаем.
+   * While the other side is speaking, the microphone is turned down.
    *
-   * Его голос звучит из динамиков, и микрофон записывает его следом. В простой
-   * сумме он оказывается дважды, со сдвигом в десятки миллисекунд — это и есть
-   * то самое эхо, из-за которого запись неприятно слушать.
+   * Their voice comes out of the speakers, and the microphone records it right
+   * after. In a plain sum it ends up there twice, tens of milliseconds apart:
+   * that is the echo that makes a recording unpleasant to listen to.
    *
-   * Приглушение по громкости — приём грубый, зато надёжный: он не трогает
-   * исходные дорожки, а нужен только для сведённой версии, которую слушают.
+   * Ducking by level is a crude trick, but a reliable one: it does not touch the
+   * original tracks and is only needed for the mixed version people listen to.
    */
   const [mic, system] = [
     existsSync(micPath) ? parts[0] : undefined,
@@ -266,8 +267,8 @@ export async function mixTracks(micPath: string, systemPath: string, outPath: st
   ]
 
   if (mic && system) {
-    // Окно 20 мс: короче — слышны рывки громкости, длиннее — приглушается
-    // и то, что человек сказал в паузе собеседника.
+    // A 20 ms window: shorter and the level jumps are audible, longer and it also
+    // ducks what a person said inside the other side's pause.
     const window = Math.round(sampleRate * 0.02)
     const duckTo = 0.25
 
@@ -292,8 +293,8 @@ export async function mixTracks(micPath: string, systemPath: string, outPath: st
       for (let i = 0; i < part.samples.length; i++) mixed[i] = mixed[i]! + part.samples[i]!
     }
   }
-  // Нормализуем только если сумма вышла за пределы: тихий разговор не должен
-  // становиться громче, чем был.
+  // Normalised only if the sum went out of range: a quiet conversation must not
+  // come out louder than it was.
   let peak = 0
   for (let i = 0; i < mixed.length; i++) peak = Math.max(peak, Math.abs(mixed[i]!))
   const gain = peak > 1 ? 1 / peak : 1
@@ -310,10 +311,10 @@ export async function mixTracks(micPath: string, systemPath: string, outPath: st
 }
 
 /**
- * Громкость дорожки окнами.
+ * The level of a track in windows.
  *
- * Нужна, чтобы отличить свою речь от эха динамиков: сравнивать дорожки по
- * тексту бесполезно, а по громкости — надёжно.
+ * Needed to tell your own speech from speaker echo: comparing the tracks by
+ * text is useless, by level it is reliable.
  */
 export function levelWindows(
   samples: Float32Array,
@@ -335,7 +336,7 @@ export function levelWindows(
   return out
 }
 
-/** Есть ли в дорожке речь вообще — дешёвая проверка по энергии. */
+/** Whether a track holds any speech at all, a cheap check by energy. */
 export function speechSeconds(samples: Float32Array, sampleRate = 16000): number {
   const frame = 512
   let noiseFloor = 0.004
@@ -362,11 +363,12 @@ export interface AudioChunk {
 }
 
 /**
- * Резка записи на куски по тишине.
+ * Cutting a recording into pieces at the silences.
  *
- * Нужна для автоопределения языка: whisper решает, на каком языке говорят,
- * один раз на файл. Режем в паузах и только рядом с целевой длиной — рвать
- * посреди фразы нельзя, иначе распознавание на стыке портится.
+ * Needed for automatic language detection: whisper decides which language is
+ * being spoken once per file. Cuts land in pauses and only near the target
+ * length; cutting mid-phrase is not allowed, as recognition suffers at the
+ * seam.
  */
 export async function splitOnSilence(
   file: string,
@@ -377,7 +379,7 @@ export async function splitOnSilence(
   const total = samples.length / sampleRate
   if (total <= targetSec * 1.5) return []
 
-  // Окно 40 мс: короче — шум, длиннее — проскакивают короткие паузы.
+  // A 40 ms window: shorter is noise, longer lets short pauses slip through.
   const window = Math.round(sampleRate * 0.04)
   const quiet: boolean[] = []
   for (let i = 0; i + window <= samples.length; i += window) {
@@ -386,7 +388,7 @@ export async function splitOnSilence(
     quiet.push(Math.sqrt(sum / window) < 0.01)
   }
 
-  // Пауза — не меньше полусекунды подряд.
+  // A pause is at least half a second in a row.
   const minQuiet = Math.round(0.5 / 0.04)
   const pauses: number[] = []
   let run = 0
@@ -399,15 +401,15 @@ export async function splitOnSilence(
     run = 0
   }
 
-  // Слишком короткий кусок распознавать бессмысленно: языку не на чем
-  // определиться. Считаем от предыдущего разреза, а не от начала файла.
+  // Recognising too short a piece is pointless: the language has nothing to be
+  // decided from. Measured from the previous cut, not from the start of the file.
   const minChunk = Math.max(5, targetSec / 4)
 
   const cuts: number[] = []
   let next = targetSec
   while (next < total - targetSec / 2) {
-    // Ближайшая пауза к желаемой границе, но не дальше половины куска от неё:
-    // если разговор идёт сплошняком, лучше не резать вовсе.
+    // The nearest pause to the wanted boundary, but no further than half a piece
+    // away: if the conversation runs without a break, better not to cut at all.
     let best = -1
     for (const pause of pauses) {
       if (pause <= (cuts[cuts.length - 1] ?? 0) + minChunk) continue
@@ -434,7 +436,7 @@ export async function splitOnSilence(
   return chunks
 }
 
-/** Запись Float32 в 16-битный WAV — обратная операция к `readWavPcm16`. */
+/** Writing Float32 into a 16-bit WAV, the reverse of `readWavPcm16`. */
 export async function writeWavPcm16(file: string, samples: Float32Array, sampleRate: number): Promise<void> {
   const data = Buffer.alloc(samples.length * 2)
   for (let i = 0; i < samples.length; i++) {
@@ -460,12 +462,12 @@ export async function writeWavPcm16(file: string, samples: Float32Array, sampleR
 
 
 /**
- * Замена промежутка тишиной.
+ * Replacing a stretch with silence.
  *
- * Используется, когда из записи нужно убрать лишнее. Именно тишина, а не
- * вырезание: укоротить файл значит сдвинуть все последующие таймкоды, отметки
- * и уже собранный конспект — а задача «здесь не должно быть слышно» решается
- * и так.
+ * Used when something has to go from a recording. Silence rather than a cut:
+ * shortening the file would shift every timestamp after it, the marks and the
+ * summary already assembled, while "nothing should be audible here" is solved
+ * without that.
  */
 export async function silenceRange(file: string, fromSec: number, toSec: number): Promise<number> {
   const { samples, sampleRate } = await readWavPcm16(file)

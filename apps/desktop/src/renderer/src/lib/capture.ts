@@ -1,16 +1,17 @@
 import { t } from '@spyly/core'
 /**
- * Захват звука средствами Chromium — для Windows и Linux.
+ * Audio capture through Chromium, for Windows and Linux.
  *
- * На macOS этот путь нерабочий: `getDisplayMedia({ audio: 'loopback' })` там
- * отдаёт уже завершённый трек. Зато на Windows (WASAPI loopback) и Linux
- * (PipeWire через портал) он штатный, и нативный код не нужен.
+ * On macOS this path does not work: `getDisplayMedia({ audio: 'loopback' })`
+ * hands back an already ended track there. On Windows (WASAPI loopback) and
+ * Linux (PipeWire through the portal) it is the normal path, and no native
+ * code is needed.
  *
- * Звук приходит с частотой звуковой карты (44.1 или 48 кГц) и в стерео, а
- * распознаванию нужен моно 16 кГц — приводим прямо здесь, чтобы через границу
- * процессов шло вчетверо меньше данных.
+ * The audio arrives at the sound card's rate (44.1 or 48 kHz) and in stereo,
+ * while recognition needs mono at 16 kHz: it is converted right here, so that a
+ * quarter as much data crosses the process boundary.
  */
-/** Кусок ~64 мс: чаще — лишние переходы между процессами, реже — заметная задержка. */
+/** A chunk of about 64 ms: more often means needless process hops, less often a noticeable delay. */
 const CHUNK_SAMPLES = 1024
 
 interface Track {
@@ -27,9 +28,9 @@ async function attach(
   onChunk: (id: 'mic' | 'system', samples: Float32Array) => void
 ): Promise<void> {
   const context = new AudioContext()
-  // Файл лежит рядом с index.html: политика безопасности приложения не пускает
-  // ни blob-, ни data-скрипты, а тихо не запустившийся обработчик даёт
-  // идеально пустую запись — худший вид поломки.
+  // The file sits next to index.html: the application's security policy allows
+  // neither blob nor data scripts, and a worklet that quietly failed to start
+  // gives a perfectly empty recording, the worst kind of breakage.
   await context.audioWorklet.addModule(new URL('downsampler.js', document.baseURI).href)
 
   const source = context.createMediaStreamSource(stream)
@@ -44,8 +45,9 @@ async function attach(
   }
 
   source.connect(node)
-  // Без подключения к выходу обработчик в некоторых версиях Chromium не
-  // вызывается вовсе; глушим громкость, чтобы звук не пошёл в динамики.
+  // Without being connected to the output the worklet is not called at all in
+  // some versions of Chromium; the volume is muted so the audio does not reach
+  // the speakers.
   const silence = context.createGain()
   silence.gain.value = 0
   node.connect(silence).connect(context.destination)
@@ -60,10 +62,10 @@ export interface CaptureRequest {
 }
 
 /**
- * Запуск захвата. Возвращает, что реально удалось открыть.
+ * Starting the capture. Returns what actually opened.
  *
- * Отказ одной дорожки не отменяет вторую: записать хотя бы свой голос лучше,
- * чем не записать ничего.
+ * One track failing does not cancel the other: recording at least your own
+ * voice beats recording nothing.
  */
 export async function startCapture(
   request: CaptureRequest,
@@ -96,8 +98,8 @@ export async function startCapture(
         video: true,
         audio: true
       })
-      // Картинка нам не нужна — гасим её сразу, иначе Chromium продолжает
-      // кодировать кадры и греет процессор всю запись.
+      // We have no use for the picture, so it is switched off at once, otherwise
+      // Chromium goes on encoding frames and heating the processor for the whole recording.
       for (const video of stream.getVideoTracks()) {
         video.stop()
         stream.removeTrack(video)

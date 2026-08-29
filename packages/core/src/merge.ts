@@ -1,25 +1,25 @@
 import type { AsrResult, AsrSegment, Meeting, SpeakerTurn, TrackId, Utterance, Word } from './types.js'
 
-/** Длительность пересечения двух отрезков. Ноль, если не пересекаются. */
+/** The length of the overlap between two stretches. Zero if they do not overlap. */
 export function overlap(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
   return Math.max(0, Math.min(aEnd, bEnd) - Math.max(aStart, bStart))
 }
 
-/** Пауза, после которой реплика одного и того же человека разрывается на две. */
+/** The pause after which one person's utterance is broken into two. */
 /**
- * Длина, после которой реплику пора разбить.
+ * The length after which an utterance has to be split.
  *
- * Разбиваем не по счётчику, а по ближайшему концу предложения после него:
- * рвать на полуслове хуже, чем показать реплику чуть длиннее.
+ * The split goes not at the counter but at the nearest end of a sentence after
+ * it: breaking mid-word is worse than showing an utterance slightly longer.
  */
 const UTTERANCE_MAX_SEC = 35
 
 const UTTERANCE_GAP_SEC = 1.5
 
 /**
- * Кластер, которому принадлежит отрезок: тот, с кем пересечение максимально.
- * Если пересечений нет вовсе (слово попало в паузу диаризации) — берём
- * ближайший по времени отрезок, иначе слово потерялось бы.
+ * The cluster a stretch belongs to: the one it overlaps most. If there is no
+ * overlap at all (the word fell into a diarization pause), the nearest stretch
+ * in time is taken, or the word would be lost.
  */
 export function clusterFor(start: number, end: number, turns: readonly SpeakerTurn[]): number | null {
   if (turns.length === 0) return null
@@ -48,28 +48,29 @@ export function clusterFor(start: number, end: number, turns: readonly SpeakerTu
   return nearest ? nearest.cluster : null
 }
 
-/** Слова сегмента; если ASR не дал пословных таймкодов — сам сегмент как одно «слово». */
+/** The words of a segment; if ASR gave no per-word timestamps, the segment itself as one "word". */
 /**
- * Столько длится самое протяжное слово.
+ * The longest a single drawn-out word lasts.
  *
- * Распознавание растягивает последние слова отрезка до его конца: на реальной
- * записи «перед» и «тем» получили по 3.5 секунды и перекрыли собой десять
- * секунд тишины. Из-за этого между словами не оставалось пауз, реплика
- * склеивалась через молчание и забирала себе чужое время в статистике.
+ * Recognition stretches the last words of a stretch out to its end: on a real
+ * recording two short words got 3.5 seconds each and covered ten seconds of
+ * silence. Because of that no pauses were left between words, an utterance was
+ * glued together across the silence and took someone else's time in the
+ * statistics.
  */
 const MAX_WORD_SEC = 2
 
 function wordsOf(seg: AsrSegment): Word[] {
   const words =
     seg.words.length > 0 ? seg.words : [{ text: seg.text.trim(), start: seg.start, end: seg.end }]
-  // Целую реплику одним «словом» не режем: там длительность осмысленна.
+  // A whole utterance as a single "word" is not clamped: its duration is meaningful there.
   if (words.length < 2) return words
   return words.map((w) =>
     w.end - w.start > MAX_WORD_SEC ? { ...w, end: w.start + MAX_WORD_SEC } : w
   )
 }
 
-/** Склейка текста с оглядкой на пунктуацию: перед точкой и запятой пробел не нужен. */
+/** Joining text with an eye on punctuation: no space is needed before a full stop or a comma. */
 function joinWords(words: readonly Word[]): string {
   let out = ''
   for (const w of words) {
@@ -84,11 +85,12 @@ function joinWords(words: readonly Word[]): string {
 }
 
 /**
- * Разложить результат ASR одной дорожки по спикерам.
+ * Lay the ASR result of one track out by speaker.
  *
- * Каждое слово получает кластер по максимальному пересечению с отрезками
- * диаризации, затем подряд идущие слова одного кластера собираются в реплику.
- * Реплика рвётся на смене кластера и на паузе длиннее UTTERANCE_GAP_SEC.
+ * Every word gets a cluster by its largest overlap with the diarization
+ * stretches, and then consecutive words of one cluster are collected into an
+ * utterance. An utterance breaks on a change of cluster and on a pause longer
+ * than UTTERANCE_GAP_SEC.
  */
 export function assignSpeakers(
   asr: AsrResult,
@@ -133,7 +135,7 @@ export function assignSpeakers(
   }
 
   for (const w of all) {
-    // Нет диаризации — вся дорожка считается одним говорящим.
+    // With no diarization the whole track counts as one speaker.
     const cluster = clusterFor(w.start, w.end, turns) ?? 0
     if (bucket.length === 0) {
       bucketCluster = cluster
@@ -146,10 +148,10 @@ export function assignSpeakers(
       flush()
       bucketCluster = cluster
     } else if (
-      // Один человек может говорить без пауз минутами, и тогда реплика
-      // вырастает в стену текста, которую нельзя ни прочитать, ни
-      // процитировать. Режем по концу предложения — но только когда реплика
-      // уже длинная, чтобы не дробить обычный разговор на огрызки.
+      // One person can speak without pauses for minutes, and then an utterance grows
+      // into a wall of text that can neither be read nor quoted. We split at the end
+      // of a sentence, but only once the utterance is already long, so as not to
+      // break an ordinary conversation into scraps.
       prev.end - bucket[0]!.start > UTTERANCE_MAX_SEC &&
       /[.!?…]$/.test(prev.text.trim())
     ) {
@@ -164,8 +166,9 @@ export function assignSpeakers(
 }
 
 /**
- * Слить дорожки в одну ленту. Кросс-трековое объединение спикеров не нужно:
- * человек физически не может быть одновременно в комнате и на том конце звонка.
+ * Merge the tracks into one feed. Cross-track speaker merging is not needed: a
+ * person cannot physically be in the room and on the other end of the call at
+ * the same time.
  */
 export function mergeTracks(...tracks: readonly Utterance[][]): Utterance[] {
   const all = tracks.flat()
@@ -173,14 +176,14 @@ export function mergeTracks(...tracks: readonly Utterance[][]): Utterance[] {
   return all
 }
 
-/** Все идентификаторы спикеров, реально встречающиеся в репликах. */
+/** Every speaker identifier that actually occurs in the utterances. */
 export function usedSpeakerIds(utterances: readonly Utterance[]): string[] {
   const seen = new Set<string>()
   for (const u of utterances) seen.add(u.speakerId)
   return [...seen].sort()
 }
 
-/** Сколько говорил каждый — для сортировки списка участников и выбора «главного». */
+/** How much each person spoke, for sorting the participant list and picking the "main" one. */
 export function speakingTime(utterances: readonly Utterance[]): Map<string, number> {
   const m = new Map<string, number>()
   for (const u of utterances) {
@@ -189,7 +192,7 @@ export function speakingTime(utterances: readonly Utterance[]): Map<string, numb
   return m
 }
 
-/** Нормализация для сравнения текста: регистр, пунктуация и ё/е не важны. */
+/** Normalisation for comparing text: case, punctuation and the ё/е distinction do not matter. */
 function normalizeForCompare(text: string): string {
   return text
     .toLowerCase()
@@ -199,7 +202,7 @@ function normalizeForCompare(text: string): string {
     .trim()
 }
 
-/** Доля общих слов — устойчивее посимвольного сравнения к оговоркам ASR. */
+/** The share of shared words, steadier against ASR slips than a character-by-character comparison. */
 export function textSimilarity(a: string, b: string): number {
   const left = normalizeForCompare(a).split(' ').filter(Boolean)
   const right = normalizeForCompare(b).split(' ').filter(Boolean)
@@ -218,7 +221,7 @@ export function textSimilarity(a: string, b: string): number {
   return (2 * shared) / (left.length + right.length)
 }
 
-/** Доля слов `part`, встречающихся в `whole`. */
+/** The share of `part`'s words that occur in `whole`. */
 export function containment(part: string, whole: string): number {
   const partWords = normalizeForCompare(part).split(' ').filter(Boolean)
   const wholeWords = normalizeForCompare(whole).split(' ').filter(Boolean)
@@ -239,20 +242,21 @@ export function containment(part: string, whole: string): number {
 }
 
 export const ECHO_CONTAINMENT_THRESHOLD = 0.7
-/** Насколько далеко от реплики микрофона ищем её источник в системной дорожке. */
+/** How far from a microphone utterance we look for its source in the system track. */
 export const ECHO_TIME_TOLERANCE_SEC = 2.5
-/** Реплики короче этого не судим по словам: «да» и «ага» совпадут с чем угодно. */
+/** Utterances shorter than this are not judged by words: "yes" and "uh-huh" match anything. */
 export const ECHO_MIN_WORDS = 3
-/** Насколько одновременно должна прозвучать короткая реплика, чтобы считаться эхом. */
+/** How closely in time a short utterance has to occur to count as echo. */
 export const SHORT_ECHO_WINDOW_SEC = 0.8
-/** Столько начальных букв должно совпасть, чтобы счесть обрывок огрызком чужого слова. */
+/** This many leading letters have to match for a scrap to count as the stump of someone else's word. */
 const ECHO_PREFIX_LEN = 4
 
 /**
- * Похоже ли короткое слово на огрызок слова из чужой речи.
+ * Whether a short word looks like the stump of a word from someone else's speech.
  *
- * Эхо динамиков распознаётся хуже оригинала, и от слова остаётся начало:
- * «займусь» превращается в «займь». Полное совпадение такое не поймает.
+ * Speaker echo is recognised worse than the original, and only the beginning of
+ * a word survives: a long word comes back as its first syllables. An exact
+ * match will not catch that.
  */
 function looksLikeFragmentOf(word: string, text: string): boolean {
   const needle = normalizeForCompare(word)
@@ -264,20 +268,20 @@ function looksLikeFragmentOf(word: string, text: string): boolean {
 }
 
 /**
- * Убрать эхо динамиков из дорожки микрофона.
+ * Remove speaker echo from the microphone track.
  *
- * Если человек сидит без наушников, микрофон слышит собеседника из колонок, и
- * та же фраза попадает в расшифровку дважды: один раз как удалённый участник,
- * второй — как кто-то «в комнате».
+ * If a person sits without headphones, the microphone hears the other side
+ * through the speakers, and the same phrase lands in the transcript twice: once
+ * as a remote participant, once as somebody "in the room".
  *
- * Сравниваем не реплику с репликой, а реплику микрофона с текстом системной
- * дорожки за то же время: распознавание и разделение по голосам нарезают
- * дорожки по-разному, и пофразовое сравнение промахивается ровно там, где
- * границы не совпали.
+ * We compare not utterance against utterance but the microphone utterance
+ * against the text of the system track over the same time: recognition and
+ * voice separation cut the tracks up differently, and a phrase-by-phrase
+ * comparison misses exactly where the boundaries did not line up.
  *
- * Собственную речь пользователя это не задевает: её нет в системной дорожке,
- * и совпадать ей не с чем. Совсем короткие реплики («да», «угу») не трогаем
- * вовсе — они случайно совпадают с чем угодно.
+ * The user's own speech is untouched by this: it is not in the system track and
+ * has nothing to match against. Very short utterances ("yes", "mhm") are left
+ * alone entirely, as they match anything by chance.
  */
 export function suppressEcho(
   micUtterances: readonly Utterance[],
@@ -297,14 +301,15 @@ export function suppressEcho(
     const nearby = systemUtterances.filter((system) => system.end >= from && system.start <= to)
     if (nearby.length === 0) return true
 
-    // Совсем короткие реплики по словам не судим: «да» и «ага» случайно
-    // совпадают с чем угодно. Исключение — когда фраза целиком повторяет
-    // начало чужой почти в тот же момент: так выглядит эхо первого слова.
+    // Very short utterances are not judged by words: "yes" and "uh-huh" match
+    // anything by chance. The exception is when a phrase repeats the whole start of
+    // somebody else's at almost the same moment: that is what an echo of the first
+    // word looks like.
     if (words.length < minWords) {
       const echoed = nearby.some((system) => {
         const simultaneous = Math.abs(system.start - mic.start) <= SHORT_ECHO_WINDOW_SEC
         if (simultaneous && containment(mic.text, system.text) === 1) return true
-        // Обрывок чужого слова поверх продолжающейся чужой речи.
+        // The stump of someone else's word on top of their speech still going on.
         const inside = mic.start >= system.start - SHORT_ECHO_WINDOW_SEC && mic.start <= system.end
         return inside && words.every((word) => looksLikeFragmentOf(word, system.text))
       })
@@ -319,16 +324,16 @@ export function suppressEcho(
 export interface SpeakingShare {
   speakerId: string
   seconds: number
-  /** Доля от всего звучавшего времени, 0..1. */
+  /** The share of all the time that was spoken, 0..1. */
   share: number
   utterances: number
 }
 
 /**
- * Кто сколько говорил.
+ * Who talked how much.
  *
- * Считаем по репликам, а не по длительности записи: паузы и тишина не
- * принадлежат никому, и включать их в долю было бы неверно.
+ * Computed over the utterances rather than the length of the recording: pauses
+ * and silence belong to nobody, and counting them into a share would be wrong.
  */
 export function speakingShares(utterances: readonly Utterance[]): SpeakingShare[] {
   const seconds = new Map<string, number>()
@@ -350,15 +355,16 @@ export function speakingShares(utterances: readonly Utterance[]): SpeakingShare[
 }
 
 /**
- * Собрать результат распознавания из уже готовой расшифровки.
+ * Rebuild a recognition result out of a transcript that already exists.
  *
- * Нужно, когда обработку перезапускают не с самого начала: слова с временами
- * лежат в самих репликах, и по ним можно заново разложить речь по говорящим,
- * не расшифровывая звук второй раз. Без этого пересборка «с разделения по
- * голосам» собирала расшифровку из пустоты и стирала её.
+ * Needed when processing is restarted from somewhere other than the beginning:
+ * the words with their times sit in the utterances themselves, and speech can be
+ * laid out by speaker again from those without transcribing the audio a second
+ * time. Without this, rebuilding "from voice separation" assembled the
+ * transcript out of nothing and erased it.
  *
- * У реплик без разметки по словам берётся текст целиком: точность внутри
- * реплики теряется, но сама реплика остаётся на месте.
+ * For utterances with no per-word markup the text is taken whole: accuracy
+ * inside the utterance is lost, but the utterance itself stays where it is.
  */
 export function asrFromUtterances(
   utterances: readonly Utterance[],
@@ -390,12 +396,12 @@ export function asrFromUtterances(
 }
 
 /**
- * Свести двух участников в одного.
+ * Merge two participants into one.
  *
- * Разделение по голосам иногда дробит речь одного человека на несколько
- * кластеров: часть сказана громче, часть поверх собеседника. Тогда он остаётся
- * в списке дважды, а его доля в разговоре делится пополам. Реплики исчезающего
- * переходят к остающемуся, порядок реплик не меняется.
+ * Voice separation sometimes breaks one person's speech into several clusters:
+ * part said louder, part over the other side. The person then sits in the list
+ * twice and their share of the conversation is halved. The utterances of the
+ * one disappearing pass to the one that stays, and their order does not change.
  */
 export function mergeSpeakers(meeting: Meeting, fromId: string, toId: string): Meeting {
   if (fromId === toId) return meeting

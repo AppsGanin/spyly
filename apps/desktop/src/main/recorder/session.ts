@@ -8,10 +8,10 @@ import { audioFile, ensureMeetingDirs, makeMeetingId, storageRoot } from '../sto
 import { writeMeta } from '../store/meetings.js'
 
 /**
- * Запас места, ниже которого запись не начинаем.
+ * The free space below which a recording is not started.
  *
- * Дорожка занимает около 2 МБ в час, но кончившееся место посреди разговора —
- * это потерянная встреча, а не мелкая неприятность.
+ * A track takes around 2 MB an hour, but running out of space mid-conversation
+ * is a meeting lost, not a minor annoyance.
  */
 const MIN_FREE_BYTES = 500 * 1024 * 1024
 
@@ -24,24 +24,24 @@ async function ensureFreeSpace(): Promise<void> {
       throw new Error(`на диске осталось ${Math.round(free / 1e6)} МБ — этого мало для записи`)
     }
   } catch (error) {
-    // Если сама проверка не удалась, запись важнее: не мешаем.
+    // If the check itself failed, the recording matters more: we do not get in the way.
     if (error instanceof Error && error.message.includes('осталось')) throw error
   }
 }
 
-/** Насколько дорожка может отстать от часов, прежде чем добьём тишиной. */
+/** How far a track may fall behind the clock before we fill it in with silence. */
 /**
- * Сколько ждать первого звука от источника.
+ * How long to wait for the first audio from a source.
  *
- * Меньше — ложные тревоги на паузе в начале разговора; больше — человек успеет
- * наговорить минуту в мёртвый микрофон.
+ * Less, and a pause at the start of a conversation raises a false alarm; more,
+ * and a person gets to talk for a minute into a dead microphone.
  */
 const SILENT_SOURCE_TIMEOUT_MS = 5000
 
 const DRIFT_TOLERANCE_SEC = 0.15
 const DRIFT_CHECK_MS = 1000
 
-/** Оба способа захвата дают одно и то же: события и уровень. */
+/** Both ways of capturing give the same thing: events and a level. */
 type Capture = NativeCapture | RendererCapture
 
 interface Track {
@@ -50,47 +50,47 @@ interface Track {
   writer: WavWriter
   ready: boolean
   error: string | null
-  /** Пришёл ли хоть один сэмпл: «готов» ещё не значит «работает». */
+  /** Whether a single sample has arrived: "ready" does not yet mean "working". */
   gotAudio: boolean
 }
 
 /**
- * Одна сессия записи.
+ * One recording session.
  *
- * Дорожки пишутся раздельно и никогда не микшируются: это даёт разделение
- * «комната / удалённые» бесплатно, убирает эхо и позволяет диаризовать каждую
- * дорожку независимо.
+ * The tracks are written separately and never mixed: that gives the "room
+ * versus remote" split for free, removes echo and lets each track be diarized
+ * independently.
  */
 export class RecordingSession extends EventEmitter {
   private tracks: Track[] = []
   private driftTimer: NodeJS.Timeout | null = null
   private startedAtMs = 0
-  /** Суммарное время на паузе — вычитается из общей длительности. */
+  /** Total time spent paused, subtracted from the overall duration. */
   private pausedMs = 0
   private pauseStartedAt: number | null = null
   private status: RecordingState['status'] = 'idle'
   private error: string | null = null
-  /** Все дорожки заведены: только после этого их потеря что-то значит. */
+  /** Every track is up: only after that does losing one mean anything. */
   private allTracksStarted = false
 
   readonly meetingId: string
   readonly meta: MeetingMeta
-  /** Отметки важных мест, поставленные во время записи. */
+  /** Marks on important moments, placed during the recording. */
   private readonly marks: { id: string; at: number; note: string }[] = []
 
-  /** Сколько уже записано раньше — при продолжении отсчёт идёт от этого. */
+  /** How much has already been recorded before: when continuing, the count starts from this. */
   private offsetSec = 0
 
   constructor(
     private readonly options: StartRecordingOptions,
     appPids: number[],
-    /** Продолжаемая встреча: её мета и уже записанная длительность. */
+    /** The meeting being continued: its meta and the duration already recorded. */
     previous?: { meta: MeetingMeta; durationSec: number }
   ) {
     super()
     const now = new Date()
     if (previous) {
-      // Продолжение: идентификатор, название и отметки остаются прежними.
+      // Continuing: the identifier, the title and the marks stay as they were.
       this.meetingId = previous.meta.id
       this.offsetSec = previous.durationSec
       this.marks.push(...previous.meta.marks)
@@ -122,7 +122,7 @@ export class RecordingSession extends EventEmitter {
 
   private appPids: number[] = []
 
-  /** Сколько всего записано с учётом прошлых частей. */
+  /** How much has been recorded in total, earlier parts included. */
   totalSec(): number {
     return this.offsetSec + this.elapsedSec()
   }
@@ -133,8 +133,8 @@ export class RecordingSession extends EventEmitter {
     await ensureMeetingDirs(this.meetingId)
     await writeMeta(this.meta)
 
-    // На macOS звук берёт свой хелпер поверх CoreAudio, на остальных
-    // платформах — сам Chromium: там его loopback работает штатно.
+    // On macOS the audio is taken by our own helper on top of CoreAudio, on the
+    // other platforms by Chromium itself: its loopback works properly there.
     const viaRenderer = usesRendererCapture()
 
     if (this.options.mic) {
@@ -153,8 +153,8 @@ export class RecordingSession extends EventEmitter {
           : new NativeCapture({
               source: 'system',
               includePids: this.appPids.length ? this.appPids : undefined,
-              // Свой собственный звук в запись попадать не должен — иначе
-              // воспроизведение прошлой встречи попадёт в новую.
+              // Our own audio must not end up in a recording, or playing back an earlier
+              // meeting lands in the new one.
               excludePids: this.appPids.length ? undefined : [process.pid]
             })
       )
@@ -169,12 +169,12 @@ export class RecordingSession extends EventEmitter {
     this.status = 'recording'
 
     /*
-     * Проверка, что источник и правда звучит.
+     * A check that the source really is making sound.
      *
-     * «Готов» — это ещё не «работает»: микрофон iPhone по Continuity, например,
-     * открывается без ошибок и не отдаёт ни одного сэмпла. Дальше выравнивание
-     * дорожек прилежно дописывает тишину, и человек узнаёт о пустой записи
-     * только когда разговор закончился.
+     * "Ready" is not yet "working": an iPhone microphone over Continuity, for
+     * instance, opens without an error and hands over not a single sample. Track
+     * alignment then diligently fills in silence, and a person finds out the
+     * recording was empty only once the conversation is over.
      */
     setTimeout(() => {
       if (this.status !== 'recording') return
@@ -217,10 +217,10 @@ export class RecordingSession extends EventEmitter {
     capture.on('error', (message: string) => {
       track.error = message
       this.error = `${id === 'mic' ? t('микрофон') : t('системный звук')}: ${message}`
-      // Захват через окно не «завершается» — он просто не открывается, и без
-      // этой проверки запись писала бы тишину до самого конца разговора.
-      // Ждём, пока встанут все дорожки: иначе ошибка первой, пришедшая раньше,
-      // чем открылась вторая, выглядела бы как потеря всех.
+      // Capture through the window does not "end", it simply never opens, and
+      // without this check a recording would write silence until the conversation was over.
+      // We wait for every track to come up: otherwise an error on the first,
+      // arriving before the second had opened, would look like losing them all.
       if (this.allTracksStarted && this.tracks.every((t) => t.error !== null)) {
         this.emit('allTracksLost')
       }
@@ -230,8 +230,8 @@ export class RecordingSession extends EventEmitter {
       if (this.status !== 'recording' && this.status !== 'paused') return
       track.error = t('захват прервался (код {code})', { code: code ?? '?' })
       this.error = `${id === 'mic' ? t('микрофон') : t('системный звук')}: ${track.error}`
-      // Если замолчали все источники, продолжать бессмысленно: дальше пишется
-      // одна тишина, и пользователь узнает об этом только в конце.
+      // If every source has gone quiet there is no point carrying on: from here it
+      // is silence being written, and the user would find out only at the end.
       if (this.tracks.every((t) => t.error !== null)) this.emit('allTracksLost')
       this.emitState()
     })
@@ -241,11 +241,12 @@ export class RecordingSession extends EventEmitter {
   }
 
   /**
-   * Догнать часы тишиной.
+   * Catch up with the clock using silence.
    *
-   * CoreAudio не вызывает колбэк, пока выбранное приложение молчит: за час
-   * созвона дорожка микрофона и дорожка системного звука разъедутся на минуты,
-   * и все таймкоды в расшифровке поедут. Поэтому недостающее дописываем сами.
+   * CoreAudio does not call the callback while the chosen application is silent:
+   * over an hour-long call the microphone track and the system audio track drift
+   * apart by minutes, and every timestamp in the transcript shifts. So the
+   * missing part is written in here.
    */
   private compensateDrift(): void {
     if (this.status !== 'recording') return
@@ -268,22 +269,22 @@ export class RecordingSession extends EventEmitter {
   }
 
   /**
-   * Отметить текущую секунду как важную.
+   * Mark the current second as important.
    *
-   * Записываем позицию в записи, а не время суток: после паузы они
-   * расходятся, а по расшифровке ориентируются именно по позиции.
+   * The position in the recording is stored rather than the time of day: after a
+   * pause the two diverge, and a transcript is navigated by position.
    */
   mark(note = ''): { id: string; at: number } | null {
     if (this.status !== 'recording' && this.status !== 'paused') return null
-    // Отметка ставится в общей шкале записи: при продолжении это важно,
-    // иначе новая часть перезапишет таймкоды старой.
+    // The mark is placed on the recording's overall scale: that matters when
+    // continuing, or the new part would overwrite the timestamps of the old one.
     const at = this.totalSec()
     const id = `mark-${this.marks.length + 1}`
     this.marks.push({ id, at, note })
     return { id, at }
   }
 
-  /** Пояснение пишется после нажатия: в момент отметки печатать некогда. */
+  /** The note is written after the key press: at the moment of marking there is no time to type. */
   annotate(id: string, note: string): void {
     const mark = this.marks.find((m) => m.id === id)
     if (mark) mark.note = note.trim()
@@ -311,8 +312,8 @@ export class RecordingSession extends EventEmitter {
   async stop(): Promise<{ durationSec: number }> {
     if (this.status === 'stopping' || this.status === 'idle') return { durationSec: 0 }
     this.status = 'stopping'
-    // Живой расшифровке нужно отдать хвост последней фразы до того,
-    // как захват остановится.
+    // Live transcription needs the tail of the last phrase handed over before
+    // capture stops.
     this.emit('stopping')
     this.emitState()
 
@@ -320,7 +321,7 @@ export class RecordingSession extends EventEmitter {
     this.compensateDrift()
 
     for (const track of this.tracks) track.capture.stop()
-    // Хелпер может дослать буфер уже после SIGTERM.
+    // The helper may send a buffer along even after SIGTERM.
     await new Promise((r) => setTimeout(r, 250))
     for (const track of this.tracks) await track.writer.close()
 

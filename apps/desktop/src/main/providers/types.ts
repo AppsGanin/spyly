@@ -8,7 +8,7 @@ export interface AsrCapabilities {
 
 export interface TranscribeOptions {
   language: string
-  /** 0..1 — для полосы прогресса на странице встречи. */
+  /** 0..1, for the progress bar on the meeting page. */
   onProgress?: (progress: number) => void
   signal?: AbortSignal
 }
@@ -18,7 +18,7 @@ export interface AsrProvider {
   name: string
   local: boolean
   capabilities: AsrCapabilities
-  /** Готов ли работать: скачана модель или введён ключ. */
+  /** Whether it is ready to work: the model downloaded or the key entered. */
   ready(): Promise<{ ready: boolean; hint?: string }>
   transcribe(wavPath: string, track: 'mic' | 'system', options: TranscribeOptions): Promise<AsrResult>
 }
@@ -28,12 +28,12 @@ export interface DiarizationProvider {
   name: string
   local: boolean
   ready(): Promise<{ ready: boolean; hint?: string }>
-  /** Отрезки речи по кластерам внутри одной дорожки. */
+  /** Stretches of speech by cluster within one track. */
   diarize(
     wavPath: string,
     options?: {
       numSpeakers?: number
-      /** Порог склейки кластеров; выше — меньше «участников». */
+      /** The cluster merging threshold; higher means fewer "participants". */
       threshold?: number
       onProgress?: (p: number) => void
     }

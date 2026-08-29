@@ -1,16 +1,17 @@
 /**
- * Дизайн-токены Geist (Vercel).
+ * The Geist design tokens (Vercel).
  *
- * Значения сняты с живого vercel.com/geist для обеих тем, а не подобраны на глаз.
- * Шрифты Geist Sans / Geist Mono лицензированы под SIL OFL и ставятся из npm-пакета
- * `geist`; компонентная библиотека Vercel публично не издана, поэтому компоненты
- * у нас свои — общий с Geist только визуальный язык.
+ * The values are taken from the live vercel.com/geist for both themes rather
+ * than picked by eye. The Geist Sans and Geist Mono fonts are licensed under
+ * the SIL OFL and come from the npm package `geist`; Vercel's component library
+ * is not published, so the components here are our own and only the visual
+ * language is shared with Geist.
  *
- * Смысл ступеней шкалы:
- *   100–300  фоны (обычный / hover / active)
- *   400–600  границы
- *   700–800  контрастные заливки
- *   900–1000 текст (вторичный / основной)
+ * What the steps of the scale mean:
+ *   100–300  backgrounds (normal / hover / active)
+ *   400–600  borders
+ *   700–800  contrasting fills
+ *   900–1000 text (secondary / primary)
  */
 
 :root {
@@ -118,10 +119,10 @@
   --ds-teal-800: oklch(57.53% .1392 181.66);
   --ds-teal-900: oklch(74.56% .1765 182.8);
 
-  /* ── материалы ─────────────────────────────────────────────── */
-  --radius-sm: 4px;   /* кнопки и мелкие контролы */
-  --radius: 6px;      /* базовый */
-  --radius-lg: 8px;   /* крупные карточки */
+  /* ── materials ─────────────────────────────────────────────── */
+  --radius-sm: 4px;   /* buttons and small controls */
+  --radius: 6px;      /* the base one */
+  --radius-lg: 8px;   /* large cards */
   --radius-full: 999px;
 
   --control-sm: 32px;
@@ -139,13 +140,13 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* ── типографика ───────────────────────────────────────────── */
+  /* ── typography ────────────────────────────────────────────── */
   --font-sans: "Geist", "Geist Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
 
   --text-xs: 11px;
   --text-sm: 12px;
-  --text-base: 14px;   /* контролы и основной текст */
+  --text-base: 14px;   /* controls and body text */
   --text-md: 16px;
   --text-lg: 20px;
   --text-xl: 24px;
@@ -157,15 +158,15 @@
   --leading-loose: 32px;
 
   --tracking-tight: -0.02em;
-  --tracking-tighter: -0.04em;   /* заголовки */
+  --tracking-tighter: -0.04em;   /* headings */
 
-  /* ── движение ──────────────────────────────────────────────── */
+  /* ── motion ────────────────────────────────────────────────── */
   --ease-swift: cubic-bezier(0.175, 0.885, 0.32, 1.1);
   --duration-fast: 120ms;
   --duration-popover: 200ms;
   --duration-overlay: 300ms;
 
-  /* ── слои ──────────────────────────────────────────────────── */
+  /* ── layers ────────────────────────────────────────────────── */
   --z-drawer: 200;
   --z-modal: 300;
   --z-menu: 2001;

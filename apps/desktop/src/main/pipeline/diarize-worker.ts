@@ -2,13 +2,14 @@ import { createRequire } from 'node:module'
 import { readWavPcm16 } from '../audio/wav.js'
 
 /**
- * Разделение по голосам в отдельном процессе.
+ * Voice separation in a separate process.
  *
- * Библиотека считает синхронно и целиком: на 130 секундах звука это семь секунд,
- * на часовой записи — минуты. В главном процессе такой вызов замораживает всё,
- * включая приём звука с микрофона, — а обработка прошлой записи вполне может
- * идти одновременно со следующей. Поэтому счёт живёт здесь и падение этого
- * процесса не уносит с собой запись.
+ * The library computes synchronously and all at once: on 130 seconds of audio
+ * that is seven seconds, on an hour-long recording, minutes. In the main
+ * process such a call freezes everything, taking in microphone audio included,
+ * and processing an earlier recording may well run alongside the next one. So
+ * the computation lives here, and this process dying does not take a recording
+ * with it.
  */
 
 const require = createRequire(import.meta.url)
@@ -17,7 +18,7 @@ export interface DiarizeJob {
   wavPath: string
   segmentation: string
   embedding: string
-  /** −1 значит «определить число говорящих самому». */
+  /** −1 means "work out the number of speakers yourself". */
   numClusters: number
   threshold: number
 }

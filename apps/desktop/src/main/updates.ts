@@ -3,22 +3,22 @@ import { app, dialog, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 
 /**
- * Обновление из релизов на GitHub.
+ * Updating from GitHub releases.
  *
- * Проверка тихая: пока обновление не скачалось, человека не трогаем. Когда оно
- * готово — спрашиваем, ставить сейчас или при следующем запуске. Прерывать
- * идущую запись обновлением нельзя ни при каких условиях, поэтому во время
- * записи мы даже не спрашиваем.
+ * The check is quiet: until an update has downloaded, nobody is disturbed. Once
+ * it is ready we ask whether to install now or at the next launch. Interrupting
+ * a recording with an update is unacceptable under any circumstances, so while
+ * recording we do not even ask.
  *
- * На macOS обновление ставится, только если приложение подписано сертификатом
- * Developer ID: Squirrel проверяет подпись перед установкой. Собранное без
- * сертификата приложение работает, но обновляться само не будет — тогда
- * остаётся ссылка на страницу релизов.
+ * On macOS an update only installs if the application is signed with a
+ * Developer ID certificate: Squirrel checks the signature before installing. An
+ * application built without a certificate works but will not update itself, and
+ * then a link to the releases page is what is left.
  */
 
 const { autoUpdater } = electronUpdater
 
-/** Раз в шесть часов: чаще незачем, релизы выходят не так быстро. */
+/** Every six hours: no reason for more, releases do not come out that fast. */
 const CHECK_EVERY_MS = 6 * 60 * 60_000
 
 const RELEASES_URL = 'https://github.com/AppsGanin/spyly/releases/latest'
@@ -27,12 +27,12 @@ let timer: ReturnType<typeof setInterval> | null = null
 let asked = false
 
 export function startUpdates(isRecording: () => boolean): void {
-  // В разработке обновляться неоткуда, а лишние запросы к GitHub только мешают.
+  // In development there is nowhere to update from, and extra requests to GitHub only get in the way.
   if (!app.isPackaged) return
 
   autoUpdater.autoDownload = true
-  // Ставим только когда человек согласился: тихий перезапуск посреди работы —
-  // худшее, что может сделать приложение, которое пишет разговоры.
+  // Installed only once a person has agreed: a silent restart in the middle of
+  // work is the worst thing an application that records conversations can do.
   autoUpdater.autoInstallOnAppQuit = true
 
   autoUpdater.on('update-downloaded', (info) => {
@@ -54,8 +54,8 @@ export function startUpdates(isRecording: () => boolean): void {
   })
 
   autoUpdater.on('error', (error: Error) => {
-    // Обновление — не то, из-за чего стоит беспокоить человека окном. В журнал
-    // пишем, чтобы разобраться, если оно молчит.
+    // An update is not something worth disturbing a person with a dialog over. It
+    // goes into the log, so that silence can be looked into.
     process.stderr.write(`[обновление] ${error.message}\n`)
   })
 
@@ -64,7 +64,7 @@ export function startUpdates(isRecording: () => boolean): void {
     void autoUpdater.checkForUpdates().catch(() => undefined)
   }
 
-  // Первую проверку откладываем: при запуске и без неё есть чем заняться.
+  // The first check is deferred: there is enough going on at startup without it.
   setTimeout(check, 30_000).unref?.()
   timer = setInterval(check, CHECK_EVERY_MS)
   timer.unref?.()
@@ -75,7 +75,7 @@ export function stopUpdates(): void {
   timer = null
 }
 
-/** Проверить по просьбе человека и ответить, что нашлось. */
+/** Check at a person's request and report what was found. */
 export async function checkForUpdatesNow(): Promise<
   { state: 'current'; version: string } | { state: 'found'; version: string } | { state: 'failed'; hint: string }
 > {

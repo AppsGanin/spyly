@@ -8,7 +8,7 @@ import { isDownloaded, modelPath, modelsDir } from '../../pipeline/models.js'
 import type { DiarizationProvider } from '../types.js'
 import type { DiarizeJob, DiarizeReply } from '../../pipeline/diarize-worker.js'
 
-// Нативный аддон грузится через require: у него нет ESM-точки входа.
+// The native addon is loaded through require: it has no ESM entry point.
 const require = createRequire(import.meta.url)
 
 interface SherpaSegment {
@@ -32,7 +32,7 @@ interface SherpaModule {
     dim: number
     createStream(): { acceptWaveform(input: { sampleRate: number; samples: Float32Array }): void; inputFinished(): void }
     isReady(stream: unknown): boolean
-    /** Второй аргумент выключает внешний буфер, запрещённый в Electron. */
+    /** The second argument switches off the external buffer, which Electron forbids. */
     compute(stream: unknown, enableExternalBuffer: boolean): Float32Array
   }
 }
@@ -57,12 +57,12 @@ export async function readWave(file: string): Promise<DecodedWav> {
 }
 
 /**
- * Порог склейки говорящих.
+ * The threshold for merging speakers.
  *
- * Ниже — каждая фраза становится отдельным «участником»: на реальном
- * получасовом разговоре троих человек значение 0.5 давало полсотни кластеров,
- * и расшифровка превращалась в мусор. Значение подобрано замером на настоящих
- * записях, а не взято из примера к библиотеке.
+ * Lower and every phrase becomes a separate "participant": on a real half-hour
+ * conversation between three people a value of 0.5 gave fifty clusters and the
+ * transcript turned into rubbish. The value was chosen by measurement on real
+ * recordings rather than taken from the library's example.
  */
 const CLUSTER_THRESHOLD = 0.9
 
@@ -83,15 +83,15 @@ export const sherpaDiarizationProvider: DiarizationProvider = {
       wavPath,
       segmentation: segmentationModelPath(),
       embedding: embeddingModelPath(),
-      // -1 значит «определить число говорящих самому»: заранее его знать
-      // неоткуда, в переговорке может оказаться кто угодно.
+      // -1 means "work out the number of speakers yourself": there is nowhere to
+      // learn it in advance, and anyone might turn up in a meeting room.
       numClusters: options.numSpeakers ?? -1,
       threshold: options.threshold ?? CLUSTER_THRESHOLD
     }
 
-    // Счёт синхронный и долгий, поэтому идёт в отдельном процессе. Если тот не
-    // запустился — считаем на месте: заморозка на несколько секунд неприятна,
-    // но лучше, чем несделанная работа.
+    // The computation is synchronous and long, so it runs in a separate process.
+    // If that failed to start we compute in place: freezing for a few seconds is
+    // unpleasant, but better than work not done.
     const turns = await diarizeInWorker(job).catch((error: unknown) => {
       process.stderr.write(`[голоса] отдельный процесс не сработал: ${String(error)}\n`)
       return null
@@ -101,7 +101,7 @@ export const sherpaDiarizationProvider: DiarizationProvider = {
   }
 }
 
-/** Тот же счёт в главном процессе — запасной путь. */
+/** The same computation in the main process, as a fallback. */
 async function diarizeHere(job: DiarizeJob): Promise<SpeakerTurn[]> {
   const { OfflineSpeakerDiarization } = sherpa()
   const wave = await readWavPcm16(job.wavPath)
@@ -120,13 +120,13 @@ async function diarizeHere(job: DiarizeJob): Promise<SpeakerTurn[]> {
     .sort((a, b) => a.start - b.start)
 }
 
-/** Час записи считается минутами; ждём с запасом, но не бесконечно. */
+/** An hour of recording takes minutes to compute; we wait generously, but not forever. */
 const WORKER_TIMEOUT_MS = 20 * 60_000
 
 async function diarizeInWorker(job: DiarizeJob): Promise<SpeakerTurn[]> {
   const { utilityProcess, app } = await import('electron')
-  // Путь один и тот же в собранном приложении и при разработке: точка входа
-  // лежит рядом с главной.
+  // The path is the same in the packaged application and in development: the
+  // entry point sits next to the main one.
   const entry = path.join(app.getAppPath(), 'out', 'main', 'diarize-worker.js')
   if (!existsSync(entry)) throw new Error(t('не найден {entry}', { entry: entry }))
 
@@ -157,10 +157,11 @@ async function diarizeInWorker(job: DiarizeJob): Promise<SpeakerTurn[]> {
 }
 
 /**
- * Усреднённый слепок голоса кластера.
+ * The averaged voice print of a cluster.
  *
- * Берём только отрезки этого кластера, склеиваем и считаем один embedding:
- * усреднение по нескольким кускам устойчивее, чем слепок с одной фразы.
+ * Only this cluster's segments are taken, glued together, and one embedding is
+ * computed: averaging over several pieces is steadier than a print from a
+ * single phrase.
  */
 export function embedSpeaker(
   samples: Float32Array,
