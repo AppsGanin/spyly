@@ -7,8 +7,8 @@
   <key>com.apple.security.cs.disable-library-validation</key><true/>
   <key>com.apple.security.device.audio-input</key><true/>
   <key>com.apple.security.device.microphone</key><true/>
-  <!-- Без этого при закалённой среде выполнения EventKit отказывает, даже не
-       обращаясь к системе разрешений: окно запроса не появляется вовсе. -->
+  <!-- Without this, under the hardened runtime EventKit refuses without even
+       reaching the permission system: the request window never appears. -->
   <key>com.apple.security.personal-information.calendars</key><true/>
 </dict>
 </plist>

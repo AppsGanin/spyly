@@ -17,12 +17,12 @@
   <key>CFBundleShortVersionString</key>
   <string>1.0</string>
   <key>NSCalendarsUsageDescription</key>
-  <string>Spyly подставит в запись название встречи и список участников из календаря.</string>
+  <string>Spyly fills in the meeting name and the participant list from your calendar.</string>
   <key>NSCalendarsFullAccessUsageDescription</key>
-  <string>Spyly подставит в запись название встречи и список участников из календаря.</string>
+  <string>Spyly fills in the meeting name and the participant list from your calendar.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Spyly записывает ваш голос, чтобы расшифровать разговор.</string>
+  <string>Spyly records your voice so the conversation can be transcribed.</string>
   <key>NSAudioCaptureUsageDescription</key>
-  <string>Spyly записывает звук приложений, чтобы расшифровать собеседников.</string>
+  <string>Spyly records application audio so the other participants can be transcribed.</string>
 </dict>
 </plist>

@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    // Мёртвые импорты и параметры копятся незаметно и мешают читать код.
+    // Dead imports and parameters pile up unnoticed and make the code harder to read.
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noUncheckedIndexedAccess": true,

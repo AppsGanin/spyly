@@ -56,24 +56,24 @@ const design = [
 ]
 
 describe('relatedMeetings', () => {
-  it('находит продолжение разговора по общим словам', () => {
+  it('finds the continuation of a conversation by shared words', () => {
     const current = meeting('billing-1', billing)
     const related = relatedMeetings(current, [meeting('billing-2', billingAgain), meeting('design-1', design)])
     expect(related.map((r) => r.meeting.id)).toEqual(['billing-2'])
     expect(related[0]!.sharedTerms).toContain('биллинг')
   })
 
-  it('не связывает разговоры на разные темы', () => {
+  it('does not link conversations on different subjects', () => {
     const related = relatedMeetings(meeting('design-1', design), [meeting('billing-1', billing)])
     expect(related).toHaveLength(0)
   })
 
-  it('себя в похожие не записывает', () => {
+  it('does not list itself among the similar ones', () => {
     const current = meeting('billing-1', billing)
     expect(relatedMeetings(current, [current])).toHaveLength(0)
   })
 
-  it('общие участники усиливают связь', () => {
+  it('shared participants strengthen the link', () => {
     const current = meeting('billing-1', billing, ['Мария', 'Пётр'])
     const withPeople = relatedMeetings(current, [meeting('billing-2', billingAgain, ['Мария', 'Пётр'])])
     const without = relatedMeetings(current, [meeting('billing-2', billingAgain)])
@@ -83,19 +83,19 @@ describe('relatedMeetings', () => {
 })
 
 describe('meetingTerms', () => {
-  it('выкидывает слова-связки', () => {
+  it('throws out filler words', () => {
     const terms = meetingTerms(meeting('x', ['просто вот это надо сделать', 'просто вот это надо сделать']))
     expect([...terms.values()]).not.toContain('просто')
     expect([...terms.values()]).toContain('сделать')
   })
 
-  it('разные формы одного слова считает за одно', () => {
+  it('counts different forms of one word as the same', () => {
     const terms = meetingTerms(meeting('x', ['биллинг сломался', 'в биллинге ошибка', 'чиним биллинга']))
     const forms = [...terms.values()].filter((w) => w.startsWith('биллинг'))
     expect(forms).toHaveLength(1)
   })
 
-  it('на длинном разговоре одиночные слова отбрасывает', () => {
+  it('on a long conversation it discards singletons', () => {
     // Eight repeated words, which is enough not to take everything indiscriminately.
     const lines = Array.from({ length: 4 }, () => 'релиз миграция биллинг тестирование деплой конфигурация мониторинг документация')
     const terms = meetingTerms(meeting('x', [...lines, 'кубернетес упал однажды']))

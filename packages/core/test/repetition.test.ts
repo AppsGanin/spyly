@@ -3,27 +3,27 @@ import { isLikelyHallucination } from '../src/hallucination.js'
 
 // Whisper falls into repeating one phrase where the person said nothing of the
 // kind. A check for a single repeated word did not catch that.
-describe('зацикленный вывод', () => {
-  it('ловит фразу, повторённую много раз', () => {
+describe('looping output', () => {
+  it('catches a phrase repeated many times', () => {
     expect(isLikelyHallucination('Я не знаю, что это значит. '.repeat(14))).toBe(true)
   })
 
-  it('ловит повтор с осмысленным хвостом', () => {
+  it('catches a repeat with a meaningful tail', () => {
     const text =
       'Там назначение новой роли, оно только новую роль. '.repeat(6) +
       'назначает, то есть я имею в виду'
     expect(isLikelyHallucination(text)).toBe(true)
   })
 
-  it('ловит фразу и её оборванный повтор', () => {
+  it('catches a phrase and its cut-off repeat', () => {
     expect(isLikelyHallucination('Я не знаю, что это значит. Я не знаю, что это')).toBe(true)
   })
 
-  it('ловит залипание на одном слове', () => {
+  it('catches getting stuck on one word', () => {
     expect(isLikelyHallucination('Да да да да да да')).toBe(true)
   })
 
-  it('не трогает обычную речь', () => {
+  it('leaves ordinary speech alone', () => {
     const normal = [
       'Привет, нам нужно переделать расчёт подписок в биллинге до конца недели',
       'Согласен. Я возьму на себя миграцию базы данных и напишу тесты.',
@@ -36,7 +36,7 @@ describe('зацикленный вывод', () => {
     }
   })
 
-  it('короткие повторы речи не считает залипанием', () => {
+  it('short repeats in speech do not count as being stuck', () => {
     // People do repeat themselves: "all right, all right" is a normal utterance.
     expect(isLikelyHallucination('Хорошо, хорошо')).toBe(false)
   })

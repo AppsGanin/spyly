@@ -108,7 +108,7 @@ func calendarEvents(backMinutes: Int, forwardMinutes: Int) -> [CalendarEvent] {
             }
             return CalendarEvent(
                 id: event.eventIdentifier ?? UUID().uuidString,
-                title: event.title ?? "Без названия",
+                title: event.title ?? "",
                 startsAt: iso.string(from: event.startDate),
                 endsAt: iso.string(from: event.endDate),
                 participants: names,

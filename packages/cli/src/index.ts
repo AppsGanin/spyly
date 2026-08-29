@@ -12,21 +12,21 @@ import {
 } from '@spyly/core'
 import { listMeetings, readMeeting, searchMeetings, storageRoot } from '@spyly/mcp-server/dist/store.js'
 
-const HELP = `spyly — созвоны в терминале
+const HELP = `spyly — your calls in the terminal
 
-  spyly list [N]              последние встречи (по умолчанию 20)
-  spyly last                  расшифровка последней встречи
-  spyly show <id>             расшифровка встречи
-  spyly summary <id>          только конспект
-  spyly search <запрос>       поиск по расшифровкам
-  spyly prompt <id> [шаблон]  готовый промпт для кодинг-агента
-  spyly where                 где лежат записи
-  spyly mcp                   запустить MCP-сервер (stdio)
+  spyly list [N]                the latest recordings (20 by default)
+  spyly last                    the transcript of the latest recording
+  spyly show <id>               the transcript of a recording
+  spyly summary <id>            the summary alone
+  spyly search <query>          search the transcripts
+  spyly prompt <id> [template]  a ready prompt for a coding agent
+  spyly where                   where the recordings are kept
+  spyly mcp                     start the MCP server (stdio)
 
-Форматы: --format md|txt|json (по умолчанию md)
-Шаблоны промпта: ${DEFAULT_PROMPT_TEMPLATES.map((t) => t.id).join(', ')}
+Formats: --format md|txt|json (md by default)
+Prompt templates: ${DEFAULT_PROMPT_TEMPLATES.map((tpl) => tpl.id).join(', ')}
 
-Пример: spyly last | claude -p "сделай тикеты"
+Example: spyly last | claude -p "turn this into tickets"
 `
 
 function flag(name: string, fallback: string): string {
@@ -43,7 +43,7 @@ function render(meeting: NonNullable<Awaited<ReturnType<typeof readMeeting>>>, f
 async function resolveMeeting(id: string) {
   const meeting = await readMeeting(id)
   if (!meeting) {
-    process.stderr.write(`Встреча ${id} не найдена. Посмотрите список: spyly list\n`)
+    process.stderr.write(`Recording ${id} not found. See the list with: spyly list\n`)
     process.exit(1)
   }
   return meeting
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
       const limit = Number(rest[0] ?? 20)
       const meetings = await listMeetings(Number.isFinite(limit) ? limit : 20)
       if (meetings.length === 0) {
-        process.stdout.write(`Записей нет. Папка: ${storageRoot()}\n`)
+        process.stdout.write(`No recordings. Folder: ${storageRoot()}\n`)
         return
       }
       for (const meeting of meetings) {
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     case 'last': {
       const [latest] = await listMeetings(1)
       if (!latest) {
-        process.stdout.write('Записей пока нет.\n')
+        process.stdout.write('No recordings yet.\n')
         return
       }
       process.stdout.write(render(await resolveMeeting(latest.id), format))
@@ -80,14 +80,14 @@ async function main(): Promise<void> {
 
     case 'show': {
       const id = rest[0]
-      if (!id) return void process.stderr.write('Укажите идентификатор встречи\n')
+      if (!id) return void process.stderr.write('Give a recording identifier\n')
       process.stdout.write(render(await resolveMeeting(id), format))
       return
     }
 
     case 'summary': {
       const id = rest[0]
-      if (!id) return void process.stderr.write('Укажите идентификатор встречи\n')
+      if (!id) return void process.stderr.write('Give a recording identifier\n')
       const meeting = await resolveMeeting(id)
       process.stdout.write(renderSummaryMarkdown(meeting))
       return
@@ -95,10 +95,10 @@ async function main(): Promise<void> {
 
     case 'search': {
       const query = rest.filter((a) => !a.startsWith('--')).join(' ')
-      if (!query) return void process.stderr.write('Укажите, что искать\n')
+      if (!query) return void process.stderr.write('Say what to search for\n')
       const hits = await searchMeetings(query, 20)
       if (hits.length === 0) {
-        process.stdout.write(`По запросу «${query}» ничего не нашлось.\n`)
+        process.stdout.write(`Nothing was found for "${query}".\n`)
         return
       }
       for (const hit of hits) {
@@ -110,7 +110,7 @@ async function main(): Promise<void> {
 
     case 'prompt': {
       const id = rest[0]
-      if (!id) return void process.stderr.write('Укажите идентификатор встречи\n')
+      if (!id) return void process.stderr.write('Give a recording identifier\n')
       const templateId = rest[1] ?? 'tasks'
       const template =
         DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === templateId) ?? DEFAULT_PROMPT_TEMPLATES[0]!

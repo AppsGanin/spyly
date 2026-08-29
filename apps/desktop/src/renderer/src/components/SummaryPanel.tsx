@@ -1,8 +1,7 @@
 import { t } from '@spyly/core'
 
-/** A marker that the summary was edited by hand. The value is internal and is not translated. */
-const MANUAL_MODEL = 'вручную'
 import { useEffect, useState } from 'react'
+import { isManualSummary } from '@spyly/core'
 import type { ActionItem, Meeting, Summary } from '@spyly/core'
 import { IconClose, IconSparkle } from '../lib/icons'
 import { Button, EmptyState, IconButton, Input } from '../ui'
@@ -311,7 +310,7 @@ export function SummaryPanel({
             {generating ? t('Пересобираю…') : t('Пересобрать конспект')}
           </Button>
         )}
-        {!dirty && draft.model === MANUAL_MODEL && <span className="dim">{t('Правлено вручную')}</span>}
+        {!dirty && isManualSummary(draft.model) && <span className="dim">{t('Правлено вручную')}</span>}
       </div>
     </div>
   )

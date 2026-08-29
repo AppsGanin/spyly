@@ -1209,11 +1209,11 @@ function PromptTemplates() {
         {templates.map((template) => (
           <div key={template.id} className="tmpl">
             <div className="grow">
-              <div className="check__title">{template.name}</div>
-              <div className="check__hint tmpl__text">{template.instruction}</div>
+              <div className="check__title">{t(template.name)}</div>
+              <div className="check__hint tmpl__text">{t(template.instruction)}</div>
             </div>
             <div className="row" style={{ gap: 'var(--space-1)' }}>
-              <IconButton aria-label={t('Изменить')} title={t('Изменить')} onClick={() => setEditing({ ...template })}>
+              <IconButton aria-label={t('Изменить')} title={t('Изменить')} onClick={() => setEditing({ ...template, name: t(template.name), instruction: t(template.instruction) })}>
                 <IconPencil />
               </IconButton>
               <IconButton

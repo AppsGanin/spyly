@@ -20,56 +20,56 @@ function meeting(marks: { at: number; note?: string }[]): Meeting {
   })
 }
 
-describe('разметка отмеченных мест', () => {
+describe('marking up the marked moments', () => {
   /**
    * A person places a mark a second or two after the thing was said, so there is
    * no exact landing inside an utterance's bounds: the nearest one is taken.
    */
-  it('к отметке подставляется ближайшая реплика', () => {
+  it('a mark gets the nearest utterance', () => {
     const text = renderTranscriptMarkdown(meeting([{ at: 6 }]))
     expect(text).toContain('первая реплика')
   })
 
-  it('отметка ближе ко второй реплике берёт вторую', () => {
+  it('a mark closer to the second utterance takes the second', () => {
     const text = renderTranscriptMarkdown(meeting([{ at: 18 }]))
     const line = text.split('\n').find((l) => l.includes('0:18'))
     expect(line).toContain('вторая реплика')
   })
 
-  it('отметка внутри реплики берёт именно её', () => {
+  it('a mark inside an utterance takes that one', () => {
     const text = renderTranscriptMarkdown(meeting([{ at: 22 }]))
     const line = text.split('\n').find((l) => l.includes('0:22'))
     expect(line).toContain('вторая реплика')
   })
 
-  it('пояснение человека важнее текста реплики', () => {
+  it('a note from a person beats the utterance text', () => {
     const text = renderTranscriptMarkdown(meeting([{ at: 3, note: 'вот это важно' }]))
     const line = text.split('\n').find((l) => l.includes('0:03'))
     expect(line).toContain('вот это важно')
     expect(line).not.toContain('первая реплика')
   })
 
-  it('без отметок раздела нет', () => {
+  it('with no marks there is no section', () => {
     expect(renderTranscriptMarkdown(meeting([]))).not.toContain('Отмеченные места')
   })
 })
 
-describe('подпись участника', () => {
-  it('имя важнее всего', () => {
+describe('the participant caption', () => {
+  it('a name beats everything', () => {
     expect(speakerLabel(Speaker.parse({ id: 'system:0', track: 'system', cluster: 0, name: 'Мария' }), 'system:0'))
       .toBe('Мария')
   })
 
-  it('своя речь называется «Вы»', () => {
+  it('your own speech is called "You"', () => {
     expect(speakerLabel(Speaker.parse({ id: 'mic:0', track: 'mic', cluster: 0, isMe: true }), 'mic:0')).toBe('Вы')
   })
 
-  it('без имени — номер по дорожке', () => {
+  it('with no name, a number by track', () => {
     expect(speakerLabel(Speaker.parse({ id: 'system:1', track: 'system', cluster: 1 }), 'system:1')).toBe('Участник 2')
     expect(speakerLabel(Speaker.parse({ id: 'mic:1', track: 'mic', cluster: 1 }), 'mic:1')).toBe('В комнате 2')
   })
 
-  it('неизвестный участник показывается своим идентификатором', () => {
+  it('an unknown participant is shown by their identifier', () => {
     expect(speakerLabel(undefined, 'system:7')).toBe('system:7')
   })
 })

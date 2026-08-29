@@ -23,7 +23,7 @@ function make(overrides: Partial<Utterance> = {}): Utterance {
 }
 
 describe('splitUtterance', () => {
-  it('делит по границе слова, когда таймкоды есть', () => {
+  it('splits at a word boundary when there are timestamps', () => {
     const utterance = make({
       words: [
         { text: 'привет', start: 10, end: 11 },
@@ -43,21 +43,21 @@ describe('splitUtterance', () => {
     expect(tail.words).toHaveLength(1)
   })
 
-  it('без таймкодов делит пропорционально длине', () => {
+  it('without timestamps it splits in proportion to length', () => {
     const [head, tail] = splitUtterance(make({ text: 'абвг', words: [] }), 2)!
     expect(head.text).toBe('аб')
     expect(tail.text).toBe('вг')
     expect(head.end).toBe(15)
   })
 
-  it('не делит, если одна половина пустая', () => {
+  it('does not split when one half would be empty', () => {
     expect(splitUtterance(make(), 0)).toBeNull()
     expect(splitUtterance(make(), 999)).toBeNull()
   })
 
   // Splitting an utterance twice easily gives two identical identifiers, and
   // after that an edit would land on the wrong utterance.
-  it('второе деление не повторяет уже занятый идентификатор', () => {
+  it('a second split does not repeat an identifier already taken', () => {
     const base = make({ text: 'один два три четыре' })
     const [head, tail] = splitUtterance(base, 9, new Set([base.id]))!
     const taken = new Set([head.id, tail.id])
@@ -66,7 +66,7 @@ describe('splitUtterance', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('половинки не выходят за границы исходной реплики', () => {
+  it('the halves stay inside the bounds of the original utterance', () => {
     const [head, tail] = splitUtterance(make({ text: 'раз два' }), 3)!
     expect(head.start).toBe(10)
     expect(tail.end).toBe(20)
@@ -76,7 +76,7 @@ describe('splitUtterance', () => {
 })
 
 describe('mergeUtterances', () => {
-  it('склеивает текст и растягивает границы', () => {
+  it('joins the text and stretches the bounds', () => {
     const merged = mergeUtterances(
       make({ text: 'первая', start: 10, end: 12 }),
       make({ id: 'u2', speakerId: 'local:0', text: 'вторая', start: 12, end: 15 })
@@ -88,7 +88,7 @@ describe('mergeUtterances', () => {
     expect(merged.speakerId).toBe('remote:0')
   })
 
-  it('слова остаются в порядке времени', () => {
+  it('the words stay in time order', () => {
     const merged = mergeUtterances(
       make({ words: [{ text: 'б', start: 12, end: 13 }] }),
       make({ id: 'u2', words: [{ text: 'а', start: 10, end: 11 }] })
@@ -97,8 +97,8 @@ describe('mergeUtterances', () => {
   })
 })
 
-describe('уверенность', () => {
-  it('находит слова, в которых модель сомневалась', () => {
+describe('confidence', () => {
+  it('finds the words the model was unsure about', () => {
     const utterance = make({
       words: [
         { text: 'точно', start: 10, end: 11, confidence: 0.95 },
@@ -108,15 +108,15 @@ describe('уверенность', () => {
     expect([...doubtfulWords(utterance)]).toEqual([1])
   })
 
-  it('без данных об уверенности не выдумывает её', () => {
+  it('does not invent confidence when there is none', () => {
     expect(utteranceConfidence(make())).toBeNull()
   })
 
-  it('на короткой записи берёт разумный порог по умолчанию', () => {
+  it('on a short recording it takes a sensible default threshold', () => {
     expect(doubtThreshold({ utterances: [make()] })).toBe(0.6)
   })
 
-  it('на шумной записи подчёркивает только худшее, а не всё подряд', () => {
+  it('on a noisy recording it underlines only the worst, not everything', () => {
     // Here the model is unsure everywhere: a fixed threshold of 0.6 would underline
     // almost the whole text and become useless.
     const words = Array.from({ length: 40 }, (_, i) => ({
@@ -130,7 +130,7 @@ describe('уверенность', () => {
     expect(flagged).toBeLessThan(words.length / 4)
   })
 
-  it('усредняет по словам', () => {
+  it('averages over the words', () => {
     const utterance = make({
       words: [
         { text: 'а', start: 10, end: 11, confidence: 0.4 },

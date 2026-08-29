@@ -74,7 +74,7 @@ export const openAiCompatibleProvider: LlmProvider = {
       // "fetch failed" tells a person nothing: we add the address that could not be
       // reached, and the reason if there is one.
       const cause = error instanceof Error && error.cause instanceof Error ? `: ${error.cause.message}` : ''
-      throw new Error(`не удалось связаться с ${url}${cause}`)
+      throw new Error(t('не удалось связаться с {url}{cause}', { url, cause }))
     })
 
     if (!response.ok) {

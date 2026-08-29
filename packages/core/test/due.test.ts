@@ -5,45 +5,45 @@ import { dueState, parseDue } from '../src/due.js'
 const thursday = new Date(2026, 8, 3, 15, 0, 0)
 
 describe('parseDue', () => {
-  it('понимает завтра и послезавтра', () => {
+  it('understands tomorrow and the day after', () => {
     expect(parseDue('завтра', thursday)).toBe('2026-09-04')
     expect(parseDue('послезавтра', thursday)).toBe('2026-09-05')
   })
 
-  it('конец недели — это пятница, а не воскресенье', () => {
+  it('the end of the week is Friday, not Sunday', () => {
     expect(parseDue('до конца недели', thursday)).toBe('2026-09-04')
   })
 
-  it('в пятницу, когда сегодня четверг, — завтра', () => {
+  it('on Friday, when today is Thursday, means tomorrow', () => {
     expect(parseDue('в пятницу', thursday)).toBe('2026-09-04')
   })
 
-  it('день недели, который уже прошёл, — на следующей неделе', () => {
+  it('a weekday that has passed means next week', () => {
     expect(parseDue('во вторник', thursday)).toBe('2026-09-08')
   })
 
-  it('разбирает число с месяцем', () => {
+  it('parses a day with a month', () => {
     expect(parseDue('до 15 сентября', thursday)).toBe('2026-09-15')
   })
 
-  it('месяц, который давно прошёл, относит к следующему году', () => {
+  it('a month long past belongs to next year', () => {
     expect(parseDue('10 января', thursday)).toBe('2027-01-10')
   })
 
-  it('считает «через N»', () => {
+  it('counts "in N"', () => {
     expect(parseDue('через 3 дня', thursday)).toBe('2026-09-06')
     expect(parseDue('через неделю', thursday)).toBe('2026-09-10')
   })
 
-  it('конец месяца — последнее его число', () => {
+  it('the end of the month is its last day', () => {
     expect(parseDue('до конца месяца', thursday)).toBe('2026-09-30')
   })
 
-  it('готовую дату принимает как есть', () => {
+  it('a ready-made date is taken as it is', () => {
     expect(parseDue('2026-12-01', thursday)).toBe('2026-12-01')
   })
 
-  it('незнакомое выражение не превращает в дату', () => {
+  it('an unfamiliar expression does not become a date', () => {
     // An invented deadline is worse than one that was never found: a reminder will arrive for it.
     expect(parseDue('как получится', thursday)).toBeNull()
     expect(parseDue('', thursday)).toBeNull()
@@ -52,14 +52,14 @@ describe('parseDue', () => {
 })
 
 describe('dueState', () => {
-  it('различает просрочено, сегодня и скоро', () => {
+  it('tells overdue, today and soon apart', () => {
     expect(dueState('2026-09-02', thursday)).toBe('overdue')
     expect(dueState('2026-09-03', thursday)).toBe('today')
     expect(dueState('2026-09-05', thursday)).toBe('soon')
     expect(dueState('2026-10-01', thursday)).toBe('later')
   })
 
-  it('без срока состояния нет', () => {
+  it('with no deadline there is no state', () => {
     expect(dueState(undefined, thursday)).toBe('none')
     expect(dueState('когда-нибудь', thursday)).toBe('none')
   })

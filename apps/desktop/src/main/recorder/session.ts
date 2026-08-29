@@ -15,17 +15,26 @@ import { writeMeta } from '../store/meetings.js'
  */
 const MIN_FREE_BYTES = 500 * 1024 * 1024
 
+/**
+ * Not enough room on the disk.
+ *
+ * A class of its own rather than a match on the message text: the message is
+ * translated, and matching on it stopped telling our own failure apart from a
+ * statfs failure the moment the interface was switched to another language.
+ */
+class NotEnoughSpace extends Error {}
+
 async function ensureFreeSpace(): Promise<void> {
   const { statfs } = await import('node:fs/promises')
   try {
     const stats = await statfs(storageRoot())
     const free = stats.bavail * stats.bsize
     if (free < MIN_FREE_BYTES) {
-      throw new Error(`на диске осталось ${Math.round(free / 1e6)} МБ — этого мало для записи`)
+      throw new NotEnoughSpace(t('на диске осталось {mb} МБ — этого мало для записи', { mb: Math.round(free / 1e6) }))
     }
   } catch (error) {
     // If the check itself failed, the recording matters more: we do not get in the way.
-    if (error instanceof Error && error.message.includes('осталось')) throw error
+    if (error instanceof NotEnoughSpace) throw error
   }
 }
 

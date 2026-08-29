@@ -2,7 +2,7 @@ import AVFoundation
 import CoreAudio
 import Foundation
 
-enum TapError: Error, CustomStringConvertible {
+enum TapError: CodedError {
     case noOutputDevice
     case tapFailed(OSStatus)
     case noTapUID
@@ -13,17 +13,32 @@ enum TapError: Error, CustomStringConvertible {
     case converterFailed
     case noSuchProcess
 
+    /// What the application matches on to pick its own wording.
+    var reason: String {
+        switch self {
+        case .noOutputDevice: return "no-output-device"
+        case .tapFailed: return "tap-failed"
+        case .noTapUID: return "tap-no-uid"
+        case .aggregateFailed: return "aggregate-failed"
+        case .formatFailed: return "tap-format-failed"
+        case .ioProcFailed: return "ioproc-failed"
+        case .startFailed: return "start-failed"
+        case .converterFailed: return "converter-failed"
+        case .noSuchProcess: return "no-such-process"
+        }
+    }
+
     var description: String {
         switch self {
-        case .noOutputDevice: return "не удалось определить устройство вывода"
-        case .tapFailed(let s): return "AudioHardwareCreateProcessTap failed (\(s)) — вероятно, нет разрешения на запись системного звука"
-        case .noTapUID: return "у созданного tap нет UID"
+        case .noOutputDevice: return "could not determine the output device"
+        case .tapFailed(let s): return "AudioHardwareCreateProcessTap failed (\(s)); most likely there is no permission to record system audio"
+        case .noTapUID: return "the tap that was created has no UID"
         case .aggregateFailed(let s): return "AudioHardwareCreateAggregateDevice failed (\(s))"
-        case .formatFailed(let s): return "не удалось прочитать формат tap (\(s))"
+        case .formatFailed(let s): return "could not read the tap format (\(s))"
         case .ioProcFailed(let s): return "AudioDeviceCreateIOProcIDWithBlock failed (\(s))"
         case .startFailed(let s): return "AudioDeviceStart failed (\(s))"
-        case .converterFailed: return "не удалось создать конвертер частоты дискретизации"
-        case .noSuchProcess: return "выбранное приложение не найдено среди источников звука"
+        case .converterFailed: return "could not create a sample rate converter"
+        case .noSuchProcess: return "the chosen application is not among the audio sources"
         }
     }
 }

@@ -30,13 +30,13 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
  * carry on.
  */
 process.on('uncaughtException', (error) => {
-  process.stderr.write(`[необработанная ошибка] ${error.stack ?? error.message}\n`)
+  process.stderr.write(`[unhandled error] ${error.stack ?? error.message}\n`)
   send('toast', { kind: 'error', text: t('Внутренняя ошибка: {error_message}', { error_message: error.message }) })
 })
 
 process.on('unhandledRejection', (reason) => {
   const text = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
-  process.stderr.write(`[необработанный отказ] ${text}\n`)
+  process.stderr.write(`[unhandled rejection] ${text}\n`)
 })
 
 // The name is set before the first getPath call: otherwise the data folder is
@@ -123,7 +123,7 @@ function registerDisplayMediaHandler(): void {
         .catch((error: unknown) => {
           // Not answering is not an option: without the callback the audio request in
           // the renderer hangs forever, and the recording is eternally "starting".
-          process.stderr.write(`[источники экрана недоступны] ${String(error)}\n`)
+          process.stderr.write(`[screen sources unavailable] ${String(error)}\n`)
           callback({})
         })
     },
@@ -180,10 +180,10 @@ function createWindow(): void {
     }
   })
   mainWindow.webContents.on('render-process-gone', (_e, details) => {
-    process.stderr.write(`[renderer упал] ${details.reason}\n`)
+    process.stderr.write(`[renderer crashed] ${details.reason}\n`)
   })
   mainWindow.webContents.on('did-fail-load', (_e, code, description) => {
-    process.stderr.write(`[загрузка не удалась] ${code} ${description}\n`)
+    process.stderr.write(`[load failed] ${code} ${description}\n`)
   })
 
   // A screenshot of the window for automated appearance checks.
@@ -192,7 +192,7 @@ function createWindow(): void {
   if (process.env.SPYLY_CONSOLE) {
     mainWindow.webContents.on('console-message', (_event, level, message, line, source) => {
       if (level < 2) return
-      process.stderr.write(`[окно] ${message} (${source}:${line})\n`)
+      process.stderr.write(`[window] ${message} (${source}:${line})\n`)
     })
   }
 
@@ -212,10 +212,8 @@ function createWindow(): void {
             `window.dispatchEvent(new KeyboardEvent('keydown', {
                key: ${JSON.stringify(key)},
                metaKey: ${parts.includes('meta')},
-               shiftKey: ${parts.includes('shift')},
-               bubbles: true
-             })), 'нажал ' + ${JSON.stringify(keys)}`
-          ).then((result: string) => process.stderr.write(`[снимок] ${result}\n`)).catch(() => undefined)
+               shiftKey: ${parts.includes('shift')},\n               bubbles: true\n             })), 'pressed ' + ${JSON.stringify(keys)}`
+          ).then((result: string) => process.stderr.write(`[screenshot] ${result}\n`)).catch(() => undefined)
           await new Promise((r) => setTimeout(r, 800))
         }
 
@@ -227,20 +225,17 @@ function createWindow(): void {
           await mainWindow!.webContents
             .executeJavaScript(
               `(() => {
-                 const target = document.querySelector(${JSON.stringify(click)})
-                 if (!target) return 'не нашёл: ' + ${JSON.stringify(click)}
-                 target.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-                 return 'нажал: ' + ${JSON.stringify(click)}
+                 const target = document.querySelector(${JSON.stringify(click)})\n                 if (!target) return 'not found: ' + ${JSON.stringify(click)}\n                 target.dispatchEvent(new MouseEvent('click', { bubbles: true }))\n                 return 'clicked: ' + ${JSON.stringify(click)}
                })()`
             )
-            .then((result: string) => process.stderr.write(`[снимок] ${result}\n`))
+            .then((result: string) => process.stderr.write(`[screenshot] ${result}\n`))
             .catch(() => undefined)
           await new Promise((r) => setTimeout(r, 600))
         }
         const image = await mainWindow!.webContents.capturePage()
         const { writeFile } = await import('node:fs/promises')
         await writeFile(shotPath, image.toPNG())
-        process.stderr.write(`[снимок сохранён] ${shotPath}\n`)
+        process.stderr.write(`[screenshot saved] ${shotPath}\n`)
 
         // The floating panel lives in its own window and does not appear in a shot of the main one.
         const panel = overlayWindow()
@@ -248,7 +243,7 @@ function createWindow(): void {
           const shot = await panel.webContents.capturePage()
           const target = shotPath.replace(/\.png$/, '-overlay.png')
           await writeFile(target, shot.toPNG())
-          process.stderr.write(`[снимок панели] ${target}\n`)
+          process.stderr.write(`[panel screenshot] ${target}\n`)
         }
         if (process.env.SPYLY_SCREENSHOT_EXIT) app.exit(0)
       }, Number(process.env.SPYLY_SCREENSHOT_DELAY ?? 1500))
@@ -386,7 +381,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     startUpdates(isRecordingNow)
 
     void killOrphanServers().then((killed) => {
-      if (killed > 0) process.stderr.write(`[очистка] снято зависших серверов: ${killed}\n`)
+      if (killed > 0) process.stderr.write(`[cleanup] stale servers removed: ${killed}\n`)
     })
 
     const settings = await loadSettings()
@@ -399,7 +394,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     if (selfTest) {
       if (settings.storageDir) setStorageRoot(settings.storageDir)
       const failures = await runSelfTest(selfTest.fixture, selfTest.seconds).catch((error: unknown) => {
-        process.stdout.write(`проверка упала: ${String(error)}\n`)
+        process.stdout.write(`the check failed: ${String(error)}\n`)
         return 1
       })
       app.exit(failures === 0 ? 0 : 1)
@@ -416,7 +411,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
 
       const meeting = await readMeeting(process.env.SPYLY_CHECK_VOICE)
       const profiles = await listVoices()
-      process.stdout.write(`[голос] слепков ${profiles.length}, участников ${meeting?.speakers.length ?? 0}, порог ${VOICE_MATCH_THRESHOLD}\n`)
+      process.stdout.write(`[voice] prints ${profiles.length}, participants ${meeting?.speakers.length ?? 0}, threshold ${VOICE_MATCH_THRESHOLD}\n`)
 
       for (const track of new Set((meeting?.speakers ?? []).map((s) => s.track))) {
         const wave = await readWave(audioFile(meeting!.id, track))
@@ -426,12 +421,12 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
         for (const speaker of meeting!.speakers.filter((s) => s.track === track)) {
           const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, speaker.cluster)
           if (!embedding) {
-            process.stdout.write(`[голос] ${speaker.id}: слепок не посчитался\n`)
+            process.stdout.write(`[voice] ${speaker.id}: the print could not be computed\n`)
             continue
           }
           for (const profile of profiles) {
             const score = cosineSimilarity(embedding, profile.embedding)
-            process.stdout.write(`[голос] ${speaker.id} ↔ «${profile.name}»: ${score.toFixed(3)}\n`)
+            process.stdout.write(`[voice] ${speaker.id} ↔ "${profile.name}": ${score.toFixed(3)}\n`)
           }
         }
       }
@@ -453,7 +448,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       for (let a = 0; a < own.length; a++) {
         for (let b = a + 1; b < own.length; b++) {
           const score = cosineSimilarity(own[a]!.embedding, own[b]!.embedding)
-          process.stdout.write(`[похожесть] ${own[a]!.id} ↔ ${own[b]!.id}: ${score.toFixed(3)}\n`)
+          process.stdout.write(`[similarity] ${own[a]!.id} ↔ ${own[b]!.id}: ${score.toFixed(3)}\n`)
         }
       }
       setTimeout(() => app.exit(0), 200)
@@ -474,7 +469,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       const root = await mkdtemp(pathMod.join(tmpdir(), 'spyly-bench-'))
       setStorageRoot(root)
       const count = Number(process.env.SPYLY_BENCH) || 300
-      const words = 'кальмар биллинг сроки задача релиз тестирование сервер клиент отчёт встреча'.split(' ')
+      const words = 'squid billing deadlines task release testing server client report meeting'.split(' ')
 
       for (let i = 0; i < count; i++) {
         const id = `2026-01-${String((i % 28) + 1).padStart(2, '0')}--zapis-${i}--x${i}`
@@ -484,7 +479,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
           pathMod.join(dir, 'meta.json'),
           JSON.stringify({
             id,
-            title: `Запись ${i}`,
+            title: `Recording ${i}`,
             startedAt: new Date(Date.UTC(2026, 0, (i % 28) + 1, 10)).toISOString(),
             durationSec: 1800,
             sources: { mic: true, system: true },
@@ -498,7 +493,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
           track: 'system',
           start: u * 4,
           end: u * 4 + 3.5,
-          text: `${words[(i + u) % words.length]} обсуждение пункта ${u} и что с ним делать дальше`,
+          text: `${words[(i + u) % words.length]} discussion of item ${u} and what to do about it next`,
           words: [],
           provisional: false
         }))
@@ -513,11 +508,11 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       const listMs = Date.now() - t1
 
       const t2 = Date.now()
-      const found = await searchMeetings(process.env.SPYLY_BENCH_QUERY ?? 'биллинг')
+      const found = await searchMeetings(process.env.SPYLY_BENCH_QUERY ?? 'billing')
       const searchMs = Date.now() - t2
 
       process.stdout.write(
-        `[нагрузка] записей ${list.length}: список ${listMs} мс, поиск ${searchMs} мс, нашлось ${found.length}\n`
+        `[load] recordings ${list.length}: list ${listMs} ms, search ${searchMs} ms, found ${found.length}\n`
       )
       setTimeout(() => app.exit(0), 200)
       return
@@ -527,7 +522,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       const { LiveTranscriber, isLiveModelReady } = await import('./pipeline/live-stream.js')
       const { readWavPcm16 } = await import('./audio/wav.js')
       if (!isLiveModelReady()) {
-        process.stdout.write('[живой] модель не скачана\n')
+        process.stdout.write('[live] the model is not downloaded\n')
         setTimeout(() => app.exit(1), 200)
         return
       }
@@ -535,7 +530,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       const step = Math.round(wave.sampleRate * 0.32)
       const loadStart = Date.now()
       const live = new LiveTranscriber('system')
-      process.stdout.write(`[живой] модель загрузилась за ${Date.now() - loadStart} мс\n`)
+      process.stdout.write(`[live] the model loaded in ${Date.now() - loadStart} ms\n`)
       let worst = 0
       let spent = 0
       let updates = 0
@@ -550,17 +545,17 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
         updates++
         if (update.final) {
           finals++
-          process.stdout.write(`[фраза ${update.start.toFixed(1)}-${update.end.toFixed(1)}] ${update.text}\n`)
+          process.stdout.write(`[phrase ${update.start.toFixed(1)}-${update.end.toFixed(1)}] ${update.text}\n`)
         } else if (process.env.SPYLY_LIVE_VERBOSE) {
           process.stdout.write(`  …${update.end.toFixed(1)}: ${update.text.slice(-60)}\n`)
         }
       }
-      for (const tail of live.finish()) process.stdout.write(`[хвост] ${tail.text}\n`)
+      for (const tail of live.finish()) process.stdout.write(`[tail] ${tail.text}\n`)
       const audioSec = wave.samples.length / wave.sampleRate
       process.stdout.write(
-        `[живой] звука ${audioSec.toFixed(0)} с, счёта ${(spent / 1000).toFixed(1)} с ` +
-          `(${(spent / 1000 / audioSec).toFixed(2)}x), худший шаг ${worst} мс, ` +
-          `фраз ${finals}, обновлений ${updates}\n`
+        `[live] audio ${audioSec.toFixed(0)} s, compute ${(spent / 1000).toFixed(1)} s ` +
+          `(${(spent / 1000 / audioSec).toFixed(2)}x), worst step ${worst} ms, ` +
+          `phrases ${finals}, updates ${updates}\n`
       )
       setTimeout(() => app.exit(0), 200)
       return
@@ -572,19 +567,19 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       const provider = providerForModel(model)
       const state = await provider.ready()
       if (!state.ready) {
-        process.stdout.write(`[расшифровка] ${provider.name} не готов: ${state.hint}\n`)
+        process.stdout.write(`[transcription] ${provider.name} is not ready: ${state.hint}\n`)
         setTimeout(() => app.exit(1), 200)
         return
       }
-      process.stdout.write('[расшифровка] движок готов, читаю файл\n')
+      process.stdout.write('[transcription] the engine is ready, reading the file\n')
       const started = Date.now()
       const result = await provider.transcribe(process.env.SPYLY_CHECK_ASR, 'system', {
         language: 'ru',
-        onProgress: (p) => process.stdout.write(`[расшифровка] ${(p * 100).toFixed(0)}%\n`)
+        onProgress: (p) => process.stdout.write(`[transcription] ${(p * 100).toFixed(0)}%\n`)
       })
       const text = result.segments.map((x) => x.text).join(' ')
       process.stdout.write(
-        `[расшифровка] ${provider.name}: ${text.length} символов за ${((Date.now() - started) / 1000).toFixed(1)} с\n` +
+        `[transcription] ${provider.name}: ${text.length} characters in ${((Date.now() - started) / 1000).toFixed(1)} s\n` +
           `${text.slice(0, 400)}\n`
       )
       setTimeout(() => app.exit(0), 200)
@@ -604,13 +599,13 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       await processMeeting(process.env.SPYLY_REPROCESS, from)
       const meeting = await readMeeting(process.env.SPYLY_REPROCESS)
       process.stdout.write(
-        `[переобработка] «${meeting?.title ?? '—'}», участников ${meeting?.speakers.length ?? 0}, ` +
-          `реплик ${meeting?.utterances.length ?? 0}\n`
+        `[reprocess] "${meeting?.title ?? '—'}", participants ${meeting?.speakers.length ?? 0}, ` +
+          `utterances ${meeting?.utterances.length ?? 0}\n`
       )
       for (const s of meeting?.speakers ?? []) {
         const own = (meeting?.utterances ?? []).filter((u) => u.speakerId === s.id)
         const seconds = own.reduce((sum, u) => sum + (u.end - u.start), 0)
-        process.stdout.write(`[участник] ${s.id} «${s.name ?? '—'}» ${own.length} реплик, ${seconds.toFixed(0)} с\n`)
+        process.stdout.write(`[participant] ${s.id} "${s.name ?? '—'}" ${own.length} utterances, ${seconds.toFixed(0)} s\n`)
       }
       setTimeout(() => app.exit(0), 300)
       return
@@ -632,7 +627,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
         if (embedding) windows.push({ at, embedding })
       }
 
-      process.stdout.write(`[карта голоса] окон ${windows.length} по ${step} с\n`)
+      process.stdout.write(`[voice map] windows ${windows.length} of ${step} s\n`)
       process.stdout.write('        ' + windows.map((w) => String(w.at).padStart(5)).join('') + '\n')
       for (const a of windows) {
         const row = windows.map((b) =>
@@ -660,13 +655,13 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
         minDurationOff: 0.5
       })
       process.stdout.write(
-        `[диагностика] модель ждёт ${engine.sampleRate} Гц, файл ${wave.sampleRate} Гц, ` +
-          `длина ${(wave.samples.length / wave.sampleRate).toFixed(0)} с\n`
+        `[diagnostics] the model expects ${engine.sampleRate} Hz, the file ${wave.sampleRate} Hz, ` +
+          `length ${(wave.samples.length / wave.sampleRate).toFixed(0)} s\n`
       )
       const turns = engine.process(wave.samples)
       for (const t of turns) {
         process.stdout.write(
-          `[отрезок] ${t.start.toFixed(1)}–${t.end.toFixed(1)} (${(t.end - t.start).toFixed(1)} с) → говорящий ${t.speaker}\n`
+          `[segment] ${t.start.toFixed(1)}–${t.end.toFixed(1)} (${(t.end - t.start).toFixed(1)} s) → speaker ${t.speaker}\n`
         )
       }
       setTimeout(() => app.exit(0), 200)
@@ -687,8 +682,8 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
         const clusters = new Set(turns.map((t) => t.cluster))
         const longest = turns.reduce((max, t) => Math.max(max, t.end - t.start), 0)
         process.stdout.write(
-          `[диаризация] порог ${threshold}: отрезков ${turns.length}, кластеров ${clusters.size}, ` +
-            `самый длинный ${longest.toFixed(0)} с, за ${((Date.now() - started) / 1000).toFixed(1)} с\n`
+          `[diarization] threshold ${threshold}: segments ${turns.length}, clusters ${clusters.size}, ` +
+            `longest ${longest.toFixed(0)} s, in ${((Date.now() - started) / 1000).toFixed(1)} s\n`
         )
       }
       setTimeout(() => app.exit(0), 200)
@@ -700,7 +695,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     if (process.env.SPYLY_CHECK_CALENDAR) {
       const { requestCalendarAccess, calendarGranted } = await import('./detect/calendar.js')
       const granted = await requestCalendarAccess()
-      process.stdout.write(`[календарь] запрос: ${granted}, состояние: ${await calendarGranted()}\n`)
+      process.stdout.write(`[calendar] request: ${granted}, state: ${await calendarGranted()}\n`)
       setTimeout(() => app.exit(granted ? 0 : 1), 300)
       return
     }

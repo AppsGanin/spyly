@@ -13,8 +13,19 @@ func emit(_ payload: [String: Any]) {
     FileHandle.standardError.write(Data((line + "\n").utf8))
 }
 
-func fail(_ message: String, code: Int32 = 1) -> Never {
-    emit(["type": "error", "message": message])
+/// An error that carries a machine-readable reason.
+///
+/// The wording a person sees is chosen by the application, which knows the
+/// interface language; the helper only says what went wrong. Its own message
+/// stays English and goes to the log.
+protocol CodedError: Error, CustomStringConvertible {
+    var reason: String { get }
+}
+
+func fail(_ message: String, reason: String? = nil, code: Int32 = 1) -> Never {
+    var payload: [String: Any] = ["type": "error", "message": message]
+    if let reason { payload["reason"] = reason }
+    emit(payload)
     exit(code)
 }
 
@@ -217,6 +228,8 @@ do {
         try capture.start(scope: scope)
     }
     emit(["type": "ready", "sampleRate": options.sampleRate, "channels": 1, "format": "f32le"])
+} catch let error as CodedError {
+    fail(error.description, reason: error.reason)
 } catch {
     fail("\(error)")
 }

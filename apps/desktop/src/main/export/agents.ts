@@ -207,7 +207,7 @@ async function claudeCodeConnect(connect: boolean): Promise<AgentActionResult> {
     })
     return { ok: true, message: t('Отключено.') }
   } catch (error) {
-    return { ok: false, message: `Не получилось: ${error instanceof Error ? error.message.slice(0, 200) : String(error)}` }
+    return { ok: false, message: t('Не получилось: {error}', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }) }
   }
 }
 

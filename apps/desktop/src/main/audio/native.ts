@@ -126,6 +126,38 @@ export function appUsesMicrophone(): boolean {
   return openMicCaptures > 0
 }
 
+/**
+ * The wording for a helper failure.
+ *
+ * The helper reports a reason, not a sentence: it knows nothing about the
+ * interface language, and its own message used to reach the screen as it was.
+ * An unknown reason falls back to that message, so a new failure is still
+ * legible rather than silently blank.
+ */
+function captureErrorText(reason: string | undefined, message: string | undefined): string {
+  switch (reason) {
+    case 'mic-unavailable':
+      return t('Микрофон недоступен или на него не выдано разрешение.')
+    case 'no-such-process':
+      return t('Выбранное приложение больше не звучит — выберите другое или весь системный звук.')
+    case 'tap-failed':
+      return t('Нет разрешения на запись системного звука. Выдайте его в настройках системы.')
+    case 'no-output-device':
+      return t('Не удалось определить устройство вывода звука.')
+    case 'mic-converter-failed':
+    case 'converter-failed':
+    case 'tap-format-failed':
+      return t('Не удалось подготовить звук к записи.')
+    case 'tap-no-uid':
+    case 'aggregate-failed':
+    case 'ioproc-failed':
+    case 'start-failed':
+      return t('Не удалось запустить захват системного звука.')
+    default:
+      return message ?? t('неизвестная ошибка захвата')
+  }
+}
+
 /** A live PCM stream from the helper. */
 export class NativeCapture extends EventEmitter {
   private child: ChildProcessByStdio<null, Readable, Readable> | null = null
@@ -179,14 +211,19 @@ export class NativeCapture extends EventEmitter {
       const trimmed = line.trim()
       if (!trimmed) continue
       try {
-        const msg = JSON.parse(trimmed) as { type: string; rms?: number; message?: string }
+        const msg = JSON.parse(trimmed) as {
+          type: string
+          rms?: number
+          message?: string
+          reason?: string
+        }
         if (msg.type === 'level' && typeof msg.rms === 'number') {
           this.lastLevel = msg.rms
           this.emit('level', msg.rms)
         } else if (msg.type === 'ready') {
           this.emit('ready')
         } else if (msg.type === 'error') {
-          this.emit('error', msg.message ?? t('неизвестная ошибка захвата'))
+          this.emit('error', captureErrorText(msg.reason, msg.message))
         }
       } catch {
         // Non-JSON on stderr, a message from the system logger for instance; ignored.

@@ -204,7 +204,7 @@ async function runWhisper(
     child.on('error', reject)
     child.on('close', (code) => {
       if (code === 0) resolve()
-      else reject(new Error(`whisper завершился с кодом ${code}: ${stderr.slice(-400)}`))
+      else reject(new Error(t('whisper завершился с кодом {code}: {detail}', { code: String(code), detail: stderr.slice(-400) })))
     })
   })
 
@@ -271,7 +271,7 @@ async function buildVocabularyPrompt(): Promise<string> {
 
   if (terms.size === 0) return ''
   // The model expects connected text rather than a list: the hint works better that way.
-  return `В разговоре встречаются: ${[...terms].join(', ')}.`
+  return t('В разговоре встречаются: {terms}.', { terms: [...terms].join(', ') })
 }
 
 export { buildVocabularyPrompt }

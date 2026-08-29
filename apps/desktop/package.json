@@ -22,7 +22,7 @@
     "sherpa-onnx-node": "^1.13.6",
     "zod": "^4.4.3"
   },
-  "description": "Рекордер созвонов с расшифровкой, разбивкой по участникам и экспортом в кодинг-агентов",
+  "description": "Records your calls, transcribes them speaker by speaker, and hands the conversation to your coding agent",
   "author": "Spyly",
   "license": "AGPL-3.0-or-later"
 }

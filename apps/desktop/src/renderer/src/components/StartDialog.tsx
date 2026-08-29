@@ -128,7 +128,7 @@ export function StartDialog({
         system: systemOn,
         micDeviceId: micDevice || undefined,
         systemApps: scope === 'apps' && selectedApps.length ? selectedApps : undefined,
-        title: linked ? event.title : undefined,
+        title: linked && event.title ? event.title : undefined,
         calendarEventId: linked ? event.id : undefined,
         calendarParticipants: linked ? event.participants : undefined
       }
@@ -244,7 +244,7 @@ export function StartDialog({
             <div className="check__body">
               <div className="spread">
                 <div className="grow">
-                  <div className="check__title">{event.title}</div>
+                  <div className="check__title">{event.title || t('Без названия')}</div>
                   <div className="check__hint">
                     {event.isNow ? t('Идёт сейчас') : t('Скоро начнётся')}
                     {event.participants.length > 0 && ` · ${event.participants.join(', ')}`}

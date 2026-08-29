@@ -60,13 +60,13 @@ const task = (text: string, extra: Partial<ActionItem> = {}): ActionItem => ({
 describe('buildDigest', () => {
   const { from, to } = lastDays(7, now)
 
-  it('считает только записи внутри периода', () => {
+  it('counts only the recordings inside the period', () => {
     const digest = buildDigest([meeting('свежая', 1), meeting('старая', 30)], from, to, now)
     expect(digest.meetings).toBe(1)
     expect(digest.seconds).toBe(600)
   })
 
-  it('собирает решения со ссылкой на разговор', () => {
+  it('collects decisions with a link to the conversation', () => {
     const digest = buildDigest(
       [meeting('a', 1, { summary: { decisions: ['переходим на новый биллинг'] } })],
       from,
@@ -78,7 +78,7 @@ describe('buildDigest', () => {
     ])
   })
 
-  it('открытые задачи отделяет от сделанных, просроченные ставит первыми', () => {
+  it('separates open tasks from done ones and puts overdue first', () => {
     const digest = buildDigest(
       [
         meeting('a', 1, {
@@ -100,7 +100,7 @@ describe('buildDigest', () => {
     expect(digest.open[0]!.overdue).toBe(true)
   })
 
-  it('считает людей по числу разговоров, а не реплик', () => {
+  it('counts people by conversations rather than utterances', () => {
     const digest = buildDigest(
       [meeting('a', 1, { people: ['Мария'] }), meeting('b', 2, { people: ['Мария', 'Пётр'] })],
       from,
@@ -113,12 +113,12 @@ describe('buildDigest', () => {
     ])
   })
 
-  it('замечает записи без конспекта', () => {
+  it('notices recordings with no summary', () => {
     const digest = buildDigest([meeting('без конспекта', 1)], from, to, now)
     expect(digest.unprocessed).toEqual([{ id: 'без конспекта', title: 'без конспекта' }])
   })
 
-  it('запись без расшифровки недоделанной не считает', () => {
+  it('a recording with no transcript does not count as unfinished', () => {
     // An empty recording is just audio that has not been processed yet; there is
     // nothing to reproach a person for.
     const digest = buildDigest([meeting('пустая', 1, { utterances: 0 })], from, to, now)
@@ -127,7 +127,7 @@ describe('buildDigest', () => {
 })
 
 describe('lastDays', () => {
-  it('семь дней включают сегодня', () => {
+  it('seven days include today', () => {
     const { from, to } = lastDays(7, now)
     expect(from.getDate()).toBe(28)
     expect(to.getDate()).toBe(3)

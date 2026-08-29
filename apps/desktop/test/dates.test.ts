@@ -7,7 +7,7 @@ import { dayLabel, fullDateLabel, timeLabel } from '../src/renderer/src/lib/date
  * application died with "Maximum call stack size exceeded" on the very first
  * screen.
  */
-describe('подписи дат', () => {
+describe('date captions', () => {
   const iso = new Date().toISOString()
 
   for (const lang of ['ru', 'en'] as const) {
@@ -20,7 +20,7 @@ describe('подписи дат', () => {
     })
   }
 
-  it('сегодняшний день называется по языку', () => {
+  it('today is named in the interface language', () => {
     setLang('ru')
     expect(dayLabel(iso)).toBe('Сегодня')
     setLang('en')
@@ -28,13 +28,13 @@ describe('подписи дат', () => {
     setLang('ru')
   })
 
-  it('давняя дата не ломается', () => {
+  it('a distant date does not break', () => {
     setLang('en')
     expect(() => dayLabel('2020-01-05T10:00:00.000Z')).not.toThrow()
     setLang('ru')
   })
 
-  it('битая дата не роняет подпись', () => {
+  it('a broken date does not bring the caption down', () => {
     expect(dayLabel('не дата')).toBe('Когда-то')
   })
 })

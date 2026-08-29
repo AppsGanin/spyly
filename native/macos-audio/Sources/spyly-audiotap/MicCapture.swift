@@ -48,12 +48,12 @@ final class MicCapture {
         if cancelEcho {
             do {
                 try startEngine(deviceUID: deviceUID, voiceProcessing: true)
-                emit(["type": "info", "message": "подавление эха включено"])
+                emit(["type": "info", "message": "echo cancellation is on"])
                 return
             } catch {
                 emit([
                     "type": "info",
-                    "message": "подавление эха недоступно, пишем как есть: \(error.localizedDescription)"
+                    "message": "echo cancellation unavailable, recording as is: \(error.localizedDescription)"
                 ])
                 teardown()
             }
@@ -162,13 +162,22 @@ final class MicCapture {
     deinit { stop() }
 }
 
-enum MicError: Error, CustomStringConvertible {
+enum MicError: CodedError {
     case noInput
     case converterFailed
+
+    /// What the application matches on to pick its own wording.
+    var reason: String {
+        switch self {
+        case .noInput: return "mic-unavailable"
+        case .converterFailed: return "mic-converter-failed"
+        }
+    }
+
     var description: String {
         switch self {
-        case .noInput: return "микрофон недоступен или не выдано разрешение"
-        case .converterFailed: return "не удалось создать конвертер для микрофона"
+        case .noInput: return "the microphone is unavailable or permission was not granted"
+        case .converterFailed: return "could not create a converter for the microphone"
         }
     }
 }

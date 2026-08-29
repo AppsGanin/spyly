@@ -89,7 +89,7 @@ async function run(spec: CliSpec, binary: string, prompt: string, timeoutMs = 18
         if (code === 0) resolve(output.trim())
         else {
           const detail = (err || output).trim().slice(-300)
-          reject(new Error(`${path.basename(binary)} завершился с кодом ${code}: ${detail}`))
+          reject(new Error(t('{binary} завершился с кодом {code}: {detail}', { binary: path.basename(binary), code: String(code), detail })))
         }
       })
     })
@@ -113,7 +113,7 @@ function cliProvider(spec: CliSpec): LlmProvider {
     },
     async complete(messages: LlmMessage[]) {
       const binary = await findBinary(spec.binary)
-      if (!binary) throw new Error(`${spec.name}: не найден исполняемый файл ${spec.binary}`)
+      if (!binary) throw new Error(t('{name}: не найден исполняемый файл {binary}', { name: spec.name, binary: spec.binary }))
       const prompt = messages.map((m) => m.content).join('\n\n')
       return run(spec, binary, prompt)
     }

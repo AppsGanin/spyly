@@ -171,7 +171,7 @@ export async function updateMeeting(
   change: (meeting: Meeting) => Meeting
 ): Promise<Meeting> {
   const meeting = await readMeeting(id)
-  if (!meeting) throw new Error(`запись не найдена: ${id}`)
+  if (!meeting) throw new Error(`recording not found: ${id}`)
   const next = Meeting.parse(change(meeting))
 
   const { speakers, utterances, summary, ...meta } = next

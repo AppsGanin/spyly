@@ -60,44 +60,44 @@ export function renderTranscriptMarkdown(meeting: Meeting, opts: MarkdownOptions
     lines.push(`# ${meeting.title}`, '')
     const started = new Date(meeting.startedAt)
     const when = Number.isNaN(started.getTime()) ? meeting.startedAt : started.toLocaleString(lang() === 'en' ? 'en-US' : 'ru-RU')
-    lines.push(`**Дата:** ${when}  `)
-    lines.push(`**Длительность:** ${humanDuration(meeting.durationSec)}  `)
+    lines.push(`**${t('Дата')}:** ${when}  `)
+    lines.push(`**${t('Длительность')}:** ${humanDuration(meeting.durationSec)}  `)
     const names = meeting.speakers.map((s) => speakerLabel(s, s.id))
-    if (names.length) lines.push(`**Участники:** ${names.join(', ')}`)
+    if (names.length) lines.push(`**${t('Участники')}:** ${names.join(', ')}`)
     lines.push('')
   }
 
   if (includeSummary && meeting.summary) {
     const s = meeting.summary
-    lines.push('## Кратко', '', s.tldr, '')
+    lines.push(`## ${t('Кратко')}`, '', s.tldr, '')
     if (s.keyPoints.length) {
-      lines.push('## Основные тезисы', '')
+      lines.push(`## ${t('Основные тезисы')}`, '')
       for (const p of s.keyPoints) lines.push(`- ${p}`)
       lines.push('')
     }
     if (s.decisions.length) {
-      lines.push('## Решения', '')
+      lines.push(`## ${t('Решения')}`, '')
       for (const d of s.decisions) lines.push(`- ${d}`)
       lines.push('')
     }
     if (s.actionItems.length) {
-      lines.push('## Задачи', '')
+      lines.push(`## ${t('Задачи')}`, '')
       for (const a of s.actionItems) {
         const who = a.assignee ? ` — ${a.assignee}` : ''
-        const due = a.due ? ` (до ${a.due})` : ''
+        const due = a.due ? ` (${t('до {due}', { due: a.due })})` : ''
         lines.push(`- [${a.done ? 'x' : ' '}] ${a.text}${who}${due}`)
       }
       lines.push('')
     }
     if (s.questions.length) {
-      lines.push('## Открытые вопросы', '')
+      lines.push(`## ${t('Открытые вопросы')}`, '')
       for (const q of s.questions) lines.push(`- ${q}`)
       lines.push('')
     }
   }
 
   if (meeting.marks.length > 0) {
-    lines.push('## Отмеченные места', '')
+    lines.push(`## ${t('Отмеченные места')}`, '')
     for (const mark of [...meeting.marks].sort((a, b) => a.at - b.at)) {
       const context = mark.note || nearestUtterance(meeting.utterances, mark.at)?.text || ''
       lines.push(`- \`${timecode(mark.at)}\`${context ? ` — ${context}` : ''}`)
@@ -105,9 +105,9 @@ export function renderTranscriptMarkdown(meeting: Meeting, opts: MarkdownOptions
     lines.push('')
   }
 
-  lines.push('## Расшифровка', '')
+  lines.push(`## ${t('Расшифровка')}`, '')
   if (meeting.utterances.length === 0) {
-    lines.push('_Речь не распознана._', '')
+    lines.push(`_${t('Речь не распознана.')}_`, '')
   }
   for (const u of meeting.utterances) {
     const who = speakerLabel(speakers.get(u.speakerId), u.speakerId)
@@ -120,9 +120,9 @@ export function renderTranscriptMarkdown(meeting: Meeting, opts: MarkdownOptions
 
 /** The summary alone, as a separate file. */
 export function renderSummaryMarkdown(meeting: Meeting): string {
-  if (!meeting.summary) return `# ${meeting.title}\n\n_Саммари ещё не сделано._\n`
+  if (!meeting.summary) return `# ${meeting.title}\n\n_${t('Конспект ещё не сделан.')}_\n`
   return renderTranscriptMarkdown(meeting, { includeSummary: true, timecodes: false })
-    .split('## Расшифровка')[0]!
+    .split(`## ${t('Расшифровка')}`)[0]!
     .trimEnd() + '\n'
 }
 

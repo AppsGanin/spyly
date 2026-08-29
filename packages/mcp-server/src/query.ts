@@ -1,3 +1,4 @@
+import { speakerLabel } from '@spyly/core'
 import type { Meeting, MeetingMeta, Utterance } from '@spyly/core'
 
 /**
@@ -52,6 +53,7 @@ export function parseWhen(input: string | undefined, now = new Date()): Date | n
     'месяц': 30,
     'month': 30,
     'квартал': 90,
+    'quarter': 90,
     'год': 365,
     'year': 365
   }
@@ -107,7 +109,7 @@ export interface Hit {
 /** Matches inside one recording, with the speaker's name. */
 export function findInMeeting(meeting: Meeting, query: string, speaker?: string): Hit[] {
   const needle = query.trim().toLowerCase()
-  const names = new Map(meeting.speakers.map((s) => [s.id, s.name ?? (s.isMe ? 'Вы' : s.id)]))
+  const names = new Map(meeting.speakers.map((s) => [s.id, speakerLabel(s, s.id)]))
   const speakerNeedle = speaker?.toLowerCase()
 
   return meeting.utterances
@@ -138,7 +140,7 @@ export function summarize(meeting: Meeting): {
     startedAt: meeting.startedAt,
     durationSec: Math.round(meeting.durationSec),
     status: meetingStatus(meeting),
-    participants: [...new Set(meeting.speakers.map((s) => s.name ?? (s.isMe ? 'Вы' : `Участник ${s.cluster + 1}`)))],
+    participants: [...new Set(meeting.speakers.map((s) => speakerLabel(s, s.id)))],
     tldr: meeting.summary?.tldr
   }
 }

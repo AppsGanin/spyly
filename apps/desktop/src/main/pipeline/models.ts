@@ -289,7 +289,7 @@ export async function downloadModel(id: string): Promise<void> {
       report(spec, 0, false)
     } else {
       await rm(tmp, { force: true })
-      send('toast', { kind: 'error', text: `Не удалось скачать «${spec.name}»: ${String(error)}` })
+      send('toast', { kind: 'error', text: t('Не удалось скачать «{name}»: {error}', { name: spec.name, error: String(error) }) })
       report(spec, 0, false)
       throw error
     }

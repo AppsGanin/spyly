@@ -5,6 +5,7 @@ import { t,
   isLikelyHallucination,
   learnedTerms,
   levelAt,
+  MANUAL_SUMMARY_MODEL,
   micIsOwnVoice,
   mergeSpeakers,
   mergeUtterances,
@@ -269,7 +270,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
     try {
       await startWhisperServer(language)
     } catch (error) {
-      send('toast', { kind: 'info', text: `Живая расшифровка недоступна: ${String(error)}` })
+      send('toast', { kind: 'info', text: t('Живая расшифровка недоступна: {error}', { error: String(error) }) })
       return
     }
   }
@@ -351,7 +352,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
           stopped = true
           send('toast', {
             kind: 'info',
-            text: `Живая расшифровка остановилась: ${error instanceof Error ? error.message : String(error)}. Запись идёт, полный текст соберётся после остановки.`
+            text: t('Живая расшифровка остановилась: {error}. Запись идёт, полный текст соберётся после остановки.', { error: error instanceof Error ? error.message : String(error) })
           })
         })
         .finally(() => {
@@ -405,7 +406,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
           stopped = true
           send('toast', {
             kind: 'info',
-            text: `Живая расшифровка не запустилась: ${error instanceof Error ? error.message : String(error)}. Полный текст соберётся после остановки.`
+            text: t('Живая расшифровка не запустилась: {error}. Полный текст соберётся после остановки.', { error: error instanceof Error ? error.message : String(error) })
           })
           return
         }
@@ -515,7 +516,7 @@ async function failsafeStop(): Promise<void> {
   } catch (error) {
     send('toast', {
       kind: 'error',
-      text: `Не удалось остановить запись: ${error instanceof Error ? error.message : String(error)}`
+      text: t('Не удалось остановить запись: {error}', { error: error instanceof Error ? error.message : String(error) })
     })
   }
 }
@@ -548,7 +549,7 @@ async function stopRecording(): Promise<{ meetingId: string | null }> {
 
   // Transcription runs in the background: the user goes straight back to the meeting list.
   void processMeeting(active.meetingId).catch((error: unknown) => {
-    send('toast', { kind: 'error', text: `Обработка не удалась: ${String(error)}` })
+    send('toast', { kind: 'error', text: t('Обработка не удалась: {error}', { error: String(error) }) })
   })
 
   return { meetingId: active.meetingId }
@@ -577,7 +578,7 @@ export function toggleRecordingFromShortcut(): void {
 
 /** For test runs only: start a recording without the interface being involved. */
 export async function autoStartForCheck(): Promise<void> {
-  await startRecording({ mic: true, system: true, title: 'Проверка интерфейса' })
+  await startRecording({ mic: true, system: true, title: 'Interface check' })
 }
 
 export function registerIpc(): void {
@@ -937,10 +938,11 @@ export function registerIpc(): void {
   })
 
   handle('meetings:updateSummary', async (id, summary) => {
-    // The edit is marked with the model "by hand": later it is clear this was not a machine.
+    // Marked as edited by a person, with a value that is never translated: the
+    // interface compares against it, and a translated marker stopped matching.
     const next = await editWithHistory(id, t('правку конспекта'), (meeting) => ({
       ...meeting,
-      summary: { ...summary, model: t('вручную') }
+      summary: { ...summary, model: MANUAL_SUMMARY_MODEL }
     }))
     send('meetings:changed', { id })
     return next
@@ -948,7 +950,7 @@ export function registerIpc(): void {
 
   handle('meetings:reprocess', async (id, from) => {
     void processMeeting(id, from).catch((error: unknown) => {
-      send('toast', { kind: 'error', text: `Обработка не удалась: ${String(error)}` })
+      send('toast', { kind: 'error', text: t('Обработка не удалась: {error}', { error: String(error) }) })
     })
   })
 

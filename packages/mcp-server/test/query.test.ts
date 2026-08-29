@@ -36,24 +36,24 @@ const localDay = (date: Date | null): string =>
     : ''
 
 describe('parseWhen', () => {
-  it('понимает слова', () => {
+  it('understands words', () => {
     expect(localDay(parseWhen('сегодня', NOW))).toBe('2026-08-27')
     expect(localDay(parseWhen('вчера', NOW))).toBe('2026-08-26')
     expect(localDay(parseWhen('неделя', NOW))).toBe('2026-08-20')
   })
-  it('понимает «за N дней»', () => {
+  it('understands "N days"', () => {
     expect(localDay(parseWhen('за 3 дня', NOW))).toBe('2026-08-24')
     expect(localDay(parseWhen('2 недели', NOW))).toBe('2026-08-13')
   })
-  it('начало периода — полночь местного дня, а не момент запроса', () => {
+  it('a period starts at midnight of the local day, not at the moment of the query', () => {
     const since = parseWhen('сегодня', NOW)!
     expect(since.getHours()).toBe(0)
     expect(since.getMinutes()).toBe(0)
   })
-  it('понимает ISO', () => {
+  it('understands ISO', () => {
     expect(parseWhen('2026-08-01', NOW)?.toISOString().slice(0, 10)).toBe('2026-08-01')
   })
-  it('на мусоре возвращает null', () => {
+  it('on rubbish it returns null', () => {
     expect(parseWhen('когда-нибудь', NOW)).toBeNull()
     expect(parseWhen('', NOW)).toBeNull()
     expect(parseWhen(undefined, NOW)).toBeNull()
@@ -61,7 +61,7 @@ describe('parseWhen', () => {
 })
 
 describe('meetingStatus', () => {
-  it('различает состояния', () => {
+  it('tells the states apart', () => {
     expect(meetingStatus(meeting())).toBe('no-summary')
     expect(meetingStatus(meeting({ utterances: [] }))).toBe('no-transcript')
     expect(meetingStatus(meeting({ stages: { transcribing: 'running' } }))).toBe('processing')
@@ -70,30 +70,30 @@ describe('meetingStatus', () => {
 })
 
 describe('matchesFilter', () => {
-  it('фильтрует по периоду', () => {
+  it('filters by period', () => {
     expect(matchesFilter(meeting(), { since: 'сегодня' }, NOW)).toBe(true)
     expect(matchesFilter(meeting({ startedAt: '2026-08-01T10:00:00.000Z' }), { since: 'неделя' }, NOW)).toBe(false)
   })
-  it('фильтрует по состоянию', () => {
+  it('filters by state', () => {
     expect(matchesFilter(meeting(), { status: 'no-summary' }, NOW)).toBe(true)
     expect(matchesFilter(meeting(), { status: 'done' }, NOW)).toBe(false)
   })
-  it('фильтрует по участнику', () => {
+  it('filters by participant', () => {
     expect(matchesFilter(meeting(), { speaker: 'мари' }, NOW)).toBe(true)
     expect(matchesFilter(meeting(), { speaker: 'Пётр' }, NOW)).toBe(false)
   })
 })
 
 describe('findInMeeting', () => {
-  it('находит реплики по тексту', () => {
+  it('finds utterances by text', () => {
     const hits = findInMeeting(meeting(), 'биллинг')
     expect(hits).toHaveLength(1)
     expect(hits[0]!.speaker).toBe('Дима')
   })
-  it('сужает по участнику', () => {
+  it('narrows by participant', () => {
     expect(findInMeeting(meeting(), '', 'Мария')).toHaveLength(1)
   })
-  it('пустой запрос без участника отдаёт всё', () => {
+  it('an empty query with no participant returns everything', () => {
     expect(findInMeeting(meeting(), '')).toHaveLength(2)
   })
 })

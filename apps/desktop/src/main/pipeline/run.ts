@@ -195,7 +195,7 @@ function notifyReady(meeting: Meeting): void {
 
   const notification = new Notification({
     title: meeting.title,
-    body: parts.length > 0 ? `Готово — ${parts.join(', ')}` : t('Обработка закончена'),
+    body: parts.length > 0 ? t('Готово — {parts}', { parts: parts.join(', ') }) : t('Обработка закончена'),
     silent: true
   })
   notification.on('click', () => {
@@ -236,7 +236,7 @@ async function transcribeTracks(
   // engine, since comparing engines by eye is not possible anyway.
   const provider = providerForModel(modelId)
   const status = await provider.ready()
-  if (!status.ready) throw new Error(`расшифровка недоступна: ${status.hint ?? t('провайдер не готов')}`)
+  if (!status.ready) throw new Error(t('расшифровка недоступна: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
 
   const out: AsrResult[] = []
   for (const [index, track] of tracks.entries()) {
@@ -301,7 +301,7 @@ async function diarizeTracks(
 ): Promise<Map<TrackId, SpeakerTurn[]>> {
   const provider = getDiarizationProvider(providerId)
   const status = await provider.ready()
-  if (!status.ready) throw new Error(`разделение по голосам недоступно: ${status.hint ?? t('провайдер не готов')}`)
+  if (!status.ready) throw new Error(t('разделение по голосам недоступно: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
 
   const out = new Map<TrackId, SpeakerTurn[]>()
   for (const [index, track] of tracks.entries()) {
@@ -329,7 +329,7 @@ async function diarizeTracks(
 function dropped(utterance: { start: number; end: number; text: string }, why: string): false {
   if (process.env.SPYLY_DIAG_FILTERS) {
     process.stderr.write(
-      `[отсев] ${utterance.start.toFixed(1)}-${utterance.end.toFixed(1)} (${why}): ` +
+      `[dropped] ${utterance.start.toFixed(1)}-${utterance.end.toFixed(1)} (${why}): ` +
         `${utterance.text.slice(0, 70)}\n`
     )
   }
@@ -392,11 +392,11 @@ async function buildTranscript(
         // not the utterance.
         const text = stripHallucination(u.text)
         if (!text || text === u.text || isLikelyHallucination(text)) {
-          dropped(u, 'выдумка')
+          dropped(u, 'invented')
           return null
         }
         if (process.env.SPYLY_DIAG_FILTERS) {
-          process.stderr.write(`[очистка] ${u.start.toFixed(1)}: убрана подпись, речь оставлена\n`)
+          process.stderr.write(`[cleaned] ${u.start.toFixed(1)}: credit removed, speech kept\n`)
         }
         return withText(u, text)
       })
@@ -404,7 +404,7 @@ async function buildTranscript(
       .filter((u) => {
         if (!wave) return true
         const level = loudestSecond(wave.samples, wave.sampleRate, u.start, u.end)
-        if (level < SILENCE_RMS_THRESHOLD) return dropped(u, `тишина под текстом, ${level.toFixed(4)}`)
+        if (level < SILENCE_RMS_THRESHOLD) return dropped(u, `silence under the text, ${level.toFixed(4)}`)
         return true
       })
     byTrack.set(asr.track, cleaned)
@@ -444,12 +444,12 @@ async function buildTranscript(
             if (!own) {
               const mine = levelAt(micLevels, u.start, u.end)
               const theirs = levelAt(systemLevels, u.start, u.end)
-              dropped(u, `эхо по уровню: микрофон ${mine.toFixed(3)}, динамики ${theirs.toFixed(3)}`)
+              dropped(u, `echo by level: mic ${mine.toFixed(3)}, speakers ${theirs.toFixed(3)}`)
               return null
             }
             if (own !== u && process.env.SPYLY_DIAG_FILTERS) {
               process.stderr.write(
-                `[очистка] ${u.start.toFixed(1)}: срезано эхо, осталось «${own.text.slice(0, 50)}»\n`
+                `[cleaned] ${u.start.toFixed(1)}: echo trimmed, left "${own.text.slice(0, 50)}"\n`
               )
             }
             return own
@@ -476,7 +476,7 @@ async function buildTranscript(
   const beforeEcho = byTrack.get('mic') ?? []
   const micUtterances = suppressEcho(beforeEcho, systemUtterances)
   for (const u of beforeEcho) {
-    if (!micUtterances.includes(u)) dropped(u, 'эхо по тексту')
+    if (!micUtterances.includes(u)) dropped(u, 'echo by text')
   }
   const utterances = mergeTracks(micUtterances, systemUtterances)
 
@@ -587,7 +587,7 @@ async function summarize(meetingId: string, providerId: string): Promise<Meeting
   const provider = getLlmProvider(providerId)
   if (!provider) throw new Error(t('неизвестный провайдер: {providerId}', { providerId: providerId }))
   const status = await provider.ready()
-  if (!status.ready) throw new Error(`конспект недоступен: ${status.hint ?? t('провайдер не готов')}`)
+  if (!status.ready) throw new Error(t('конспект недоступен: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
 
   report(meetingId, 'summarizing', 'running', 0.2)
   const raw = await provider.complete([{ role: 'user', content: buildSummaryPrompt(meeting) }], { maxTokens: 3000 })

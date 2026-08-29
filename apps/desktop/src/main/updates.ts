@@ -56,7 +56,7 @@ export function startUpdates(isRecording: () => boolean): void {
   autoUpdater.on('error', (error: Error) => {
     // An update is not something worth disturbing a person with a dialog over. It
     // goes into the log, so that silence can be looked into.
-    process.stderr.write(`[обновление] ${error.message}\n`)
+    process.stderr.write(`[update] ${error.message}\n`)
   })
 
   const check = (): void => {

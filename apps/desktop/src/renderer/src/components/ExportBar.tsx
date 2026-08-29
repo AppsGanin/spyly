@@ -52,8 +52,8 @@ export function ExportBar({
       } catch {
         // Private mode: the choice simply will not survive a restart.
       }
-      const name = templates.find((t) => t.id === id)?.name
-      notify('success', name ? t('Промпт «{name}» в буфере', { name: name }) : t('Промпт в буфере'))
+      const name = templates.find((tpl) => tpl.id === id)?.name
+      notify('success', name ? t('Промпт «{name}» в буфере', { name: t(name) }) : t('Промпт в буфере'))
     } finally {
       setBusy(false)
     }
@@ -91,7 +91,7 @@ export function ExportBar({
             </Button>
           }
           items={templates.map((template) => ({
-            label: template.id === active?.id ? `${template.name} ·` : template.name,
+            label: template.id === active?.id ? `${t(template.name)} ·` : t(template.name),
             onSelect: () => void copy(template.id),
             disabled: !ready
           }))}

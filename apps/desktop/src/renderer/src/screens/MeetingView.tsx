@@ -103,7 +103,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
       }
       reload()
       void reloadMeetings()
-      notify('success', `${direction === 'undo' ? t('Отменено') : t('Возвращено')}: ${done.label}`)
+      notify('success', t('{action}: {what}', { action: direction === 'undo' ? t('Отменено') : t('Возвращено'), what: done.label }))
     },
     [id, notify, reload, reloadMeetings]
   )

@@ -26,7 +26,7 @@ function buildMenu(state: RecordingState | null): Menu {
   const recording = state?.status === 'recording' || state?.status === 'paused'
   return Menu.buildFromTemplate([
     {
-      label: recording ? `Идёт запись · ${humanDuration(state?.elapsedSec ?? 0)}` : t('Запись не идёт'),
+      label: recording ? t('Идёт запись · {elapsed}', { elapsed: humanDuration(state?.elapsedSec ?? 0) }) : t('Запись не идёт'),
       enabled: false
     },
     { type: 'separator' },
@@ -58,7 +58,7 @@ export function updateTray(state: RecordingState): void {
   const image = nativeImage.createFromPath(iconPath(recording))
   image.setTemplateImage(true)
   tray.setImage(image)
-  tray.setToolTip(recording ? `Spyly · запись ${humanDuration(state.elapsedSec)}` : 'Spyly')
+  tray.setToolTip(recording ? t('Spyly · запись {elapsed}', { elapsed: humanDuration(state.elapsedSec) }) : 'Spyly')
   tray.setContextMenu(buildMenu(state))
 }
 

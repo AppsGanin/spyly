@@ -93,7 +93,7 @@ export const sherpaDiarizationProvider: DiarizationProvider = {
     // If that failed to start we compute in place: freezing for a few seconds is
     // unpleasant, but better than work not done.
     const turns = await diarizeInWorker(job).catch((error: unknown) => {
-      process.stderr.write(`[голоса] отдельный процесс не сработал: ${String(error)}\n`)
+      process.stderr.write(`[voices] the separate process did not work: ${String(error)}\n`)
       return null
     })
     options.onProgress?.(1)
