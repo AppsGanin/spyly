@@ -129,6 +129,36 @@ export function renderSummaryMarkdown(meeting: Meeting): string {
     .trimEnd() + '\n'
 }
 
+/**
+ * The note that goes with a calendar event.
+ *
+ * A calendar note is read in a small panel next to the day grid, so it holds
+ * the gist and the decisions and stops there: the transcript belongs in the
+ * application, not in a field one scrolls with a mouse wheel.
+ */
+export function renderCalendarNotes(meeting: Meeting): string {
+  const parts: string[] = []
+  if (meeting.summary?.tldr) parts.push(meeting.summary.tldr)
+
+  const decisions = meeting.summary?.decisions ?? []
+  if (decisions.length > 0) {
+    parts.push([`${t('Решения')}:`, ...decisions.map((d) => `• ${d}`)].join('\n'))
+  }
+
+  const tasks = meeting.summary?.actionItems ?? []
+  if (tasks.length > 0) {
+    parts.push(
+      [
+        `${t('Задачи')}:`,
+        ...tasks.map((task) => `• ${task.text}${task.assignee ? ` — ${task.assignee}` : ''}`)
+      ].join('\n')
+    )
+  }
+
+  parts.push(t('Запись в Spyly.'))
+  return parts.join('\n\n')
+}
+
 /** Plain text with no markup, for the clipboard and for pipes. */
 export function renderPlainText(meeting: Meeting): string {
   const speakers = speakerMap(meeting)

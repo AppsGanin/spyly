@@ -106,6 +106,46 @@ export async function eventsAround(startedAt: string, durationSec: number): Prom
 }
 
 /**
+ * Writing a conversation that has already happened into the calendar.
+ *
+ * Returns the identifier of what was created, or the reason it failed: the
+ * calendar can refuse for reasons of its own — an account gone read-only, no
+ * calendar for new events at all — and silence there would look like a button
+ * that does nothing.
+ */
+export async function createEvent(input: {
+  title: string
+  startsAt: string
+  endsAt: string
+  notes?: string
+}): Promise<{ id: string } | { error: string }> {
+  const { code, stdout, stderr } = await run(['calendar-create'], {
+    SPYLY_CAL_TITLE: input.title,
+    SPYLY_CAL_START: input.startsAt,
+    SPYLY_CAL_END: input.endsAt,
+    SPYLY_CAL_NOTES: input.notes ?? ''
+  })
+  if (code === 0) {
+    try {
+      const parsed = JSON.parse(stdout) as { id?: string }
+      if (parsed.id) return { id: parsed.id }
+    } catch {
+      // falls through to the error below
+    }
+  }
+  // The helper reports the reason as a line of JSON on stderr.
+  for (const line of stderr.split('\n')) {
+    try {
+      const parsed = JSON.parse(line) as { type?: string; message?: string }
+      if (parsed.type === 'error' && parsed.message) return { error: parsed.message }
+    } catch {
+      continue
+    }
+  }
+  return { error: stderr.trim() || t('календарь не принял встречу') }
+}
+
+/**
  * The event a starting recording most likely belongs to.
  *
  * One happening now beats the nearest one ahead: if a meeting has already

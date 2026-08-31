@@ -27,6 +27,18 @@ private let iso: ISO8601DateFormatter = {
 }()
 
 /**
+ * Reading a date back.
+ *
+ * JavaScript writes dates with milliseconds, and a formatter set up without
+ * them refuses such a string outright, so both shapes are tried.
+ */
+private func parseISO(_ value: String) -> Date? {
+    let withFraction = ISO8601DateFormatter()
+    withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return withFraction.date(from: value) ?? iso.date(from: value)
+}
+
+/**
  * Asking the system for permission.
  *
  * We wait by turning the run loop rather than blocking the thread with a
@@ -121,4 +133,49 @@ func calendarEvents(backMinutes: Int, forwardMinutes: Int) -> [CalendarEvent] {
             if a.isNow != b.isNow { return a.isNow }
             return a.startsAt < b.startsAt
         }
+}
+
+
+/**
+ * Writing a conversation that has already happened into the calendar.
+ *
+ * Not every conversation was in the calendar to begin with: someone called out
+ * of the blue, the meeting was agreed in a chat. Afterwards it is still worth
+ * having in there — that is where a person looks to remember how the week went.
+ *
+ * It goes into the calendar for new events, the same one the system itself
+ * would pick. Choosing a calendar in our own interface would mean a second
+ * setting for a rare action.
+ */
+enum CalendarWriteResult {
+    case created(String)
+    case failed(String)
+}
+
+func createCalendarEvent(title: String, startsAt: String, endsAt: String, notes: String?) -> CalendarWriteResult {
+    guard calendarAuthorized() else { return .failed("no access to the calendar") }
+    guard let start = parseISO(startsAt), let end = parseISO(endsAt) else {
+        return .failed("could not read the dates: \(startsAt) — \(endsAt)")
+    }
+
+    let store = EKEventStore()
+    guard let calendar = store.defaultCalendarForNewEvents else {
+        return .failed("no calendar to write into")
+    }
+
+    let event = EKEvent(eventStore: store)
+    event.calendar = calendar
+    event.title = title
+    event.startDate = start
+    // A meeting of zero length is drawn as a dot and is impossible to hit with a
+    // cursor, so a recording shorter than a minute still takes a minute.
+    event.endDate = max(end, start.addingTimeInterval(60))
+    event.notes = notes
+
+    do {
+        try store.save(event, span: .thisEvent, commit: true)
+    } catch {
+        return .failed(error.localizedDescription)
+    }
+    return .created(event.eventIdentifier ?? "")
 }

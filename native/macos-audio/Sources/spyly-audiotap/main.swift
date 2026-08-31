@@ -47,7 +47,7 @@ func parseArguments() -> Options {
         let arg = args[i]
         switch arg {
         case "list-processes", "list-mics", "mic-status", "check", "capture", "capture-mic",
-             "calendar-status", "calendar-request", "calendar-events":
+             "calendar-status", "calendar-request", "calendar-events", "calendar-create":
             o.mode = arg
         case "--rate":
             i += 1
@@ -102,6 +102,25 @@ case "calendar-events":
         print("[]")
     }
     exit(0)
+
+case "calendar-create":
+    let env = ProcessInfo.processInfo.environment
+    let result = createCalendarEvent(
+        title: env["SPYLY_CAL_TITLE"] ?? "",
+        startsAt: env["SPYLY_CAL_START"] ?? "",
+        endsAt: env["SPYLY_CAL_END"] ?? "",
+        notes: env["SPYLY_CAL_NOTES"]
+    )
+    switch result {
+    case .created(let id):
+        if let data = try? JSONSerialization.data(withJSONObject: ["id": id]),
+           let out = String(data: data, encoding: .utf8) {
+            print(out)
+        }
+        exit(0)
+    case .failed(let message):
+        fail(message, reason: "calendar-create")
+    }
 
 case "list-mics":
     let devices = MicCapture.inputDevices()

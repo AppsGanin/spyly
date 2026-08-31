@@ -164,6 +164,8 @@ export interface IpcRequests {
   'calendar:current': () => CalendarEventInfo | null
   /** Events around a recording that has already happened, to attach one by hand. */
   'calendar:around': (startedAt: string, durationSec: number) => CalendarEventInfo[]
+  /** Put a conversation that was never in the calendar into it after the fact. */
+  'calendar:create': (meetingId: string) => { id: string } | { error: string }
 
   'audio:listMics': () => AudioDevice[]
   'audio:listApps': () => AudioApp[]

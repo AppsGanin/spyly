@@ -5,6 +5,7 @@ import { t,
   isLikelyHallucination,
   levelAt,
   micIsOwnVoice,
+  renderCalendarNotes,
   renderTranscriptMarkdown,
   SILENCE_RMS_THRESHOLD,
   textSimilarity,
@@ -656,6 +657,28 @@ export function registerIpc(): void {
   handle('calendar:around', async (startedAt, durationSec) => {
     const { eventsAround } = await import('../detect/calendar.js')
     return eventsAround(startedAt, durationSec)
+  })
+
+  handle('calendar:create', async (meetingId) => {
+    const meeting = await readMeeting(meetingId)
+    if (!meeting) return { error: t('Запись не найдена') }
+
+    const { createEvent } = await import('../detect/calendar.js')
+    const start = new Date(meeting.startedAt)
+    const end = new Date(start.getTime() + Math.max(60, meeting.durationSec) * 1000)
+    const result = await createEvent({
+      title: meeting.title,
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      notes: renderCalendarNotes(meeting)
+    })
+    // The recording remembers the event it was written into, so the calendar is
+    // not filled with a copy on every press.
+    if ('id' in result) {
+      await updateMeeting(meetingId, (m) => ({ ...m, calendarEventId: result.id }))
+      send('meetings:changed', { id: meetingId })
+    }
+    return result
   })
 
   handle('calendar:current', async () => {

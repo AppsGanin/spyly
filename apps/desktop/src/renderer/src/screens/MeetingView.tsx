@@ -716,22 +716,39 @@ function CalendarLink({ meeting, onDone }: { meeting: Meeting; onDone: () => voi
     notify('success', t('Встреча привязана'))
   }
 
+  /** Writes the conversation into the calendar as a meeting that has already been. */
+  const create = async () => {
+    setBusy(true)
+    try {
+      const result = await api.call('calendar:create', meeting.id)
+      if ('error' in result) {
+        notify('error', result.error)
+        return
+      }
+      setOpen(false)
+      onDone()
+      notify('success', t('Встреча добавлена в календарь'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <>
       <IconButton
         onClick={() => void load()}
-        aria-label={t('Привязать встречу из календаря')}
-        title={t('Привязать встречу из календаря')}
+        aria-label={t('Встреча в календаре')}
+        title={t('Встреча в календаре')}
         className={meeting.calendarEventId ? 'iconbtn--on' : undefined}
       >
         <IconCalendar />
       </IconButton>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={t('Встреча из календаря')}>
+      <Modal open={open} onClose={() => setOpen(false)} title={t('Встреча в календаре')}>
         {granted === false ? (
           <div className="col" style={{ gap: 'var(--space-3)' }}>
             <p className="muted">
-              {t('Календарь знает название встречи и кто на ней был. Доступ нужен только на чтение.')}
+              {t('Календарь знает название встречи и кто на ней был, а разговор, которого в нём не было, можно туда записать.')}
             </p>
             <Button variant="primary" disabled={busy} onClick={() => void ask()}>
               {busy ? t('Жду ответа…') : t('Дать доступ')}
@@ -739,18 +756,44 @@ function CalendarLink({ meeting, onDone }: { meeting: Meeting; onDone: () => voi
           </div>
         ) : events === null ? (
           <p className="muted">{t('Смотрю календарь…')}</p>
-        ) : events.length === 0 ? (
-          <p className="muted">
-            {t('В календаре нет встреч, которые шли во время этой записи. Привязывать нечего.')}
-          </p>
         ) : (
-          <div className="col" style={{ gap: 'var(--space-1)' }}>
-            {events.map((event) => (
-              <button key={event.id} className="pick" onClick={() => void attach(event)}>
-                <span className="grow">{event.title}</span>
-                <span className="dim">{shortWhen(event.startsAt)}</span>
-              </button>
-            ))}
+          <div className="col" style={{ gap: 'var(--space-4)' }}>
+            {meeting.calendarEventId && (
+              <p className="muted">{t('Эта запись уже привязана к встрече в календаре.')}</p>
+            )}
+
+            {events.length > 0 && (
+              <div className="col" style={{ gap: 'var(--space-2)' }}>
+                <span className="field__label">{t('Встречи во время этой записи')}</span>
+                <div className="col" style={{ gap: 'var(--space-1)' }}>
+                  {events.map((event) => (
+                    <button key={event.id} className="pick" onClick={() => void attach(event)}>
+                      <span className="grow">{event.title}</span>
+                      <span className="dim">{shortWhen(event.startsAt)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* A conversation that was never in anyone's calendar — someone rang
+                out of the blue — is still worth having there afterwards: that is
+                where a person looks to remember how the week went. */}
+            <div className="col" style={{ gap: 'var(--space-2)' }}>
+              <span className="field__label">
+                {events.length > 0 ? t('Или добавить новую') : t('В календаре ничего подходящего нет')}
+              </span>
+              <p className="muted">
+                {t('Прошедшая встреча «{title}», {when}, {duration}. В заметку попадёт конспект.', {
+                  title: meeting.title,
+                  when: shortWhen(meeting.startedAt),
+                  duration: humanDuration(Math.max(60, meeting.durationSec))
+                })}
+              </p>
+              <Button variant="primary" disabled={busy} onClick={() => void create()}>
+                {busy ? t('Добавляю…') : t('Добавить в календарь')}
+              </Button>
+            </div>
           </div>
         )}
       </Modal>

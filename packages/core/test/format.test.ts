@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { renderTranscriptMarkdown, speakerLabel } from '../src/format.js'
+import { renderCalendarNotes, renderTranscriptMarkdown, speakerLabel } from '../src/format.js'
 import { Meeting, Speaker } from '../src/types.js'
 
 function meeting(marks: { at: number; note?: string }[]): Meeting {
@@ -66,5 +66,56 @@ describe('the caption for a side', () => {
   it('without a speaker the track is read off the identifier', () => {
     expect(speakerLabel(undefined, 'mic')).toBe('Вы')
     expect(speakerLabel(undefined, 'system')).toBe('Собеседник')
+  })
+})
+
+describe('the note for a calendar event', () => {
+  function withSummary(summary: Meeting['summary']): Meeting {
+    return Meeting.parse({
+      id: '2026-08-28--test--bbbb',
+      title: 'Разговор',
+      startedAt: '2026-08-28T10:00:00.000Z',
+      durationSec: 60,
+      sources: { mic: true, system: true },
+      summary
+    })
+  }
+
+  it('holds the gist, the decisions and the tasks', () => {
+    const note = renderCalendarNotes(
+      withSummary({
+        tldr: 'Обсудили биллинг',
+        keyPoints: [],
+        decisions: ['Переносим релиз'],
+        actionItems: [{ text: 'Собрать сборку', assignee: 'Максим', done: false }],
+        questions: [],
+        generatedAt: '2026-08-28T11:00:00.000Z'
+      })
+    )
+    expect(note).toContain('Обсудили биллинг')
+    expect(note).toContain('Переносим релиз')
+    expect(note).toContain('Собрать сборку — Максим')
+  })
+
+  /** A conversation may be written into the calendar before it is summarised. */
+  it('without a summary it still says where the meeting came from', () => {
+    const note = renderCalendarNotes(withSummary(undefined))
+    expect(note.trim()).toBe('Запись в Spyly.')
+  })
+
+  /** An empty heading with nothing under it reads as a mistake. */
+  it('a section with nothing in it is left out', () => {
+    const note = renderCalendarNotes(
+      withSummary({
+        tldr: 'Коротко',
+        keyPoints: [],
+        decisions: [],
+        actionItems: [],
+        questions: [],
+        generatedAt: '2026-08-28T11:00:00.000Z'
+      })
+    )
+    expect(note).not.toContain('Решения')
+    expect(note).not.toContain('Задачи')
   })
 })
