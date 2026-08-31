@@ -1,5 +1,6 @@
 import { t } from '@spyly/core'
 import { createPortal } from 'react-dom'
+import { IconClose } from '../lib/icons'
 import {
   forwardRef,
   useEffect,
@@ -137,6 +138,10 @@ export function Spinner() {
  * A dialog on the native <dialog>: it provides the focus trap, closing on
  * Escape and the dimming through ::backdrop by itself, and our own
  * implementation would be worse.
+ *
+ * A way out is built in rather than left to the caller: a cross in the corner
+ * and a click on the dimmed area. A dialog whose only exit is Escape reads as
+ * stuck, and one of them — a calendar with nothing to pick — really was.
  */
 export function Modal({
   open,
@@ -152,6 +157,7 @@ export function Modal({
   actions?: ReactNode
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const downOnBackdrop = useRef(false)
 
   useEffect(() => {
     const dialog = ref.current
@@ -161,11 +167,32 @@ export function Modal({
   }, [open])
 
   return (
-    <dialog ref={ref} className="modal" onClose={onClose} onCancel={onClose}>
+    <dialog
+      ref={ref}
+      className="modal"
+      onClose={onClose}
+      onCancel={onClose}
+      // A click on the backdrop lands on the dialog itself: the body covers it
+      // whole, so only the dimmed area outside gives this target. The press is
+      // checked as well — selecting text and letting go past the edge is not a
+      // click on the backdrop, though the event looks exactly like one.
+      onMouseDown={(event) => {
+        downOnBackdrop.current = event.target === ref.current
+      }}
+      onClick={(event) => {
+        if (downOnBackdrop.current && event.target === ref.current) onClose()
+      }}
+    >
       <div className="modal__body">
-        <h3>{title}</h3>
+        <h3 className="modal__title">{title}</h3>
         {children}
         {actions && <div className="modal__actions">{actions}</div>}
+        {/* The cross goes last on purpose, though it is drawn in the corner: a
+            <dialog> hands focus to the first control it finds, and standing at
+            the top it took that focus away from the button one came here for. */}
+        <button type="button" className="modal__close" onClick={onClose} aria-label={t('Закрыть')}>
+          <IconClose />
+        </button>
       </div>
     </dialog>
   )

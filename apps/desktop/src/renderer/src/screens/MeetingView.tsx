@@ -740,7 +740,9 @@ function CalendarLink({ meeting, onDone }: { meeting: Meeting; onDone: () => voi
         ) : events === null ? (
           <p className="muted">{t('Смотрю календарь…')}</p>
         ) : events.length === 0 ? (
-          <p className="muted">{t('Вокруг этой записи в календаре ничего нет.')}</p>
+          <p className="muted">
+            {t('В календаре нет встреч, которые шли во время этой записи. Привязывать нечего.')}
+          </p>
         ) : (
           <div className="col" style={{ gap: 'var(--space-1)' }}>
             {events.map((event) => (

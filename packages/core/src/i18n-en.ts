@@ -510,7 +510,9 @@ export const EN: Record<string, string> = {
   'Календарь доступен только на macOS': 'The calendar is available on macOS only',
   'Календарь знает название встречи и кто на ней был. Доступ нужен только на чтение.': 'The calendar knows the meeting name and who was there. Read-only access is all it needs.',
   'Смотрю календарь…': 'Looking at the calendar…',
-  'Вокруг этой записи в календаре ничего нет.': 'There is nothing in the calendar around this recording.',
+  'В календаре нет встреч, которые шли во время этой записи. Привязывать нечего.':
+    'No calendar meeting was running while this was recorded. There is nothing to attach.',
+  'Закрыть': 'Close',
   'Встреча привязана': 'The meeting is attached',
   'Дать доступ': 'Grant access',
 }

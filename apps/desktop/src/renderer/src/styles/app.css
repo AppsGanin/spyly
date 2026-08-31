@@ -726,7 +726,28 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: none; }
 }
-.modal__body { padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+.modal__body { position: relative; padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); }
+/* Keeps room for the cross so a long title does not run under it. */
+.modal__title { padding-right: var(--space-6); }
+/* The cross sits in the corner of the window and does not pull the eye: the way
+   out has to be there, but it is not the point of the dialog. */
+.modal__close {
+  position: absolute;
+  top: calc(var(--space-5) - 3px);
+  right: calc(var(--space-5) - 4px);
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ds-gray-900);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--duration-popover) var(--ease-swift), color var(--duration-popover) var(--ease-swift);
+}
+.modal__close:hover { background: var(--ds-gray-200); color: var(--ds-gray-1000); }
+.modal__close:focus-visible { box-shadow: var(--ds-focus-ring); outline: none; }
 .modal__actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 
 /* ── processing progress ──────────────────────────────────────── */
