@@ -353,7 +353,6 @@ function CalendarAccess() {
 const ASR_MODELS = [
   'whisper-large-v3-turbo',
   'whisper-large-v3',
-  'gigaam-v3-ru',
   'parakeet-tdt-v3',
   'nemotron-3.5'
 ]

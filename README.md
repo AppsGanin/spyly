@@ -1,6 +1,6 @@
 # Spyly
 
-**Records your calls, transcribes them speaker by speaker, and hands the conversation to your coding agent.**
+**Records your calls, transcribes both sides of them, and hands the conversation to your coding agent.**
 
 Everything runs on your machine. No account, no API key, no audio leaving the computer.
 
@@ -14,10 +14,8 @@ A call is a finished spec that nobody writes down. Spyly records it, works out w
 
 ## What it does
 
-- **Records you and the room on separate tracks.** The microphone and the system audio are captured independently, so the transcript knows who spoke and speaker echo never doubles a phrase.
-- **Splits both tracks by voice.** Several people around one microphone in a meeting room get separated too.
+- **Records you and the other side on separate tracks.** The microphone and the system audio are captured independently, so the transcript knows which side spoke and speaker echo never doubles a phrase.
 - **Shows text while you talk.** Words appear as they are spoken — measured 0.5–0.8 s behind speech on an M-series Mac.
-- **Learns people's voices.** Name someone once; from the next recording their name fills itself in from the voice print.
 - **Removes speaker bleed.** Without headphones your microphone hears the other side. Spyly compares levels between the two tracks and drops the echo.
 - **Notices a call starting** — the microphone being taken by another app, browser calls included.
 - **Names the recording by what was discussed** once the transcript is ready.
@@ -51,7 +49,7 @@ For Codex, the app's settings screen shows the snippet for `~/.codex/config.toml
 |---|---|
 | `stats`, `digest` | how much was recorded, what is still unprocessed |
 | `list_meetings`, `search` | find a conversation by time, participant, or words in it |
-| `get_transcript`, `get_summary` | the conversation itself, whole or by speaker or by time range |
+| `get_transcript`, `get_summary` | the conversation itself, whole or by side or by time range |
 | `list_tasks`, `add_task`, `complete_task` | what was promised out loud, across every recording |
 | `list_participants`, `tag_meeting`, `update_summary` | who talks to you, and corrections to what the machine wrote |
 | `ask_meeting`, `current_recording` | a question about one recording; what is being recorded right now |
@@ -70,7 +68,7 @@ spyly search "billing"
 
 ```
 microphone ─┐
-            ├─→ two WAV tracks ─→ transcription ─→ voice separation ─→ people ─→ summary
+            ├─→ two WAV tracks ─→ transcription ─→ echo removal ─→ summary
 system audio ┘        │
                       └─→ streaming model ─→ live text while you speak
 ```
@@ -81,7 +79,7 @@ Files are the source of truth. A recording is a folder you can copy, hand to an 
 ~/Spyly/meetings/2026-08-27--billing-worker--a1b2/
   meta.json          what, when, who, processing state
   audio/             mic.wav and system.wav, 16 kHz mono
-  transcript.json    speakers, utterances, word timings
+  transcript.json    the two sides, utterances, word timings
   transcript.md      the same for people and agents
   summary.md
 ```
@@ -100,11 +98,9 @@ Downloaded on first run into `~/Library/Application Support/Spyly/models`.
 |---|---|---|
 | Whisper large-v3-turbo | default: accuracy and speed, 99 languages | 574 MB |
 | Whisper large-v3 | more accurate on poor audio, about twice as slow | 1.0 GB |
-| GigaAM v3 | best Russian, punctuation included | 500 MB |
 | Parakeet TDT v3 | much faster than Whisper, 25 languages | 638 MB |
 | Nemotron Speech 3.5 | streaming — this is what live text runs on | 475 MB |
 
-Voice separation uses pyannote segmentation 3.0 (7 MB) and 3D-Speaker embeddings (40 MB).
 
 ### Made-up text
 
@@ -131,7 +127,7 @@ Anthropic and OpenAI have no public OAuth for third-party apps, only API keys. T
 
 ## Privacy
 
-Transcription and voice separation run locally by default. Voice prints are biometrics: they stay on this computer, go to no cloud provider, and can be deleted from settings. The calendar is read-only and only around the current moment.
+Transcription runs locally by default. Nothing about a voice is stored: the two sides of a conversation follow from the two tracks, so there is no voice print to keep. The calendar is read-only and only around the current moment.
 
 The app is deliberately visible while recording — the tray icon changes, and a reminder to tell the other side appears before it starts. In many jurisdictions recording a conversation without telling the participants is illegal.
 
@@ -143,7 +139,7 @@ You may use, study, change and share this program. Anything built on it must be 
 
 For use without those obligations, a commercial licence is available: open an issue or write to [@AppsGanin](https://github.com/AppsGanin).
 
-Third-party parts keep their own licences: whisper.cpp is MIT, sherpa-onnx is Apache-2.0, the Geist fonts are under the SIL Open Font License. Recognition models are downloaded at runtime and carry their own terms — GigaAM in particular is not licensed for commercial use.
+Third-party parts keep their own licences: whisper.cpp is MIT, sherpa-onnx is Apache-2.0, the Geist fonts are under the SIL Open Font License. Recognition models are downloaded at runtime and carry their own terms.
 
 ## Development
 
@@ -153,7 +149,7 @@ npm test          # 185 unit tests
 npm run typecheck
 ```
 
-End-to-end check — a real recording, transcription and voice separation, 87 assertions:
+End-to-end check — a real recording, transcription and a summary:
 
 ```bash
 npx electron apps/desktop --selftest path/to/file.wav 25

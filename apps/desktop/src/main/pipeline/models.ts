@@ -51,17 +51,6 @@ export const MODELS: ModelSpec[] = [
     tradeoff: t('Точнее на плохом звуке и в именах, но считает примерно вдвое дольше')
   },
   {
-    id: 'gigaam-v3-ru',
-    name: 'GigaAM v3',
-    purpose: 'asr',
-    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-punct-giga-am-v3-russian-2025-12-16.tar.bz2',
-    file: 'sherpa-onnx-nemo-ctc-punct-giga-am-v3-russian-2025-12-16',
-    sizeBytes: 163_000_000,
-    archive: 'tar.bz2',
-    tier: t('Только русский'),
-    tradeoff: t('На русском точнее и быстрее, сама расставляет знаки препинания. Только русский')
-  },
-  {
     id: 'parakeet-tdt-v3',
     name: 'Parakeet TDT v3',
     purpose: 'asr',
@@ -312,7 +301,6 @@ export function asrModels(): string[] {
   return [
     'whisper-large-v3-turbo',
     'whisper-large-v3',
-    'gigaam-v3-ru',
     'parakeet-tdt-v3',
     'nemotron-3.5'
   ]

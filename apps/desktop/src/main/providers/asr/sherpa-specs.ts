@@ -1,7 +1,7 @@
 /**
  * Recognition models on the sherpa-onnx engine.
  *
- * Every non-Whisper model lives here: GigaAM, Parakeet, Nemotron. They are
+ * Every non-Whisper model lives here: Parakeet and Nemotron. They are
  * built differently, one returning text whole, another working as a stream,
  * but from the pipeline's point of view they do the same thing, so their code
  * is shared.
@@ -23,22 +23,13 @@ interface SherpaSpec {
    * The chunk length in seconds.
    *
    * Chosen by measurement: Parakeet brings the process down with a native crash
-   * on two-minute chunks, GigaAM holds them. Chunks that are too small are bad
-   * as well, as recognition loses words at the seams.
+   * on two-minute chunks. Chunks that are too small are bad as well, as
+   * recognition loses words at the seams.
    */
   chunkSeconds: number
 }
 
 const SPECS: SherpaSpec[] = [
-  {
-    id: 'gigaam-v3-ru',
-    name: 'GigaAM v3',
-    dir: 'sherpa-onnx-nemo-ctc-punct-giga-am-v3-russian-2025-12-16',
-    streaming: false,
-    files: { model: 'model.int8.onnx' },
-    language: 'ru',
-    chunkSeconds: 120
-  },
   {
     id: 'parakeet-tdt-v3',
     name: 'Parakeet TDT v3',

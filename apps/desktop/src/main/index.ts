@@ -506,7 +506,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
 
     if (process.env.SPYLY_CHECK_ASR) {
       const { providerForModel } = await import('./providers/registry.js')
-      const model = process.env.SPYLY_ASR_MODEL ?? 'gigaam-v3-ru'
+      const model = process.env.SPYLY_ASR_MODEL ?? 'parakeet-tdt-v3'
       const provider = providerForModel(model)
       const state = await provider.ready()
       if (!state.ready) {

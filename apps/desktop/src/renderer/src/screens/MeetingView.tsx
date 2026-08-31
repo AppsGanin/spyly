@@ -25,7 +25,6 @@ import { TranscriptSelection } from '../components/TranscriptSelection'
 const MODEL_LABELS: Record<string, string> = {
   'whisper-large-v3-turbo': 'Whisper large-v3-turbo',
   'whisper-large-v3': 'Whisper large-v3',
-  'gigaam-v3-ru': 'GigaAM v3',
   'parakeet-tdt-v3': 'Parakeet TDT v3',
   'nemotron-3.5': 'Nemotron Speech 3.5',
 }
@@ -352,7 +351,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
             во время разговора. Точность у него ниже, зато он показывает
             происходившее так, как его видел человек. */}
         {draft.length > 0 && (
-          <button className={`tab ${tab === 'live' ? 'tab--active' : ''}`} onClick={() => setTab('live')}>{t('Черновик')}<span className="dim"> {draft.length}</span>
+          <button className={`tab ${tab === 'live' ? 'tab--active' : ''}`} onClick={() => setTab('live')}>
+            {t('Черновик')}
           </button>
         )}
       </div>
