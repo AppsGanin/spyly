@@ -1372,3 +1372,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   outline: none;
   box-shadow: var(--ds-focus-ring);
 }
+
+/* Выключенный переключатель: зависит от соседнего, который сейчас выключен. */
+.switch:disabled { opacity: 0.4; cursor: not-allowed; }

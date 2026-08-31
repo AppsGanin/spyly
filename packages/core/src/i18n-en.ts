@@ -11,7 +11,6 @@
 export const EN: Record<string, string> = {
   ' · просрочено: {overdue}': ' · overdue: {overdue}',
   ' Внимание: Spyly запущен не из «Программ», и путь к нему может смениться — перенесите приложение в «Программы» и подключите заново.': ' Note: Spyly is not running from Applications, so its path may change. Move the app to Applications and connect again.',
-  '35 языков, включая русский. Расшифровывает на лету — на ней работает живой текст по ходу разговора': '35 languages including Russian. Transcribes on the fly: live text runs on this one',
   'Claude Code не найден на этом компьютере.': 'Claude Code is not installed on this computer.',
   'Codex не найден': 'Codex not found',
   'Ollama (локально)': 'Ollama (local)',
@@ -42,7 +41,6 @@ export const EN: Record<string, string> = {
   'Английский': 'English',
   'Без конспекта': 'No summary',
   'Быстрая многоязычная': 'Fast, multilingual',
-  'Быстрее Whisper и не выдумывает лишнего. 25 языков, включая русский': 'Faster than Whisper and makes less up. 25 languages including Russian',
   'В списке только готовое к работе: свой сервис появится, когда вы его настроите': 'The list shows what is ready to use; your own service appears once you set it up',
   'В этой записи нет звука': 'This recording has no audio',
   'В этом месяце': 'This month',
@@ -506,4 +504,10 @@ export const EN: Record<string, string> = {
   'О программе': 'About',
   'Живая расшифровка на лету и детектор речи. Без потоковой модели текст приходит кусками после пауз.': 'Live transcription on the fly, and speech detection. Without the streaming model the text arrives in lumps after pauses.',
   'Расшифровать': 'Transcribe',
+  'Расшифровка сразу после записи': 'Transcribe as soon as recording stops',
+  'Иначе её можно запустить вручную на странице записи': 'Otherwise it can be started by hand on the recording page',
+  'Расшифровка автоматически': 'Transcribe automatically',
+  'Нужна расшифровка сразу после записи: собирать конспект пока не из чего': 'Needs transcription right after recording: there is nothing to summarise otherwise',
+  'Заметно быстрее Whisper и чище на тишине. 25 языков': 'Noticeably faster than Whisper and cleaner on silence. 25 languages',
+  'Расшифровывает на лету: на ней работает живой текст во время записи. 35 языков': 'Transcribes on the fly: this is what the live text during a recording runs on. 35 languages',
 }

@@ -18,6 +18,7 @@ function defaults(): Settings {
     llmProvider: 'anthropic',
     openAiCompatible: { baseUrl: '', model: '' },
     liveTranscription: true,
+    autoTranscribe: true,
     autoSummarize: true,
     autoDetectCalls: 'notify',
     storageDir: storageRoot(),

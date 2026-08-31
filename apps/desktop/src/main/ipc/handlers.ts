@@ -541,10 +541,14 @@ async function stopRecording(): Promise<{ meetingId: string | null }> {
     return { meetingId: active.meetingId }
   }
 
-  // Transcription runs in the background: the user goes straight back to the meeting list.
-  void processMeeting(active.meetingId).catch((error: unknown) => {
-    send('toast', { kind: 'error', text: t('Обработка не удалась: {error}', { error: String(error) }) })
-  })
+  // Transcription runs in the background: the user goes straight back to the
+  // meeting list. Switched off, nothing starts by itself and the recording page
+  // offers to do it by hand.
+  if ((await loadSettings()).autoTranscribe) {
+    void processMeeting(active.meetingId).catch((error: unknown) => {
+      send('toast', { kind: 'error', text: t('Обработка не удалась: {error}', { error: String(error) }) })
+    })
+  }
 
   return { meetingId: active.meetingId }
 }

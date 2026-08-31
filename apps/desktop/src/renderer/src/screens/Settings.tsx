@@ -171,9 +171,34 @@ function GeneralTab({
         />
       </Row>
 
-      <Row title={t('Конспект сразу после записи')} hint={t('Иначе его можно собрать вручную на странице записи')} inline>
+      <Row
+        title={t('Расшифровка сразу после записи')}
+        hint={t('Иначе её можно запустить вручную на странице записи')}
+        inline
+      >
+        <Switch
+          checked={settings.autoTranscribe}
+          // Without a transcript there is nothing to summarise, so the summary
+          // switch goes off with it rather than staying on and never firing.
+          onChange={(next) =>
+            void saveSettings(next ? { autoTranscribe: true } : { autoTranscribe: false, autoSummarize: false })
+          }
+          label={t('Расшифровка автоматически')}
+        />
+      </Row>
+
+      <Row
+        title={t('Конспект сразу после записи')}
+        hint={
+          settings.autoTranscribe
+            ? t('Иначе его можно собрать вручную на странице записи')
+            : t('Нужна расшифровка сразу после записи: собирать конспект пока не из чего')
+        }
+        inline
+      >
         <Switch
           checked={settings.autoSummarize}
+          disabled={!settings.autoTranscribe}
           onChange={(next) => void saveSettings({ autoSummarize: next })}
           label={t('Конспект автоматически')}
         />

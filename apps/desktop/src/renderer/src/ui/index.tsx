@@ -97,11 +97,14 @@ export function Field({
 export function Switch({
   checked,
   onChange,
-  label
+  label,
+  disabled = false
 }: {
   checked: boolean
   onChange: (next: boolean) => void
   label: string
+  /** A switch that cannot be on right now, because something it depends on is off. */
+  disabled?: boolean
 }) {
   return (
     <button
@@ -109,6 +112,7 @@ export function Switch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       className={`switch ${checked ? 'switch--on' : ''}`}
       onClick={() => onChange(!checked)}
     />

@@ -216,8 +216,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     setMatchIndex((current) => (current + delta + matchCount) % matchCount)
   }
 
-  // Two participants can be given the same name, so the header shows it once.
-  const participants = [...new Set(meeting.speakers.map((s) => speakerLabel(s, s.id)))]
 
   // Plus a short "just pressed" flag: the first event does not arrive instantly.
   const summarizing = reallyRunning || justAsked
@@ -272,14 +270,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
             <>
               <span>·</span>
               <span>{humanDuration(meeting.durationSec)}</span>
-            </>
-          )}
-          {participants.length > 0 && (
-            <>
-              <span>·</span>
-              <span className="truncate" title={participants.join(', ')}>
-                {participants.join(', ')}
-              </span>
             </>
           )}
           {/* Чем расшифровано: через месяц по тексту не понять, лёгкой моделью

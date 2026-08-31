@@ -97,6 +97,8 @@ export interface Settings {
   openAiCompatible: { baseUrl: string; model: string }
   /** The silence threshold below which a track counts as empty. */
   liveTranscription: boolean
+  /** Start transcribing as soon as a recording stops. */
+  autoTranscribe: boolean
   autoSummarize: boolean
   autoDetectCalls: 'off' | 'notify' | 'auto'
   storageDir: string
