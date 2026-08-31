@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
+import { PILL_HEIGHT, pointIsOnPanel } from './overlay-hit.js'
 
 /**
  * The floating panel window.
@@ -10,18 +11,26 @@ import { BrowserWindow, screen } from 'electron'
  */
 let overlay: BrowserWindow | null = null
 
-const WIDTH = 236
-const HEIGHT = 44
-
 /**
- * The panel grows when there is a draft to show.
+ * The window is as wide as the draft from the outset.
  *
- * It is not made tall in advance: the window is transparent, but a transparent
- * window still swallows clicks, and an empty strip under the pill would sit on
- * top of whatever the person is actually working in.
+ * It used to be as narrow as the pill and widen leftwards when the text
+ * appeared. That cost twice over: the box for the text visibly grew as one
+ * read, and after the resize macOS went on hit-testing the buttons at their old
+ * places, so the stop button stopped responding. The window keeps one width
+ * now, and the empty part of it is let through to whatever is underneath.
  */
-const WIDE = 460
+const WIDTH = 460
+const HEIGHT = PILL_HEIGHT
+
+/** Only the height changes: the pill stays at the top and does not move. */
 const TALL = 168
+
+/** How often the cursor is checked against what the panel actually draws. */
+const CURSOR_CHECK_MS = 100
+
+let cursorTimer: NodeJS.Timeout | null = null
+let takingMouse = false
 
 export function showOverlay(dirname: string): void {
   if (overlay && !overlay.isDestroyed()) {
@@ -34,7 +43,8 @@ export function showOverlay(dirname: string): void {
     width: WIDTH,
     height: HEIGHT,
     // Top right corner: it is least in the way there, and it matches the usual
-    // place for a recording indicator in the system.
+    // place for a recording indicator in the system. The content inside is
+    // pressed to the right edge, so the pill lands there whatever the width.
     x: workArea.x + workArea.width - WIDTH - 20,
     y: workArea.y + 20,
     frame: false,
@@ -65,13 +75,19 @@ export function showOverlay(dirname: string): void {
   if (url) void overlay.loadURL(`${url}#overlay`)
   else void overlay.loadFile(path.join(dirname, '../renderer/index.html'), { hash: 'overlay' })
 
+  // Clicks pass through until the cursor comes to rest on something of ours.
+  overlay.setIgnoreMouseEvents(true)
+  watchCursor()
+
   overlay.once('ready-to-show', () => overlay?.showInactive())
   overlay.on('closed', () => {
     overlay = null
+    stopWatchingCursor()
   })
 }
 
 export function hideOverlay(): void {
+  stopWatchingCursor()
   if (overlay && !overlay.isDestroyed()) overlay.close()
   overlay = null
 }
@@ -90,14 +106,43 @@ export function overlayWindow(): BrowserWindow | null {
 export function setOverlayDraft(visible: boolean): void {
   const win = overlayWindow()
   if (!win) return
-  const width = visible ? WIDE : WIDTH
   const height = visible ? TALL : HEIGHT
   const bounds = win.getBounds()
-  if (bounds.width === width && bounds.height === height) return
-  win.setBounds({
-    x: bounds.x + bounds.width - width,
-    y: bounds.y,
-    width,
-    height
-  })
+  if (bounds.height === height) return
+  win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height })
 }
+
+/**
+ * Whether the panel takes the mouse or lets it through.
+ *
+ * Most of the window is empty and transparent, and an invisible pane over
+ * somebody's call would be worse than no panel at all. So clicks pass through
+ * by default, and the panel takes them only while the cursor is over the pill
+ * or over the text.
+ *
+ * Where the cursor is we work out ourselves rather than ask the window: a
+ * window that ignores the mouse is not reliably told the mouse moved, and
+ * getting that wrong would leave the stop button dead — which is the very thing
+ * being fixed here.
+ */
+function watchCursor(): void {
+  if (cursorTimer) return
+  cursorTimer = setInterval(() => {
+    const win = overlayWindow()
+    if (!win) return stopWatchingCursor()
+    const point = screen.getCursorScreenPoint()
+    const over = pointIsOnPanel(win.getBounds(), point)
+    if (over === takingMouse) return
+    takingMouse = over
+    win.setIgnoreMouseEvents(!over)
+  }, CURSOR_CHECK_MS)
+  cursorTimer.unref?.()
+}
+
+function stopWatchingCursor(): void {
+  if (cursorTimer) clearInterval(cursorTimer)
+  cursorTimer = null
+  takingMouse = false
+}
+
+

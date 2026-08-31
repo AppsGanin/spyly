@@ -512,4 +512,8 @@ export const EN: Record<string, string> = {
   'Встреча добавлена в календарь': 'The meeting is in the calendar',
   'Запись в Spyly.': 'Recorded in Spyly.',
   'календарь не принял встречу': 'the calendar would not take the meeting',
+  'Микрофон пишет тишину — проверьте, не выключен ли он и не занят ли другим приложением':
+    'The microphone is recording silence — check that it is not muted or taken by another application',
+  'Системный звук пишет тишину — проверьте, что выбрано нужное приложение':
+    'The system audio is recording silence — check that the right application is picked',
 }

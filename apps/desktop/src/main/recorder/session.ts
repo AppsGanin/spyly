@@ -47,6 +47,36 @@ async function ensureFreeSpace(): Promise<void> {
  */
 const SILENT_SOURCE_TIMEOUT_MS = 5000
 
+/**
+ * How long a source may hand over nothing but digital silence.
+ *
+ * Longer than the wait for the first sample: a person may well start the
+ * recording and stay quiet for a few seconds. But not much longer — the point
+ * of the check is that they find out now rather than after the conversation.
+ */
+const DEAD_SOURCE_TIMEOUT_MS = 12_000
+
+/**
+ * Below this a sample counts as digital silence.
+ *
+ * Not "a quiet room": a live microphone always has a noise floor well above
+ * this, and even a good one sits around -70 dBFS. Exactly zero comes from a
+ * source that is not working — a muted input, a device taken by another
+ * application, a phone microphone over Continuity that opened and gave nothing.
+ */
+const SILENCE_FLOOR = 1e-4
+
+/** How often the "hands over silence" check runs. */
+const DEAD_SOURCE_CHECK_MS = 3000
+
+/** Whether there is anything in the frame beyond digital silence. */
+function hasSound(chunk: Float32Array): boolean {
+  for (const sample of chunk) {
+    if (sample > SILENCE_FLOOR || sample < -SILENCE_FLOOR) return true
+  }
+  return false
+}
+
 const DRIFT_TOLERANCE_SEC = 0.15
 const DRIFT_CHECK_MS = 1000
 
@@ -61,6 +91,10 @@ interface Track {
   error: string | null
   /** Whether a single sample has arrived: "ready" does not yet mean "working". */
   gotAudio: boolean
+  /** Whether anything above digital silence has arrived: samples are not yet sound. */
+  gotSound: boolean
+  /** Reported as dead already, so the message is not rewritten every check. */
+  warnedDead: boolean
 }
 
 /**
@@ -73,6 +107,7 @@ interface Track {
 export class RecordingSession extends EventEmitter {
   private tracks: Track[] = []
   private driftTimer: NodeJS.Timeout | null = null
+  private deadTimer: NodeJS.Timeout | null = null
   private startedAtMs = 0
   /** Total time spent paused, subtracted from the overall duration. */
   private pausedMs = 0
@@ -197,6 +232,31 @@ export class RecordingSession extends EventEmitter {
         this.emitState()
       }
     }, SILENT_SOURCE_TIMEOUT_MS).unref?.()
+
+    /*
+     * A source that hands over samples but no sound.
+     *
+     * The check above catches a source that gives nothing at all. A worse case
+     * gives frames of exact zeros: the track is written to the full length, the
+     * timer runs, the level meter is calm, and the conversation turns out to be
+     * one-sided only once it is over. A muted input or a device taken by another
+     * application looks exactly like this.
+     */
+    this.deadTimer = setInterval(() => {
+      if (this.status !== 'recording') return
+      for (const track of this.tracks) {
+        if (track.gotSound || track.error || track.warnedDead) continue
+        if (!track.gotAudio) continue
+        if (this.elapsedSec() * 1000 < DEAD_SOURCE_TIMEOUT_MS) continue
+        track.warnedDead = true
+        this.error =
+          track.id === 'mic'
+            ? t('Микрофон пишет тишину — проверьте, не выключен ли он и не занят ли другим приложением')
+            : t('Системный звук пишет тишину — проверьте, что выбрано нужное приложение')
+        this.emitState()
+      }
+    }, DEAD_SOURCE_CHECK_MS)
+    this.deadTimer.unref?.()
     this.driftTimer = setInterval(() => this.compensateDrift(), DRIFT_CHECK_MS)
     this.driftTimer.unref?.()
     this.emitState()
@@ -210,10 +270,24 @@ export class RecordingSession extends EventEmitter {
       append: this.offsetSec > 0
     })
     await writer.open()
-    const track: Track = { id, capture, writer, ready: false, error: null, gotAudio: false }
+    const track: Track = {
+      id, capture, writer, ready: false, error: null,
+      gotAudio: false, gotSound: false, warnedDead: false
+    }
 
     capture.on('samples', (chunk: Float32Array) => {
       track.gotAudio = true
+      if (!track.gotSound && hasSound(chunk)) {
+        track.gotSound = true
+        // The source came alive after all — take the complaint back rather than
+        // leave it hanging over a recording that is now working.
+        if (track.warnedDead) {
+          track.warnedDead = false
+          track.error = null
+          this.error = null
+          this.emitState()
+        }
+      }
       if (this.status === 'paused') return
       writer.writeFloat32(chunk)
       this.emit('samples', id, chunk)
@@ -327,6 +401,7 @@ export class RecordingSession extends EventEmitter {
     this.emitState()
 
     if (this.driftTimer) clearInterval(this.driftTimer)
+    if (this.deadTimer) clearInterval(this.deadTimer)
     this.compensateDrift()
 
     for (const track of this.tracks) track.capture.stop()

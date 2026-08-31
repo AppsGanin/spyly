@@ -148,8 +148,8 @@
 .navitem svg { color: var(--ds-gray-700); flex: none; }
 .navitem:hover svg, .navitem--active svg { color: var(--ds-gray-900); }
 .navitem:hover { background: var(--ds-gray-alpha-200); color: var(--ds-gray-1000); }
-/* Тот же оттенок, что и у наведения, читался как наведение: понять, что ты
-   сейчас в настройках, было нельзя. Активный пункт держит заливку и метку слева. */
+/* The same shade as hover read as hover: there was no telling that this is
+   where you are. The active item keeps its fill and a marker on the left. */
 .navitem--active {
   background: var(--ds-gray-200);
   color: var(--ds-gray-1000);
@@ -751,8 +751,8 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .modal__actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 
 /* ── processing progress ──────────────────────────────────────── */
-/* Этапов теперь три, и все они умещаются в строку: колонкой они занимали
-   пол-экрана ради трёх слов. Кнопка пересборки стоит там же, справа. */
+/* Three stages now, and all of them fit on one line: in a column they took
+   half the screen for three words. The rebuild button stands there too, right. */
 .stages__card {
   padding: var(--space-2) var(--space-3);
   display: flex;
@@ -1193,8 +1193,8 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   box-shadow: var(--ds-shadow-border), var(--ds-shadow-menu);
   animation: menu-in var(--duration-fast) var(--ease-swift);
 }
-/* Горизонталь считает сам компонент, чтобы прижать меню к краю окна;
-   сдвиг остаётся только вертикальный, когда меню раскрывается вверх. */
+/* The component works out the horizontal itself, to keep the menu inside the
+   window; only the vertical shift is left here, for a menu that opens upwards. */
 .menu__list--up { transform: translateY(-100%); }
 .menu__item {
   display: block;
@@ -1289,8 +1289,9 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   height: 100%;
 }
 
-/* Панель и черновик под ней: окно прозрачное, поэтому пустого места не видно,
-   а по ширине оба блока прижаты к правому краю, где панель и живёт. */
+/* The pill and the draft under it. The window is transparent, so the empty part
+   of it is not seen; both blocks are pressed to the right edge, where the panel
+   lives. */
 .overlay__stack {
   height: 100vh;
   display: flex;
@@ -1299,7 +1300,9 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   gap: var(--space-2);
 }
 .overlay__draft {
-  max-width: 100%;
+  /* The full width from the first word: sized by its content, the box grew
+     sideways as one was reading it. */
+  align-self: stretch;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--ds-gray-100);
@@ -1307,8 +1310,8 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   font-size: var(--text-sm);
   line-height: var(--leading-base);
   color: var(--ds-gray-900);
-  /* Пять строк, прижатых к низу: новые слова приходят снизу, а прочитанное
-     стоит на месте. Обрезка сверху — как в терминале. */
+  /* Five lines pressed to the bottom: new words arrive at the bottom and what
+     has been read stays where it was. Clipped at the top, as in a terminal. */
   height: calc(5 * var(--leading-base));
   display: flex;
   flex-direction: column;
@@ -1381,7 +1384,7 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .item__tags .badge { font-size: 11px; padding: 1px 6px; }
 
-/* Те же перебитые тени, но у контролов самого приложения. */
+/* The same overridden shadows, on the application's own controls. */
 .switch:focus-visible,
 .tab:focus-visible,
 .navitem:focus-visible,
@@ -1394,10 +1397,10 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   box-shadow: var(--ds-focus-ring);
 }
 
-/* Выключенный переключатель: зависит от соседнего, который сейчас выключен. */
+/* A switch turned off because the one it depends on is off. */
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* Выбор одной встречи из списка календаря. */
+/* Picking one meeting out of the calendar list. */
 .pick {
   display: flex;
   align-items: center;
@@ -1414,5 +1417,5 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .pick:hover { background: var(--ds-gray-alpha-200); }
 
-/* Кнопка, у которой уже что-то привязано. */
+/* A button whose thing is already attached. */
 .iconbtn--on { color: var(--ds-blue-900); }
