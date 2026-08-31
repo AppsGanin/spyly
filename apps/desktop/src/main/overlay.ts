@@ -13,6 +13,16 @@ let overlay: BrowserWindow | null = null
 const WIDTH = 236
 const HEIGHT = 44
 
+/**
+ * The panel grows when there is a draft to show.
+ *
+ * It is not made tall in advance: the window is transparent, but a transparent
+ * window still swallows clicks, and an empty strip under the pill would sit on
+ * top of whatever the person is actually working in.
+ */
+const WIDE = 420
+const TALL = 92
+
 export function showOverlay(dirname: string): void {
   if (overlay && !overlay.isDestroyed()) {
     overlay.showInactive()
@@ -69,4 +79,25 @@ export function hideOverlay(): void {
 /** The panel receives events just like the main window. */
 export function overlayWindow(): BrowserWindow | null {
   return overlay && !overlay.isDestroyed() ? overlay : null
+}
+
+/**
+ * Make room for the draft, keeping the pill where it was.
+ *
+ * The panel is anchored to the right edge, so the window grows to the left and
+ * downwards: the buttons stay under the cursor that was already reaching for them.
+ */
+export function setOverlayDraft(visible: boolean): void {
+  const win = overlayWindow()
+  if (!win) return
+  const width = visible ? WIDE : WIDTH
+  const height = visible ? TALL : HEIGHT
+  const bounds = win.getBounds()
+  if (bounds.width === width && bounds.height === height) return
+  win.setBounds({
+    x: bounds.x + bounds.width - width,
+    y: bounds.y,
+    width,
+    height
+  })
 }

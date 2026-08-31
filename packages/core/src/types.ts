@@ -96,27 +96,6 @@ export const Summary = z.object({
 })
 export type Summary = z.infer<typeof Summary>
 
-/**
- * Who last touched a summary, when it was not a model.
- *
- * The value is stored in the file and compared against, so it is never
- * translated. It used to be written through the translation function, and the
- * moment the interface was switched to English the marker stopped matching the
- * constant it is compared with: the "edited by hand" note disappeared for
- * everyone not using Russian.
- */
-export const MANUAL_SUMMARY_MODEL = 'manual'
-
-/** The same, for an edit that arrived from an agent over MCP. */
-export const AGENT_SUMMARY_MODEL = 'agent'
-
-/** What earlier versions wrote, still recognised so old summaries keep their note. */
-export const LEGACY_MANUAL_SUMMARY_MODELS: readonly string[] = ['вручную', 'by hand']
-
-/** Whether a summary was edited by a person rather than produced by a model. */
-export function isManualSummary(model: string | undefined): boolean {
-  return model === MANUAL_SUMMARY_MODEL || (model !== undefined && LEGACY_MANUAL_SUMMARY_MODELS.includes(model))
-}
 
 /** A "this matters" mark, placed during the conversation. */
 export const Mark = z.object({

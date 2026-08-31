@@ -1,8 +1,7 @@
 import type {
   Meeting,
   MeetingMeta,
-  Related,
-  Summary
+  Related
 } from '@spyly/core'
 
 /** What the level meter and the recording pill show. */
@@ -174,6 +173,8 @@ export interface IpcRequests {
   'rec:resume': () => RecordingState
   'rec:state': () => RecordingState
   /** Mark the current moment of the recording as important. */
+  /** The panel grows to show the draft and shrinks back when there is none. */
+  'overlay:draft': (visible: boolean) => void
   'rec:mark': (note?: string) => { id: string; at: number } | null
   /** Add a note to a mark that has already been placed. */
   'rec:markNote': (id: string, note: string) => void
@@ -198,8 +199,6 @@ export interface IpcRequests {
   'meetings:related': (id: string) => Related[]
   /** Silence a stretch and remove the utterances that fall inside it. */
   'meetings:removeRange': (id: string, from: number, to: number) => { meeting: Meeting; removed: number }
-  /** Editing the summary by hand: the machine makes mistakes, and they have to be fixable. */
-  'meetings:updateSummary': (id: string, summary: Summary) => Meeting
   'meetings:reprocess': (id: string, from: 'transcribing' | 'summarizing') => void
   'meetings:audioPath': (id: string, track: 'mic' | 'system' | 'mix') => string | null
 

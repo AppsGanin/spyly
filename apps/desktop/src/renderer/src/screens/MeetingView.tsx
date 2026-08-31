@@ -323,7 +323,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       {(busy || anyFailed || meeting.utterances.length > 0) && !isRecordingThis && (
         <div style={{ padding: '0 var(--space-6) var(--space-4)' }}>
-          <div className="card" style={{ padding: 'var(--space-4) var(--space-5)' }}>
+          <div className="card stages__card">
             <div className="stages">
               {stages.map((key) => {
                 const state = meeting.stages[key] ?? 'pending'
@@ -346,9 +346,9 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                 )
               })}
             </div>
-            <div className="row" style={{ marginTop: 'var(--space-3)', gap: 'var(--space-2)' }}>
+            <div className="row" style={{ gap: 'var(--space-2)' }}>
               {/* Пересобрать можно любой этап, а не только упавший: модель
-                  сменилась, участников стало известно, конспект не понравился. */}
+                  сменилась, конспект не понравился, звук переслушали. */}
               <Menu
                 align="start"
                 trigger={
@@ -390,7 +390,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       <div className="main__scroll" style={{ paddingTop: 'var(--space-5)' }}>
         {tab === 'live' ? (
-          <LiveDraft lines={draft} onSeek={seek} />
+          <LiveDraft lines={draft} />
         ) : tab === 'summary' ? (
           <SummaryPanel
             meeting={meeting}
@@ -628,43 +628,28 @@ function shortWhen(iso: string): string {
  * it keeps what a person was reading during the conversation and reacting to.
  * Hence a tab of its own rather than replacing the main transcript.
  */
+/**
+ * The draft, as one running text.
+ *
+ * Timestamps and sides are deliberately absent. This is not the transcript but
+ * a record of what was on screen while people talked; broken into stamped lines
+ * it read as a worse copy of the transcript next to it, and the point of it —
+ * seeing the words arrive — was lost in the furniture.
+ */
 function LiveDraft({
-  lines,
-  onSeek
+  lines
 }: {
   lines: { track: 'mic' | 'system'; text: string; start: number; end: number }[]
-  onSeek: (seconds: number) => void
 }) {
+  const text = lines
+    .map((line) => line.text.trim())
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div className="col" style={{ gap: 'var(--space-4)', maxWidth: 780 }}>
-      <p className="field__hint">{t('Так расшифровка выглядела во время записи: она собиралась на лету и по частям, поэтому менее точна. Полный текст — на вкладке «Расшифровка».')}</p>
-
-      <div className="transcript">
-        {lines.map((line, index) => (
-          <div key={index} className="utterance">
-            <button
-              className="utterance__time mono"
-              onClick={() => onSeek(line.start)}
-              title={t('Слушать с этого места')}
-            >
-              {timecode(line.start)}
-            </button>
-            <div style={{ minWidth: 0 }}>
-              <div className="utterance__speaker">
-                <span
-                  className="speaker-dot"
-                  style={{ background: `var(--ds-${line.track === 'mic' ? 'blue' : 'green'}-900)` }}
-                />
-                <span style={{ color: `var(--ds-${line.track === 'mic' ? 'blue' : 'green'}-900)` }}>
-                  {line.track === 'mic' ? t('Вы') : t('Собеседник')}
-                </span>
-              </div>
-              <div className="utterance__text">{line.text}</div>
-            </div>
-            <span />
-          </div>
-        ))}
-      </div>
+      <p className="field__hint">{t('Так расшифровка выглядела во время записи: черновая, на лету.')}</p>
+      <div className="summary__tldr">{text}</div>
     </div>
   )
 }

@@ -11,10 +11,12 @@ import { LevelMeter } from '../ui'
  * During a call the Spyly window is covered by somebody else's: a browser,
  * Zoom, an editor. And that is exactly when a "this bit matters" mark has to be
  * placed, or when it has to be visible that recording is still running. The
- * panel is small, always on top, and does exactly four things.
+ * panel is small, always on top, and does exactly four things — plus showing
+ * the words as they are recognised, so a person can see the recording is not
+ * silently writing nothing.
  */
 export function Overlay() {
-  const { recording, levels } = useStore()
+  const { recording, levels, live } = useStore()
   const [marked, setMarked] = useState<'ok' | 'fail' | null>(null)
   const paused = recording.status === 'paused'
 
@@ -26,6 +28,20 @@ export function Overlay() {
     return () => clearTimeout(timer)
   }, [marked])
 
+  // The last words, as one running line: the panel is a strip, and speaker
+  // labels and timestamps would leave no room for the words themselves.
+  const draft = live
+    .map((u) => u.text.trim())
+    .filter(Boolean)
+    .join(' ')
+    .slice(-220)
+
+  // The window is transparent but still catches clicks, so it grows only while
+  // there is something to show.
+  useEffect(() => {
+    void api.call('overlay:draft', draft.length > 0)
+  }, [draft.length > 0])
+
   const mark = async () => {
     try {
       const result = await api.call('rec:mark')
@@ -36,7 +52,8 @@ export function Overlay() {
   }
 
   return (
-    <div className={`overlay ${paused ? 'overlay--paused' : ''}`}>
+    <div className="overlay__stack">
+      <div className={`overlay ${paused ? 'overlay--paused' : ''}`}>
       <span className={`overlay__dot ${paused ? 'overlay__dot--paused' : ''}`} />
       <span className="overlay__time mono">{timecode(recording.elapsedSec)}</span>
 
@@ -65,6 +82,9 @@ export function Overlay() {
       >
         <IconStop />
       </button>
+      </div>
+
+      {draft && <div className="overlay__draft">{draft}</div>}
     </div>
   )
 }

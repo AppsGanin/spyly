@@ -4,7 +4,6 @@ import { t,
   containment,
   isLikelyHallucination,
   levelAt,
-  MANUAL_SUMMARY_MODEL,
   micIsOwnVoice,
   renderTranscriptMarkdown,
   SILENCE_RMS_THRESHOLD,
@@ -64,6 +63,7 @@ import { audioFile, meetingDir, meetingFile } from '../store/paths.js'
 import { loadSettings, saveSettings } from '../store/settings.js'
 import { encryptionAvailable, hasSecret, setSecret } from '../store/secrets.js'
 import { send, setOverlayVisible, showMainWindow } from '../index.js'
+import { setOverlayDraft } from '../overlay.js'
 import { trayActions, updateTray } from '../tray.js'
 import { processMeeting } from '../pipeline/run.js'
 import { listProviders } from '../providers/registry.js'
@@ -769,6 +769,8 @@ export function registerIpc(): void {
     return next
   })
 
+  handle('overlay:draft', (visible) => setOverlayDraft(visible))
+
   handle('edit:history', (id) => historyState(id))
 
   handle('edit:undo', async (id) => {
@@ -838,17 +840,6 @@ export function registerIpc(): void {
       // The draft is auxiliary data: a broken file is no reason to show an error.
       return []
     }
-  })
-
-  handle('meetings:updateSummary', async (id, summary) => {
-    // Marked as edited by a person, with a value that is never translated: the
-    // interface compares against it, and a translated marker stopped matching.
-    const next = await editWithHistory(id, t('правку конспекта'), (meeting) => ({
-      ...meeting,
-      summary: { ...summary, model: MANUAL_SUMMARY_MODEL }
-    }))
-    send('meetings:changed', { id })
-    return next
   })
 
   handle('meetings:reprocess', async (id, from) => {

@@ -27,9 +27,9 @@ export function CallPrompt() {
       await api.call('rec:start', {
         mic: true,
         system: true,
-        title: app ? t(t('Запись · {app}'), { app: app }) : undefined
+        title: app ? t('Запись · {app}', { app: app }) : undefined
       })
-      notify('success', t(t('Запись началась')))
+      notify('success', t('Запись началась'))
     } catch (error) {
       notify('error', error instanceof Error ? error.message : String(error))
     }
@@ -39,21 +39,21 @@ export function CallPrompt() {
     <Modal
       open={app !== null}
       onClose={() => setApp(null)}
-      title={t(t('Похоже, начался разговор'))}
+      title={t('Похоже, начался разговор')}
       actions={
         <>
-          <Button onClick={() => setApp(null)}>{t(t('Не сейчас'))}</Button>
-          <Button variant="primary" onClick={() => void start()}>{t(t('Записать'))}</Button>
+          <Button onClick={() => setApp(null)}>{t('Не сейчас')}</Button>
+          <Button variant="primary" onClick={() => void start()}>{t('Записать')}</Button>
         </>
       }
     >
       <p className="muted">
         {app
-          ? t(t('{app} слушает микрофон.'), { app: app })
-          : t(t('Микрофон занят другим приложением. Обычно так начинается разговор.'))}{' '}
+          ? t('{app} слушает микрофон.', { app: app })
+          : t('Микрофон занят другим приложением. Обычно так начинается разговор.')}{' '}
         {t('После остановки появится расшифровка и конспект.')}
       </p>
-      <p className="check__hint">{t(t('Подсказку можно отключить в настройках, в разделе «Замечать начало разговора».'))}</p>
+      <p className="check__hint">{t('Подсказку можно отключить в настройках, в разделе «Замечать начало разговора».')}</p>
     </Modal>
   )
 }

@@ -1,10 +1,8 @@
 import { t } from '@spyly/core'
 
-import { useEffect, useState } from 'react'
-import { isManualSummary } from '@spyly/core'
-import type { ActionItem, Meeting, Summary } from '@spyly/core'
-import { IconClose, IconSparkle } from '../lib/icons'
-import { Button, EmptyState, IconButton, Input } from '../ui'
+import type { ActionItem, Meeting } from '@spyly/core'
+import { IconSparkle } from '../lib/icons'
+import { Button, EmptyState } from '../ui'
 
 /** The model often writes a deadline with a preposition already, so a second "by" is redundant. */
 function formatDue(due: string): string {
@@ -12,139 +10,47 @@ function formatDue(due: string): string {
   return /^(до|к|by|until)\s/i.test(trimmed) ? trimmed : t('до {trimmed}', { trimmed: trimmed })
 }
 
-/** An editable list row: click to edit, empty means deleted. */
-function EditableLine({
-  value,
-  placeholder,
-  onChange,
-  onRemove
-}: {
-  value: string
-  placeholder: string
-  onChange: (next: string) => void
-  onRemove: () => void
-}) {
-  return (
-    <div className="editline">
-      <div
-        className="editline__text"
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder={placeholder}
-        onBlur={(e) => {
-          const next = (e.currentTarget.textContent ?? '').trim()
-          if (next !== value) onChange(next)
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault()
-            e.currentTarget.blur()
-          }
-        }}
-      >
-        {value}
-      </div>
-      <IconButton className="editline__remove" aria-label={t('Убрать пункт')} onClick={onRemove}>
-        <IconClose />
-      </IconButton>
-    </div>
-  )
-}
-
-/**
- * A list from the summary: the model writes it, a person corrects what is there.
- *
- * Adding a line of your own was removed. A summary is what was said in the
- * conversation; a thought typed into it afterwards looks the same as a thought
- * that was spoken, and a month later there is no telling them apart.
- */
-function ListSection({
-  title,
-  items,
-  onChange
-}: {
-  title: string
-  items: string[]
-  onChange: (next: string[]) => void
-}) {
+/** A list from the summary. Empty sections are not shown at all. */
+function ListSection({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null
 
   return (
     <section className="summary__section">
       <h4>{title}</h4>
-      <div className="col" style={{ gap: 4 }}>
+      <ul className="summary__list">
         {items.map((item, index) => (
-          <EditableLine
-            key={`${index}-${item.slice(0, 12)}`}
-            value={item}
-            placeholder={t('Пункт')}
-            onChange={(next) =>
-              onChange(next ? items.map((v, i) => (i === index ? next : v)) : items.filter((_, i) => i !== index))
-            }
-            onRemove={() => onChange(items.filter((_, i) => i !== index))}
-          />
+          <li key={`${index}-${item.slice(0, 12)}`}>{item}</li>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }
 
-function TaskRow({
-  item,
-  onChange,
-  onRemove
-}: {
-  item: ActionItem
-  onChange: (next: ActionItem) => void
-  onRemove: () => void
-}) {
+/**
+ * A task from the summary.
+ *
+ * Read-only, the box included: whether a task is done is changed by an agent
+ * over MCP, where the task is actually being worked on, rather than by ticking
+ * a box in a window nobody has open at the time.
+ */
+function TaskRow({ item }: { item: ActionItem }) {
   return (
-    <div className="taskrow">
-      <input
-        type="checkbox"
-        className="taskrow__check"
-        checked={item.done}
-        aria-label={t('Сделано: {item_text}', { item_text: item.text })}
-        onChange={() => onChange({ ...item, done: !item.done })}
-      />
-      <div
-        className={`editline__text grow ${item.done ? 'task-card__text--done' : ''}`}
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={(e) => {
-          const text = (e.currentTarget.textContent ?? '').trim()
-          if (text !== item.text) onChange({ ...item, text })
-        }}
-      >
-        {item.text}
-      </div>
-      <Input
-        className="taskrow__meta taskrow__who"
-        value={item.assignee ?? ''}
-        placeholder={t('кто')}
-        aria-label={t('Исполнитель')}
-        onChange={(e) => onChange({ ...item, assignee: e.target.value || undefined })}
-      />
-      <Input
-        className="taskrow__meta taskrow__when"
-        value={item.due ?? ''}
-        placeholder={t('срок')}
-        aria-label={t('Срок')}
-        onChange={(e) => onChange({ ...item, due: e.target.value || undefined })}
-      />
-      <IconButton className="taskrow__remove" aria-label={t('Убрать задачу')} onClick={onRemove}>
-        <IconClose />
-      </IconButton>
-    </div>
+    <li className={`summary__task ${item.done ? 'task-card__text--done' : ''}`}>
+      <span className="grow">{item.text}</span>
+      {item.assignee && <span className="summary__taskMeta">{item.assignee}</span>}
+      {item.due && <span className="summary__taskMeta">{formatDue(item.due)}</span>}
+    </li>
   )
 }
 
 /**
- * The summary: what the model assembled, and what a person corrected in it.
+ * The summary: what the model made of the conversation.
  *
- * Everything is editable: the machine regularly attributes a task to the wrong
- * person and invents deadlines, and rebuilding the whole summary over one
- * mistake is a poor trade.
+ * Nothing here is edited by hand any more. A summary is an account of what was
+ * said; once it can be typed into, a thought added afterwards looks exactly
+ * like one that was spoken, and a month later there is no telling them apart.
+ * What the machine got wrong is fixed by rebuilding it, or by an agent over
+ * MCP, which leaves a trace of who changed what.
  */
 export function SummaryPanel({
   meeting,
@@ -159,29 +65,10 @@ export function SummaryPanel({
   generating: boolean
   canSummarize: boolean
 }) {
-  const [draft, setDraft] = useState<Summary | null>(meeting.summary ?? null)
-  const [dirty, setDirty] = useState(false)
+  const summary = meeting.summary
   const empty = meeting.utterances.length === 0
 
-  // A rebuilt summary should displace the draft without wiping an unsaved edit.
-  useEffect(() => {
-    if (!dirty) setDraft(meeting.summary ?? null)
-  }, [meeting.summary, dirty])
-
-  const patch = (next: Partial<Summary>) => {
-    if (!draft) return
-    setDraft({ ...draft, ...next })
-    setDirty(true)
-  }
-
-  const save = async () => {
-    if (!draft) return
-    const { api } = await import('../lib/api')
-    await api.call('meetings:updateSummary', meeting.id, draft)
-    setDirty(false)
-  }
-
-  if (!draft) {
+  if (!summary) {
     const failed = meeting.stages.summarizing === 'failed'
     return (
       <EmptyState
@@ -194,7 +81,7 @@ export function SummaryPanel({
               ? t('Сначала нужна расшифровка: собирать конспект пока не из чего.')
               : canSummarize
                 ? t('Соберём краткое содержание, решения и задачи из расшифровки.')
-                : t('Нужна языковая модель. Подойдёт установленный Claude Code, Codex или Ollama: ключ и оплата по токенам не понадобятся.')
+                : t('Нужна языковая модель. Подойдёт установленный Claude Code или Codex, либо локальная Ollama.')
         }
         action={
           canSummarize ? (
@@ -211,73 +98,31 @@ export function SummaryPanel({
 
   return (
     <div className="summary">
-      <div
-        className="summary__tldr editline__text"
-        contentEditable
-        suppressContentEditableWarning
-        data-placeholder={t('О чём был разговор')}
-        onBlur={(e) => {
-          const tldr = (e.currentTarget.textContent ?? '').trim()
-          if (tldr !== draft.tldr) patch({ tldr })
-        }}
-      >
-        {draft.tldr}
-      </div>
+      <div className="summary__tldr">{summary.tldr}</div>
 
-      <ListSection
-        title={t('Основное')}
-        items={draft.keyPoints}
-        onChange={(keyPoints) => patch({ keyPoints })}
-      />
-      <ListSection
-        title={t('Решили')}
-        items={draft.decisions}
-        onChange={(decisions) => patch({ decisions })}
-      />
+      <ListSection title={t('Основное')} items={summary.keyPoints} />
+      <ListSection title={t('Решили')} items={summary.decisions} />
 
-      <section className="summary__section">
-        <h4>{t('Задачи')}</h4>
-        <div className="col" style={{ gap: 4 }}>
-          {draft.actionItems.map((item, index) => (
-            <TaskRow
-              key={`${index}-${item.text.slice(0, 12)}`}
-              item={item}
-              onChange={(next) =>
-                patch({ actionItems: draft.actionItems.map((v, i) => (i === index ? next : v)) })
-              }
-              onRemove={() => patch({ actionItems: draft.actionItems.filter((_, i) => i !== index) })}
-            />
-          ))}
-        </div>
-      </section>
+      {summary.actionItems.length > 0 && (
+        <section className="summary__section">
+          <h4>{t('Задачи')}</h4>
+          <ul className="summary__list">
+            {summary.actionItems.map((item, index) => (
+              <TaskRow key={`${index}-${item.text.slice(0, 12)}`} item={item} />
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <ListSection
-        title={t('Осталось решить')}
-        items={draft.questions}
-        onChange={(questions) => patch({ questions })}
-      />
+      <ListSection title={t('Осталось решить')} items={summary.questions} />
 
-      <div className="row" style={{ gap: 'var(--space-2)' }}>
-        {dirty && (
-          <Button variant="primary" size="sm" onClick={() => void save()}>{t('Сохранить правки')}</Button>
-        )}
-        {dirty && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setDraft(meeting.summary ?? null)
-              setDirty(false)
-            }}
-          >{t('Отменить')}</Button>
-        )}
-        {!dirty && canSummarize && (
+      {canSummarize && (
+        <div className="row" style={{ gap: 'var(--space-2)' }}>
           <Button size="sm" onClick={onGenerate} disabled={generating}>
             {generating ? t('Пересобираю…') : t('Пересобрать конспект')}
           </Button>
-        )}
-        {!dirty && isManualSummary(draft.model) && <span className="dim">{t('Правлено вручную')}</span>}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

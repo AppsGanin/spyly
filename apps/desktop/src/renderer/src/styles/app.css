@@ -551,6 +551,17 @@
 .summary { max-width: 720px; display: flex; flex-direction: column; gap: var(--space-6); }
 .summary__tldr { font-size: var(--text-md); line-height: var(--leading-relaxed); }
 .summary__section h4 { margin-bottom: var(--space-2); color: var(--ds-gray-900); }
+.summary__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  line-height: var(--leading-relaxed);
+}
+.summary__task { display: flex; align-items: baseline; gap: var(--space-3); }
+.summary__taskMeta { flex: none; font-size: var(--text-sm); color: var(--ds-gray-900); }
 .task { display: flex; gap: var(--space-2); align-items: flex-start; line-height: var(--leading-relaxed); }
 .task input { margin-top: 4px; accent-color: var(--ds-blue-700); }
 
@@ -703,8 +714,18 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .modal__actions { display: flex; gap: var(--space-2); justify-content: flex-end; }
 
 /* ── processing progress ──────────────────────────────────────── */
-.stages { display: flex; flex-direction: column; gap: var(--space-2); }
-.stage { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-base); }
+/* Этапов теперь три, и все они умещаются в строку: колонкой они занимали
+   пол-экрана ради трёх слов. Кнопка пересборки стоит там же, справа. */
+.stages__card {
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.stages { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
+.stage { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); }
 .stage__mark {
   width: 16px;
   height: 16px;
@@ -1030,55 +1051,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 }
 .marknote__at { color: var(--ds-amber-900); font-weight: 600; flex: none; }
 
-/* ── editable summary rows ─────────────────────────────────────── */
-.editline {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  border-radius: var(--radius-sm);
-  transition: background var(--duration-fast) var(--ease-swift);
-}
-.editline:hover { background: var(--ds-gray-alpha-100); }
-.editline__text {
-  flex: 1;
-  min-width: 0;
-  padding: 4px var(--space-2);
-  border-radius: var(--radius-sm);
-  line-height: var(--leading-relaxed);
-  outline: none;
-  word-break: break-word;
-}
-.editline__text:focus { box-shadow: var(--ds-focus-ring); }
-/* An empty row otherwise collapses and the caret cannot be placed in it. */
-.editline__text:empty::before {
-  content: attr(data-placeholder);
-  color: var(--ds-gray-700);
-}
-.editline__remove { opacity: 0; transition: opacity var(--duration-fast) var(--ease-swift); }
-.editline:hover .editline__remove,
-.editline__remove:focus-visible { opacity: 1; }
-
-.taskrow {
-  display: grid;
-  grid-template-columns: auto 1fr 120px 110px auto;
-  gap: var(--space-2);
-  align-items: center;
-  padding: 2px 0;
-}
-.taskrow__meta { height: var(--control-sm); font-size: var(--text-sm); }
-
-@media (max-width: 980px) {
-  .taskrow {
-    grid-template-columns: auto 1fr 1fr auto;
-    grid-template-areas: 'check text text remove' '. who when .';
-  }
-  .taskrow__check { grid-area: check; }
-  .taskrow > .editline__text { grid-area: text; }
-  .taskrow__who { grid-area: who; }
-  .taskrow__when { grid-area: when; }
-  .taskrow__remove { grid-area: remove; }
-}
-
 /* ── speaking shares ───────────────────────────────────────────── */
 .shares { display: flex; flex-direction: column; gap: var(--space-2); }
 .shares__bar {
@@ -1280,12 +1252,38 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   height: 100%;
 }
 
+/* Панель и черновик под ней: окно прозрачное, поэтому пустого места не видно,
+   а по ширине оба блока прижаты к правому краю, где панель и живёт. */
+.overlay__stack {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.overlay__draft {
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--ds-gray-100);
+  box-shadow: var(--ds-shadow-border), var(--ds-shadow-menu);
+  font-size: var(--text-sm);
+  line-height: var(--leading-base);
+  color: var(--ds-gray-900);
+  /* Две строки: третья уже закрывает то, что человек читает под панелью. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  -webkit-app-region: drag;
+  user-select: none;
+}
 .overlay {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  /* Exactly the window: any gap shows straight through, as the window is transparent. */
-  height: 100vh;
+  height: 44px;
   padding: 0 8px 0 12px;
   border-radius: var(--radius-full);
   background: var(--ds-gray-100);
