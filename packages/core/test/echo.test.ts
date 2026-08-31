@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { keepOwnVoice, levelAt, micIsOnlyEcho, micIsOwnVoice, trimEchoedStart, type LevelWindow } from '../src/echo.js'
+import {
+  ECHO_CORRELATION_THRESHOLD,
+  ECHO_LOUDNESS_LIMIT,
+  echoMatch,
+  keepOwnVoice,
+  levelAt,
+  micIsOnlyEcho,
+  micIsOwnVoice,
+  trimEchoedStart,
+  type LevelWindow
+} from '../src/echo.js'
 import type { Utterance, Word } from '../src/types.js'
 
 /**
@@ -202,5 +212,80 @@ describe('your own speech inside an utterance with echo', () => {
       { mic: () => 0.02, system: (from: number) => (from > 98.05 && from < 98.9 ? 0 : 0.1) }
     )
     expect(result).toBeNull()
+  })
+})
+
+describe('the speakers heard again in the microphone', () => {
+  const frameSec = 0.02
+
+  /**
+   * A phrase as an outline: loud where the words are, quiet in the pauses.
+   *
+   * Deliberately irregular. A first attempt built it from two sines, and two
+   * different "phrases" then matched at 0.91 — periodic outlines line up at some
+   * shift whatever is in them, and speech is not periodic.
+   */
+  function phrase(frames: number, seed: number): number[] {
+    let state = seed * 2654435761
+    const next = (): number => {
+      state = (state * 1103515245 + 12345) & 0x7fffffff
+      return state / 0x7fffffff
+    }
+    const out: number[] = []
+    while (out.length < frames) {
+      // A word, then a pause: the lengths of both are what makes the outline.
+      const word = 3 + Math.floor(next() * 12)
+      const loud = 0.15 + next() * 0.5
+      for (let i = 0; i < word && out.length < frames; i++) out.push(loud * (0.6 + next() * 0.4))
+      const pause = 1 + Math.floor(next() * 8)
+      for (let i = 0; i < pause && out.length < frames; i++) out.push(0.01 * next())
+    }
+    return out
+  }
+  function track(parts: { at: number; data: number[] }[], frames: number): Float32Array {
+    const out = new Float32Array(frames)
+    for (const p of parts) p.data.forEach((v, i) => { out[p.at + i] = v })
+    return out
+  }
+
+  it('the same sound, quieter and later, is echo', () => {
+    const said = phrase(150, 1)
+    const system = track([{ at: 100, data: said }], 500)
+    // The microphone heard the same thing 0.5 s later and four times quieter.
+    const mic = track([{ at: 125, data: said.map((v) => v * 0.25) }], 500)
+    const m = echoMatch(mic, system, { frameSec, from: 125 * frameSec, to: 275 * frameSec })
+    expect(m.correlation).toBeGreaterThan(ECHO_CORRELATION_THRESHOLD)
+    expect(m.ratio).toBeLessThan(ECHO_LOUDNESS_LIMIT)
+    expect(m.shiftSec).toBeCloseTo(-0.5, 1)
+  })
+
+  it('a different sound at the same moment is not echo', () => {
+    const system = track([{ at: 100, data: phrase(150, 1) }], 500)
+    const mic = track([{ at: 100, data: phrase(150, 11) }], 500)
+    const m = echoMatch(mic, system, { frameSec, from: 2, to: 5 })
+    expect(m.correlation).toBeLessThan(ECHO_CORRELATION_THRESHOLD)
+  })
+
+  /** Talking over the other side gives the same outline — but you are the loud one. */
+  it('speaking over the other side is told apart by loudness', () => {
+    const said = phrase(150, 1)
+    const system = track([{ at: 100, data: said }], 500)
+    const mic = track([{ at: 100, data: said.map((v) => v * 3) }], 500)
+    const m = echoMatch(mic, system, { frameSec, from: 2, to: 5 })
+    expect(m.ratio).toBeGreaterThan(ECHO_LOUDNESS_LIMIT)
+  })
+
+  it('against silence from the speakers nothing matches', () => {
+    const mic = track([{ at: 100, data: phrase(150, 1) }], 500)
+    const m = echoMatch(mic, new Float32Array(500), { frameSec, from: 2, to: 5 })
+    expect(m.correlation).toBe(0)
+  })
+
+  /** Half a second agrees with anything by chance, so it is not judged at all. */
+  it('too short a stretch is not judged', () => {
+    const said = phrase(150, 1)
+    const system = track([{ at: 100, data: said }], 500)
+    const mic = track([{ at: 100, data: said }], 500)
+    expect(echoMatch(mic, system, { frameSec, from: 2, to: 2.2 }).correlation).toBe(0)
   })
 })

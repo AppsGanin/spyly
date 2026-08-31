@@ -81,6 +81,121 @@ export function micIsOnlyEcho(
 }
 
 /**
+ * How closely the outlines must agree for one sound to be the other heard again.
+ *
+ * Measured on an hour-long call where the speakers were loud: echo gave 0.81 to
+ * 0.99, and everything the person said themselves gave 0.12 to 0.44. The gap in
+ * between is wide and empty, and the threshold stands in the middle of it.
+ */
+export const ECHO_CORRELATION_THRESHOLD = 0.75
+
+/**
+ * How much quieter than the speakers the microphone must be for it to be echo.
+ *
+ * The outline is not enough on its own: talking over the other side gives the
+ * same agreement, because their voice is in the microphone too. But then the
+ * person is the louder one. On that call echo held 0.23 to 0.66, and speech of
+ * their own 0.83 and above.
+ */
+export const ECHO_LOUDNESS_LIMIT = 0.8
+
+/**
+ * The shape of a sound over time, in short frames.
+ *
+ * Loudness alone, at a fine enough step to keep the outline of speech: the
+ * pauses between words, where a phrase rises and where it falls. Two recordings
+ * of one sound have the same outline even when they differ in everything else.
+ */
+export function envelope(samples: Float32Array, sampleRate: number, frameSec = 0.02): Float32Array {
+  const size = Math.max(1, Math.round(sampleRate * frameSec))
+  const out = new Float32Array(Math.floor(samples.length / size))
+  for (let f = 0; f < out.length; f++) {
+    let energy = 0
+    const at = f * size
+    for (let i = at; i < at + size; i++) energy += samples[i]! * samples[i]!
+    out[f] = Math.sqrt(energy / size)
+  }
+  return out
+}
+
+/** Pearson correlation of two equal stretches; 0 when either is flat. */
+function pearson(a: Float32Array, aFrom: number, b: Float32Array, bFrom: number, length: number): number {
+  let sa = 0
+  let sb = 0
+  for (let i = 0; i < length; i++) {
+    sa += a[aFrom + i]!
+    sb += b[bFrom + i]!
+  }
+  const ma = sa / length
+  const mb = sb / length
+
+  let cov = 0
+  let va = 0
+  let vb = 0
+  for (let i = 0; i < length; i++) {
+    const da = a[aFrom + i]! - ma
+    const db = b[bFrom + i]! - mb
+    cov += da * db
+    va += da * da
+    vb += db * db
+  }
+  return va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : 0
+}
+
+/**
+ * How much of a stretch of the microphone is the system audio heard again.
+ *
+ * This is the honest question, and the levels were only ever a proxy for it. If
+ * the speakers played a phrase and the microphone picked it up, the two
+ * recordings hold one sound, and their outlines coincide — at some shift, since
+ * the tracks do not start together and the path through the air takes its time.
+ * So the shift is searched for and the best agreement returned.
+ *
+ * `ratio` is how loud the microphone was against the speakers over the same
+ * stretch. Echo comes back quieter; a person talking over the other side is
+ * not, and the two are told apart by this even when the outlines agree.
+ */
+export function echoMatch(
+  micEnvelope: Float32Array,
+  systemEnvelope: Float32Array,
+  options: { frameSec: number; from: number; to: number; maxShiftSec?: number }
+): { correlation: number; shiftSec: number; ratio: number } {
+  const { frameSec, from, to } = options
+  const maxShift = Math.round((options.maxShiftSec ?? 3) / frameSec)
+
+  const start = Math.max(0, Math.round(from / frameSec))
+  const length = Math.round((to - from) / frameSec)
+  const none = { correlation: 0, shiftSec: 0, ratio: 0 }
+  // Too short a stretch agrees with anything by chance.
+  if (length < Math.round(0.5 / frameSec) || start + length > micEnvelope.length) return none
+
+  let best = 0
+  let bestShift = 0
+  for (let shift = -maxShift; shift <= maxShift; shift++) {
+    const at = start + shift
+    if (at < 0 || at + length > systemEnvelope.length) continue
+    const r = pearson(micEnvelope, start, systemEnvelope, at, length)
+    if (r > best) {
+      best = r
+      bestShift = shift
+    }
+  }
+
+  let micSum = 0
+  let systemSum = 0
+  for (let i = 0; i < length; i++) {
+    micSum += micEnvelope[start + i]!
+    const at = start + bestShift + i
+    systemSum += at >= 0 && at < systemEnvelope.length ? systemEnvelope[at]! : 0
+  }
+  return {
+    correlation: best,
+    shiftSec: bestShift * frameSec,
+    ratio: systemSum > 0 ? micSum / systemSum : 0
+  }
+}
+
+/**
  * Trim someone else's tail from the start of your own utterance.
  *
  * The two tracks are cut into pieces differently, and the other side's last

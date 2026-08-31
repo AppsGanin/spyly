@@ -9,6 +9,10 @@ import { t,
   isAutoTitle,
   isLikelyHallucination,
   stripHallucination,
+  echoMatch,
+  envelope,
+  ECHO_CORRELATION_THRESHOLD,
+  ECHO_LOUDNESS_LIMIT,
   levelAt,
   mergeTracks,
   micIsOnlyEcho,
@@ -32,6 +36,9 @@ import { levelWindows, readWavPcm16, speechSeconds } from '../audio/wav.js'
 import { readMeeting, updateMeeting, writeMeeting } from '../store/meetings.js'
 import { audioFile } from '../store/paths.js'
 import { loadSettings } from '../store/settings.js'
+
+/** The step at which the outline of a sound is measured: fine enough to keep the pauses between words. */
+const ECHO_FRAME_SEC = 0.02
 
 const running = new Set<string>()
 
@@ -372,6 +379,29 @@ async function buildTranscript(
       const micLevels = levelWindows(micWave.samples, micWave.sampleRate)
       const systemLevels = levelWindows(systemWave.samples, systemWave.sampleRate)
 
+      /*
+       * The microphone against the speakers, by the sound rather than by its level.
+       *
+       * Levels only ever stood in for the real question: is this the same sound?
+       * They answer it badly — a word of echo landing in a gap between the other
+       * side's words looks like speech of one's own. The outlines of the two
+       * recordings answer it directly, and the shift between the tracks is
+       * searched for rather than assumed: they do not start together, and the
+       * path through the air takes its own time.
+       */
+      const micEnvelope = envelope(micWave.samples, micWave.sampleRate, ECHO_FRAME_SEC)
+      const systemEnvelope = envelope(systemWave.samples, systemWave.sampleRate, ECHO_FRAME_SEC)
+      const heardAgain = (u: { start: number; end: number }): boolean => {
+        const match = echoMatch(micEnvelope, systemEnvelope, {
+          frameSec: ECHO_FRAME_SEC,
+          from: u.start,
+          to: u.end
+        })
+        return (
+          match.correlation >= ECHO_CORRELATION_THRESHOLD && match.ratio <= ECHO_LOUDNESS_LIMIT
+        )
+      }
+
       if (micIsOnlyEcho(micLevels, systemLevels)) {
         // The person was silent for the whole recording: the microphone track is echo
         // throughout, and everything coming out of it would be attributed to them by mistake.
@@ -384,6 +414,11 @@ async function buildTranscript(
         }
 
         const kept = micUtterances
+          .filter((u) => {
+            if (!heardAgain(u)) return true
+            dropped(u, 'the speakers heard again in the microphone')
+            return false
+          })
           .map((u) => {
             const own = keepOwnVoice(u, levels)
             if (!own) {
