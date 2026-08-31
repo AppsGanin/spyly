@@ -66,6 +66,14 @@ const DEAD_SOURCE_TIMEOUT_MS = 12_000
  */
 const SILENCE_FLOOR = 1e-4
 
+/**
+ * How long the microphone may hand over silence before it is restarted.
+ *
+ * Shorter than the final verdict: a second attempt lies ahead, and waiting the
+ * full time twice would cost half a minute of the conversation.
+ */
+const MIC_RETRY_TIMEOUT_MS = 6000
+
 /** How often the "hands over silence" check runs. */
 const DEAD_SOURCE_CHECK_MS = 3000
 
@@ -95,6 +103,10 @@ interface Track {
   gotSound: boolean
   /** Reported as dead already, so the message is not rewritten every check. */
   warnedDead: boolean
+  /** Already restarted without echo cancellation; there is no second attempt. */
+  retriedPlain: boolean
+  /** When silence on this track stops being a pause and becomes a fault, in ms since the epoch. */
+  judgeAt: number
 }
 
 /**
@@ -247,7 +259,19 @@ export class RecordingSession extends EventEmitter {
       for (const track of this.tracks) {
         if (track.gotSound || track.error || track.warnedDead) continue
         if (!track.gotAudio) continue
-        if (this.elapsedSec() * 1000 < DEAD_SOURCE_TIMEOUT_MS) continue
+        if (Date.now() < track.judgeAt) continue
+
+        // The microphone gets a second attempt without echo cancellation before
+        // it is declared broken: that is the one thing that turns a working
+        // input into a stream of zeros, and it is the difference between this
+        // and the level meter in the source picker, which never had it on.
+        if (track.id === 'mic' && !track.retriedPlain) {
+          track.retriedPlain = true
+          track.judgeAt = Date.now() + DEAD_SOURCE_TIMEOUT_MS
+          this.restartWithoutEchoCancel(track)
+          continue
+        }
+
         track.warnedDead = true
         this.error =
           track.id === 'mic'
@@ -272,8 +296,28 @@ export class RecordingSession extends EventEmitter {
     await writer.open()
     const track: Track = {
       id, capture, writer, ready: false, error: null,
-      gotAudio: false, gotSound: false, warnedDead: false
+      gotAudio: false, gotSound: false, warnedDead: false, retriedPlain: false,
+      // The microphone is judged sooner: it has a second attempt ahead of it,
+      // and waiting the full time twice would cost half a minute of the call.
+      judgeAt: Date.now() + (id === 'mic' ? MIC_RETRY_TIMEOUT_MS : DEAD_SOURCE_TIMEOUT_MS)
     }
+
+    this.wireCapture(track, capture)
+    capture.start()
+    this.tracks.push(track)
+  }
+
+  /**
+   * Everything a capture reports, hooked up to the track.
+   *
+   * Kept apart from creating the track so that the capture can be replaced
+   * without touching the file being written: the microphone is restarted
+   * without echo cancellation when it hands over silence, and the recording
+   * carries on into the same WAV.
+   */
+  private wireCapture(track: Track, capture: Capture): void {
+    const id = track.id
+    const writer = track.writer
 
     capture.on('samples', (chunk: Float32Array) => {
       track.gotAudio = true
@@ -318,9 +362,37 @@ export class RecordingSession extends EventEmitter {
       if (this.tracks.every((t) => t.error !== null)) this.emit('allTracksLost')
       this.emitState()
     })
+  }
 
+  /**
+   * Start the microphone again, this time without echo cancellation.
+   *
+   * The system node that removes the other side from the microphone is the one
+   * thing that turns a working input into exact zeros — with another
+   * application holding the microphone for a call, for instance. Echo in the
+   * recording is a nuisance; a silent recording is a lost conversation, so the
+   * nuisance wins.
+   *
+   * The writer is not touched: the file goes on, and the gap left while the
+   * capture comes back up is filled with silence by the drift compensation.
+   */
+  private restartWithoutEchoCancel(track: Track): void {
+    if (track.id !== 'mic' || usesRendererCapture()) return
+
+    process.stderr.write('[recorder] the microphone is writing silence, restarting without echo cancellation\n')
+    track.capture.removeAllListeners()
+    track.capture.stop()
+
+    const capture = new NativeCapture({
+      source: 'mic',
+      micDeviceId: this.options.micDeviceId,
+      noEchoCancel: true
+    })
+    track.capture = capture
+    track.ready = false
+    track.gotAudio = false
+    this.wireCapture(track, capture)
     capture.start()
-    this.tracks.push(track)
   }
 
   /**
