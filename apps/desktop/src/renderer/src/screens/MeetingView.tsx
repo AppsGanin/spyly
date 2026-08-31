@@ -10,8 +10,9 @@ import { t,
 } from '@spyly/core'
 import { api, useAsync, useIpcEvent } from '../lib/api'
 import { fullDateLabel, uiLocale } from '../lib/dates'
-import { IconAlert, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconChevron, IconContinueRecord, IconSearch, IconStop, IconTag, IconTrash } from '../lib/icons'
+import { IconAlert, IconCalendar, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconChevron, IconContinueRecord, IconSearch, IconStop, IconTag, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
+import type { CalendarEventInfo } from '@shared/ipc'
 import { Button, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
 import { ExportBar } from '../components/ExportBar'
 import { Player, type PlayerTrack } from '../components/Player'
@@ -255,6 +256,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                 }}
               />
             )}
+            {!isRecordingThis && <CalendarLink meeting={meeting} onDone={reload} />}
             {!isRecordingThis && (
               <ExportBar meetingId={id} ready={meeting.utterances.length > 0} />
             )}
@@ -655,6 +657,102 @@ function LiveDraft({
       </div>
       <div ref={bottom} />
     </div>
+  )
+}
+
+/**
+ * Attaching a calendar event to a recording, by hand.
+ *
+ * It used to happen on its own, and the permission for it lived in settings
+ * among the switches — asked for once, in the abstract, long before anything
+ * needed it. Here it is asked for at the moment it is used, on the recording it
+ * is about, and nothing is attached that a person did not pick.
+ */
+function CalendarLink({ meeting, onDone }: { meeting: Meeting; onDone: () => void }) {
+  const { notify } = useStore()
+  const [open, setOpen] = useState(false)
+  const [events, setEvents] = useState<CalendarEventInfo[] | null>(null)
+  const [granted, setGranted] = useState<boolean | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = async () => {
+    const status = await api.call('calendar:status')
+    if (!status.supported) {
+      notify('info', t('Календарь доступен только на macOS'))
+      return
+    }
+    setGranted(status.granted)
+    setOpen(true)
+    if (status.granted) {
+      setEvents(await api.call('calendar:around', meeting.startedAt, meeting.durationSec))
+    }
+  }
+
+  const ask = async () => {
+    setBusy(true)
+    try {
+      const result = await api.call('calendar:request')
+      setGranted(result.granted)
+      if (result.granted) {
+        setEvents(await api.call('calendar:around', meeting.startedAt, meeting.durationSec))
+      } else if (result.needsSettings) {
+        // The system dialog is shown once; after that only settings will do.
+        void api.call('app:openPrivacySettings', 'calendar')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const attach = async (event: CalendarEventInfo) => {
+    await api.call('meetings:update', meeting.id, {
+      // A title the person gave stays theirs; only one the application invented is replaced.
+      ...(meeting.titleAuto ? { title: event.title } : {}),
+      calendarEventId: event.id,
+      calendarParticipants: event.participants
+    })
+    setOpen(false)
+    onDone()
+    notify('success', t('Встреча привязана'))
+  }
+
+  return (
+    <>
+      <IconButton
+        onClick={() => void load()}
+        aria-label={t('Привязать встречу из календаря')}
+        title={t('Привязать встречу из календаря')}
+        className={meeting.calendarEventId ? 'iconbtn--on' : undefined}
+      >
+        <IconCalendar />
+      </IconButton>
+
+      <Modal open={open} onClose={() => setOpen(false)} title={t('Встреча из календаря')}>
+        {granted === false ? (
+          <div className="col" style={{ gap: 'var(--space-3)' }}>
+            <p className="muted">
+              {t('Календарь знает название встречи и кто на ней был. Доступ нужен только на чтение.')}
+            </p>
+            <Button variant="primary" disabled={busy} onClick={() => void ask()}>
+              {busy ? t('Жду ответа…') : t('Дать доступ')}
+            </Button>
+          </div>
+        ) : events === null ? (
+          <p className="muted">{t('Смотрю календарь…')}</p>
+        ) : events.length === 0 ? (
+          <p className="muted">{t('Вокруг этой записи в календаре ничего нет.')}</p>
+        ) : (
+          <div className="col" style={{ gap: 'var(--space-1)' }}>
+            {events.map((event) => (
+              <button key={event.id} className="pick" onClick={() => void attach(event)}>
+                <span className="grow">{event.title}</span>
+                <span className="dim">{shortWhen(event.startsAt)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Modal>
+    </>
   )
 }
 

@@ -1375,3 +1375,23 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 
 /* Выключенный переключатель: зависит от соседнего, который сейчас выключен. */
 .switch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Выбор одной встречи из списка календаря. */
+.pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ds-gray-1000);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pick:hover { background: var(--ds-gray-alpha-200); }
+
+/* Кнопка, у которой уже что-то привязано. */
+.iconbtn--on { color: var(--ds-blue-900); }

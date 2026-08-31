@@ -653,6 +653,11 @@ export function registerIpc(): void {
     return { granted, needsSettings: !granted }
   })
 
+  handle('calendar:around', async (startedAt, durationSec) => {
+    const { eventsAround } = await import('../detect/calendar.js')
+    return eventsAround(startedAt, durationSec)
+  })
+
   handle('calendar:current', async () => {
     const { likelyEvent } = await import('../detect/calendar.js')
     const event = await likelyEvent()

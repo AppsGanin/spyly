@@ -2,7 +2,7 @@ import { t } from '@spyly/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { AgentStatus, ModelInfo, ProviderInfo, Settings } from '@shared/ipc'
 import { api, useAsync, useIpcEvent } from '../lib/api'
-import { IconAlert, IconCalendar, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
+import { IconAlert, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
 import { Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
 
@@ -218,8 +218,6 @@ function GeneralTab({
         </Select>
       </Row>
 
-      <CalendarAccess />
-
     </section>
   )
 }
@@ -307,85 +305,6 @@ function Updates() {
   )
 }
 
-/**
- * Calendar access.
- *
- * Without it a recording is called "Recording, 27 August" and the participants
- * "Speaker 2": finding the conversation you want in an archive like that is
- * impossible.
- */
-function CalendarAccess() {
-  const { notify } = useStore()
-  const [state, setState] = useState<{ supported: boolean; granted: boolean } | null>(null)
-  const [busy, setBusy] = useState(false)
-  /** The system has already refused: the dialog will not be shown again, only settings remain. */
-  const [denied, setDenied] = useState(false)
-
-  const refresh = async () => setState(await api.call('calendar:status'))
-  useEffect(() => {
-    void refresh()
-  }, [])
-
-  // Coming back from the system settings, a person expects the application to
-  // notice the access granted by itself rather than after a restart.
-  useEffect(() => {
-    const recheck = () => void refresh()
-    window.addEventListener('focus', recheck)
-    return () => window.removeEventListener('focus', recheck)
-  }, [])
-
-  if (!state?.supported) return null
-
-  const request = async () => {
-    setBusy(true)
-    try {
-      const result = await api.call('calendar:request')
-      setDenied(result.needsSettings)
-      if (result.granted) {
-        notify('success', t('Доступ к календарю разрешён'))
-      } else {
-        // The system shows its dialog once, and sometimes does not show it at all. So
-        // we do not report a refusal but lead straight to where access is granted by
-        // hand and for certain.
-        notify('info', t('Открываю настройки. Включите Spyly в разделе «Календари»'))
-        await api.call('app:openPrivacySettings', 'calendar')
-      }
-      await refresh()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="check">
-      <span className="check__icon" style={{ color: state.granted ? 'var(--ds-green-900)' : undefined }}>
-        {state.granted ? <IconCheck /> : <IconCalendar />}
-      </span>
-      <div className="check__body">
-        <div className="spread">
-          <div className="grow">
-            <div className="check__title">{t('Календарь')}</div>
-            <div className="check__hint">
-              {state.granted
-                ? t('Записи получают название встречи и список участников автоматически')
-                : denied
-                  ? t('Доступ закрыт. Откройте в настройках раздел «Календари» и включите Spyly')
-                  : t('Разрешите доступ, и записи будут называться по встрече из календаря')}
-            </div>
-          </div>
-          {!state.granted &&
-            (denied ? (
-              <Button size="sm" onClick={() => void api.call('app:openPrivacySettings', 'calendar')}>{t('Открыть настройки')}</Button>
-            ) : (
-              <Button size="sm" disabled={busy} onClick={() => void request()}>
-                {busy ? t('Жду ответа…') : t('Разрешить')}
-              </Button>
-            ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── transcription ─────────────────────────────────────────────────────────
 

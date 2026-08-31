@@ -82,6 +82,30 @@ export async function currentEvents(backMinutes = 20, forwardMinutes = 10): Prom
 }
 
 /**
+ * Events that overlap a recording that has already happened.
+ *
+ * The helper only knows how to look around the present moment, so the window is
+ * measured back from now and the result is narrowed to what actually touches the
+ * recording. Half an hour either side: a meeting is rarely started to the minute.
+ */
+export async function eventsAround(startedAt: string, durationSec: number): Promise<CalendarEvent[]> {
+  const start = new Date(startedAt).getTime()
+  if (Number.isNaN(start)) return []
+  const end = start + Math.max(0, durationSec) * 1000
+  const slack = 30 * 60_000
+
+  const back = Math.ceil((Date.now() - start + slack) / 60_000)
+  const events = await currentEvents(Math.max(30, back), 30)
+
+  return events.filter((event) => {
+    const from = new Date(event.startsAt).getTime()
+    const to = new Date(event.endsAt).getTime()
+    if (Number.isNaN(from) || Number.isNaN(to)) return false
+    return from <= end + slack && to >= start - slack
+  })
+}
+
+/**
  * The event a starting recording most likely belongs to.
  *
  * One happening now beats the nearest one ahead: if a meeting has already

@@ -162,6 +162,8 @@ export interface IpcRequests {
   'calendar:request': () => { granted: boolean; needsSettings: boolean }
   /** The event a starting recording most likely belongs to. */
   'calendar:current': () => CalendarEventInfo | null
+  /** Events around a recording that has already happened, to attach one by hand. */
+  'calendar:around': (startedAt: string, durationSec: number) => CalendarEventInfo[]
 
   'audio:listMics': () => AudioDevice[]
   'audio:listApps': () => AudioApp[]
