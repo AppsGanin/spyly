@@ -516,4 +516,6 @@ export const EN: Record<string, string> = {
     'The microphone is recording silence — check that it is not muted or taken by another application',
   'Системный звук пишет тишину — проверьте, что выбрано нужное приложение':
     'The system audio is recording silence — check that the right application is picked',
+  'Нет доступа к микрофону — он запишет тишину. Дайте доступ в настройках системы.':
+    'No access to the microphone — it would record silence. Grant it in system settings.',
 }

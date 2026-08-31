@@ -454,6 +454,30 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
 async function startRecording(options: StartRecordingOptions): Promise<RecordingState> {
   if (session) return session.state()
 
+  /*
+   * Permission for the microphone, before a word is said into it.
+   *
+   * Without it macOS does not refuse and does not ask: the capture opens, the
+   * timer runs, and the track fills with exact zeros for the whole
+   * conversation. The permission is tied to the signature of the build, so a
+   * new version of the application arrives without it — and the first person to
+   * find out used to be the one reading a one-sided transcript afterwards.
+   */
+  if (options.mic && process.platform === 'darwin') {
+    const status = systemPreferences.getMediaAccessStatus('microphone')
+    const granted = status === 'granted' || (await systemPreferences.askForMediaAccess('microphone'))
+    if (!granted) {
+      send('toast', {
+        kind: 'error',
+        text: t('Нет доступа к микрофону — он запишет тишину. Дайте доступ в настройках системы.')
+      })
+      void shell.openExternal(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+      )
+      return idleState()
+    }
+  }
+
   let pids: number[] = []
   if (options.systemApps?.length) {
     const apps = await listApps()
