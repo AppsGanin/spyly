@@ -148,7 +148,23 @@
 .navitem svg { color: var(--ds-gray-700); flex: none; }
 .navitem:hover svg, .navitem--active svg { color: var(--ds-gray-900); }
 .navitem:hover { background: var(--ds-gray-alpha-200); color: var(--ds-gray-1000); }
-.navitem--active { background: var(--ds-gray-alpha-300); color: var(--ds-gray-1000); }
+/* Тот же оттенок, что и у наведения, читался как наведение: понять, что ты
+   сейчас в настройках, было нельзя. Активный пункт держит заливку и метку слева. */
+.navitem--active {
+  background: var(--ds-gray-200);
+  color: var(--ds-gray-1000);
+  position: relative;
+}
+.navitem--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--ds-gray-1000);
+}
 
 /* ── the list filters ──────────────────────────────────────────── */
 .filters { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 4px; }

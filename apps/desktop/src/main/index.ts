@@ -88,6 +88,18 @@ export function send(channel: string, payload: unknown): void {
 }
 
 /** The panel comes up for the duration of a recording and goes away with it. */
+/**
+ * The screen a test run asked for.
+ *
+ * Sent when the window asks for its settings rather than when the page finishes
+ * loading: the load event fires before React has subscribed, so the request was
+ * dropped and the run quietly opened the default screen instead.
+ */
+export function sendStartView(): void {
+  const [kind, tab] = (process.env.SPYLY_START_VIEW ?? '').split(':')
+  if (kind) send('debug:view', { kind, tab })
+}
+
 export function setOverlayVisible(visible: boolean): void {
   if (visible) showOverlay(dirname)
   else hideOverlay()
@@ -256,13 +268,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Test runs need to open a particular screen without any clicking.
-  if (process.env.SPYLY_START_VIEW) {
-    mainWindow.webContents.on('did-finish-load', () => {
-      const [kind, tab] = (process.env.SPYLY_START_VIEW ?? '').split(':')
-      mainWindow?.webContents.send('debug:view', { kind, tab })
-    })
-  }
 
   if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)

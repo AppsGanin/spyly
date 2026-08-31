@@ -195,22 +195,23 @@ export function Menu({
    * be clipped by its edge. So the list is moved to the end of the page and its
    * place is computed from the button, opening upwards near the bottom edge.
    */
-  const place = (): void => {
+  const measure = (): { top: number; left: number; flip: boolean } | null => {
     const button = root.current?.getBoundingClientRect()
-    if (!button) return
+    if (!button) return null
     const height = list.current?.offsetHeight ?? 0
     const width = list.current?.offsetWidth ?? 0
     const flip = height > 0 && button.bottom + 4 + height > window.innerHeight - 8
     // The horizontal edge is computed here rather than left to a transform: a
     // menu is wider than the button that opens it, and next to the right edge of
-    // the window it used to hang off the screen with its items cut in half.
+    // the window it hung off the screen with its items cut in half.
     const wanted = align === 'end' ? button.right - width : button.left
     const left = width > 0 ? Math.max(8, Math.min(wanted, window.innerWidth - width - 8)) : wanted
-    setAt({
-      top: flip ? button.top - 4 : button.bottom + 4,
-      left,
-      flip
-    })
+    return { top: flip ? button.top - 4 : button.bottom + 4, left, flip }
+  }
+
+  const place = (): void => {
+    const next = measure()
+    if (next) setAt(next)
   }
 
   useEffect(() => {
@@ -237,14 +238,20 @@ export function Menu({
     }
   }, [open])
 
-  // The height of the list is only known after rendering: the first pass places
-  // it against the button, the second works out whether there is room below.
+  /**
+   * The size of the list is only known once it is in the page.
+   *
+   * The first pass places it against the button with nothing measured, the
+   * second corrects it. That second pass used to look at the height alone and
+   * return early whenever there was room below, so a menu wider than its button
+   * kept the uncorrected left edge and ran off the side of the window.
+   */
   useLayoutEffect(() => {
-    if (!open || at.flip || !list.current) return
-    const height = list.current.offsetHeight
-    const button = root.current?.getBoundingClientRect()
-    if (!button || button.bottom + 4 + height <= window.innerHeight - 8) return
-    setAt({ top: button.top - 4, left: at.left, flip: true })
+    if (!open || !list.current) return
+    const next = measure()
+    if (!next) return
+    if (next.top === at.top && next.left === at.left && next.flip === at.flip) return
+    setAt(next)
   }, [open, at])
 
   return (

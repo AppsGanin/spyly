@@ -61,7 +61,7 @@ import { findRelated, forgetRelated } from '../store/related.js'
 import { audioFile, meetingDir, meetingFile } from '../store/paths.js'
 import { loadSettings, saveSettings } from '../store/settings.js'
 import { encryptionAvailable, hasSecret, setSecret } from '../store/secrets.js'
-import { send, setOverlayVisible, showMainWindow } from '../index.js'
+import { send, sendStartView, setOverlayVisible, showMainWindow } from '../index.js'
 import { setOverlayDraft } from '../overlay.js'
 import { trayActions, updateTray } from '../tray.js'
 import { processMeeting } from '../pipeline/run.js'
@@ -863,7 +863,17 @@ export function registerIpc(): void {
     return setAgentConnection(id, connect)
   })
 
-  handle('settings:get', () => loadSettings())
+  let startViewSent = false
+  handle('settings:get', async () => {
+    const settings = await loadSettings()
+    // The window is up and listening by the time it asks for this, which is
+    // where a test run's start screen can safely be delivered.
+    if (!startViewSent) {
+      startViewSent = true
+      sendStartView()
+    }
+    return settings
+  })
   handle('settings:set', async (patch) => {
     const next = await saveSettings(patch)
     cachedDetectMode = next.autoDetectCalls
