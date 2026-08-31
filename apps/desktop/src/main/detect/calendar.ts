@@ -119,12 +119,18 @@ export async function createEvent(input: {
   endsAt: string
   notes?: string
 }): Promise<{ id: string } | { error: string }> {
-  const { code, stdout, stderr } = await run(['calendar-create'], {
-    SPYLY_CAL_TITLE: input.title,
-    SPYLY_CAL_START: input.startsAt,
-    SPYLY_CAL_END: input.endsAt,
-    SPYLY_CAL_NOTES: input.notes ?? ''
-  })
+  // Longer than a read: a calendar living in an account, rather than on the
+  // machine, takes its time saving.
+  const { code, stdout, stderr } = await run(
+    ['calendar-create'],
+    {
+      SPYLY_CAL_TITLE: input.title,
+      SPYLY_CAL_START: input.startsAt,
+      SPYLY_CAL_END: input.endsAt,
+      SPYLY_CAL_NOTES: input.notes ?? ''
+    },
+    25_000
+  )
   if (code === 0) {
     try {
       const parsed = JSON.parse(stdout) as { id?: string }
