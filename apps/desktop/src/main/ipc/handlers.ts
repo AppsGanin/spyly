@@ -727,16 +727,28 @@ export function registerIpc(): void {
     stopProbes()
     if (!isSupported()) return
 
-    // The model for live transcription takes seconds to load. It is warmed up
-    // while the user picks sources: otherwise the start of a call would have no
-    // text. The whisper server is only started when there is no streaming model:
-    // it holds a gigabyte and a half in memory, which is not to be taken lightly.
-    void loadSettings().then((s) => {
-      if (!s.liveTranscription) return
-      if (isLiveModelReady()) setTimeout(() => warmLiveModel(), 0).unref?.()
-      else void startWhisperServer(s.language).catch(() => undefined)
+    const levels = { mic: 0, system: 0 }
+
+    /*
+     * The microphone starts first, before anything else in this handler.
+     *
+     * This is the meter a person watches while saying "one, two", and it used
+     * to be started last: in front of it stood the list of applications and the
+     * warming of a model a gigabyte and a half in size. The bar came alive
+     * seconds after the words, which reads as a microphone that does not work.
+     */
+    // Without echo cancellation: bringing that node up takes about four
+    // seconds, and here it is not needed at all — the meter shows a level, not
+    // a recording. With it the bar came alive long after the words.
+    const mic = new NativeCapture({ source: 'mic', micDeviceId: opts.micDeviceId, noEchoCancel: true })
+    mic.on('level', (rms: number) => {
+      levels.mic = rms
+      send('audio:levels', { ...levels })
     })
-    const mic = new NativeCapture({ source: 'mic', micDeviceId: opts.micDeviceId })
+    mic.on('error', (message: string) => send('toast', { kind: 'error', text: t('Микрофон: {message}', { message: message }) }))
+    probes = [mic]
+    mic.start()
+
     let systemPids: number[] = []
     if (opts.systemApps?.length) {
       const apps = await listApps()
@@ -747,20 +759,32 @@ export function registerIpc(): void {
       includePids: systemPids.length ? systemPids : undefined,
       excludePids: systemPids.length ? undefined : [process.pid]
     })
-    probes = [mic, system]
-    const levels = { mic: 0, system: 0 }
-    mic.on('level', (rms: number) => {
-      levels.mic = rms
-      send('audio:levels', { ...levels })
-    })
     system.on('level', (rms: number) => {
       levels.system = rms
       send('audio:levels', { ...levels })
     })
-    mic.on('error', (message: string) => send('toast', { kind: 'error', text: t('Микрофон: {message}', { message: message }) }))
     system.on('error', (message: string) => send('toast', { kind: 'error', text: t('Системный звук: {message}', { message: message }) }))
-    mic.start()
+    probes = [mic, system]
     system.start()
+
+    /*
+     * The model for live transcription takes seconds to load. It is warmed up
+     * while the user picks sources: otherwise the start of a call would have no
+     * text. The whisper server is only started when there is no streaming model:
+     * it holds a gigabyte and a half in memory, which is not to be taken lightly.
+     *
+     * It waits for the meters: loading such a model takes the disk and the
+     * processor, and doing it while the capture is coming up is what made the
+     * microphone look dead. A dialog closed by then needs nothing warmed at all.
+     */
+    setTimeout(() => {
+      if (!probes.includes(mic)) return
+      void loadSettings().then((s) => {
+        if (!s.liveTranscription || !probes.includes(mic)) return
+        if (isLiveModelReady()) warmLiveModel()
+        else void startWhisperServer(s.language).catch(() => undefined)
+      })
+    }, 1500).unref?.()
   })
 
   handle('audio:stopProbe', () => {

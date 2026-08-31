@@ -99,6 +99,14 @@ export interface CaptureOptions {
   /** `system` is application audio, `mic` is the microphone. */
   source: 'system' | 'mic'
   micDeviceId?: string
+  /**
+   * Skip echo cancellation on the microphone.
+   *
+   * The system node takes about four seconds to come up, which is right for a
+   * recording and wrong for the level meter in the source picker: there a
+   * person says "one, two" and watches the bar, and echo does not matter at all.
+   */
+  noEchoCancel?: boolean
   /** Application PIDs; empty means all system audio. */
   includePids?: number[]
   excludePids?: number[]
@@ -179,6 +187,7 @@ export class NativeCapture extends EventEmitter {
     if (this.options.source === 'mic' && this.options.micDeviceId) {
       args.push('--mic-device', this.options.micDeviceId)
     }
+    if (this.options.source === 'mic' && this.options.noEchoCancel) args.push('--no-echo-cancel')
     for (const pid of this.options.includePids ?? []) args.push('--include-pid', String(pid))
     for (const pid of this.options.excludePids ?? []) args.push('--exclude-pid', String(pid))
 

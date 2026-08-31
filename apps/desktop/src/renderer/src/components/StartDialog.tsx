@@ -1,10 +1,10 @@
 import { t } from '@spyly/core'
 import { useEffect, useState } from 'react'
-import type { AudioApp, AudioDevice, CalendarEventInfo, Permissions, StartRecordingOptions } from '@shared/ipc'
+import type { AudioApp, AudioDevice, CalendarEventInfo, ModelInfo, Permissions, StartRecordingOptions } from '@shared/ipc'
 import { api, useIpcEvent } from '../lib/api'
 import { IconCalendar, IconMic, IconSpeaker } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Button, Meter, Modal, Select, Switch } from '../ui'
+import { Button, Meter, Modal, Select, Spinner, Switch } from '../ui'
 
 /**
  * Choosing the sources before recording.
@@ -55,10 +55,20 @@ export function StartDialog({
   const [starting, setStarting] = useState(false)
   const [permissions, setPermissions] = useState<Permissions | null>(null)
   const [asrReady, setAsrReady] = useState<{ ready: boolean; hint?: string } | null>(null)
+  const [asrModel, setAsrModel] = useState<ModelInfo | null>(null)
   const [event, setEvent] = useState<CalendarEventInfo | null>(null)
   const [useEvent, setUseEvent] = useState(true)
 
   useIpcEvent('audio:levels', setLevels)
+
+  // The download runs in the main process; its progress reaches us as events.
+  useIpcEvent('models:progress', (model) => {
+    setAsrModel((current) => (current && model.id === current.id ? model : current))
+    if (model.downloaded) void api.call('settings:providers').then((list) => {
+      const engine = list.find((p) => p.kind === 'asr')
+      setAsrReady(engine ? { ready: engine.ready, hint: engine.hint } : null)
+    })
+  })
 
   useEffect(() => {
     if (!open) return
@@ -74,15 +84,12 @@ export function StartDialog({
       const engine = providers.find((p) => p.kind === 'asr')
       setAsrReady(engine ? { ready: engine.ready, hint: engine.hint } : null)
 
-      // The calendar knows the meeting name and the participants, which beats
-      // "Recording, 27 August" and "Speaker 2" in the archive.
-      const found = await api.call('calendar:current')
-      if (!cancelled) setEvent(found)
-
       // On Windows and Linux the main process has no list of microphones, as no
       // native helper exists there. We ask the browser itself.
       setMics(deviceList.length > 0 ? deviceList : await browserMics())
       setApps(appList)
+      // Before the permissions, so that the level meter starts once, on the
+      // right device, rather than starting and restarting.
       setMicDevice((current) => current || deviceList[0]?.id || '')
 
       /*
@@ -99,11 +106,30 @@ export function StartDialog({
           ? await api.call('app:requestPermission', 'microphone')
           : perms
       if (cancelled) return
+      // This starts the level meter, so nothing slow may stand in front of it.
       setPermissions(answered)
       // A source without permission is switched off: otherwise the recording starts
       // and silently writes silence.
       if (answered.microphone === 'denied') setMicOn(false)
       if (answered.systemAudio === 'denied') setSystemOn(false)
+
+      // The calendar comes last: it knows the meeting name and the participants,
+      // which beats "Recording, 27 August" in the archive, but reading it means
+      // a helper process and EventKit — seconds during which the meter would
+      // otherwise be standing still.
+      const found = await api.call('calendar:current')
+      if (!cancelled) setEvent(found)
+
+      // Which model the recording would be transcribed with, so that the state
+      // of the download can be shown rather than a bare "the engine is not
+      // ready". Last of all: this is a warning, and warnings do not go in front
+      // of the level meter.
+      if (!engine?.ready) {
+        const models = await api.call('models:list')
+        if (cancelled) return
+        const asr = models.filter((m) => m.purpose === 'asr')
+        setAsrModel(asr.find((m) => m.downloading) ?? asr.find((m) => m.paused) ?? asr[0] ?? null)
+      }
     })()
     return () => {
       cancelled = true
@@ -131,7 +157,11 @@ export function StartDialog({
 
   const micBlocked = permissions?.microphone === 'denied'
   const systemBlocked = permissions?.systemAudio === 'denied'
-  const canStart = (micOn && !micBlocked) || (systemOn && !systemBlocked)
+  const hasSource = (micOn && !micBlocked) || (systemOn && !systemBlocked)
+  // Recording without a model is recording into a void: the sound would be
+  // saved and there would be nothing to turn it into text with. Better to wait
+  // out the download than to find that out after the conversation.
+  const canStart = hasSource && asrReady?.ready === true
 
   const start = async () => {
     if (!canStart) return
@@ -277,16 +307,63 @@ export function StartDialog({
           </label>
         )}
 
-        {!canStart && (
+        {!hasSource && (
           <p className="check__hint" style={{ color: 'var(--ds-amber-900)' }}>{t('Нужен хотя бы один доступный источник звука.')}</p>
         )}
-        {asrReady && !asrReady.ready && (
-          <p className="check__hint" style={{ color: 'var(--ds-amber-900)' }}>
-            {t('Записать можно, но расшифровать пока нечем: {hint}. Звук сохранится, и текст появится, когда модель будет на месте.', { hint: asrReady.hint ?? t('движок не готов') })}
-          </p>
-        )}
+        {asrReady && !asrReady.ready && <AsrModelState model={asrModel} hint={asrReady.hint} />}
         <p className="check__hint">{t('Предупредите собеседников о записи: в большинстве стран этого требует закон.')}</p>
       </div>
     </Modal>
+  )
+}
+
+/**
+ * The state of the model the recording will be transcribed with.
+ *
+ * It used to say "you can record, but there is nothing to transcribe with" and
+ * let the recording start. That is a promise the application cannot keep: the
+ * sound is saved and stays sound. So the download is shown here instead, and
+ * the start waits for it.
+ */
+function AsrModelState({ model, hint }: { model: ModelInfo | null; hint?: string }) {
+  const [asked, setAsked] = useState(false)
+
+  if (!model) {
+    return (
+      <p className="check__hint" style={{ color: 'var(--ds-amber-900)' }}>
+        {t('Нечем расшифровать: {hint}', { hint: hint ?? t('движок не готов') })}
+      </p>
+    )
+  }
+
+  const running = model.downloading === true
+  const percent = Math.round((model.progress ?? 0) * 100)
+
+  return (
+    <div className="col" style={{ gap: 'var(--space-2)' }}>
+      <div className="row" style={{ gap: 'var(--space-2)', alignItems: 'center' }}>
+        {running && <Spinner />}
+        <span className="check__hint" style={{ color: 'var(--ds-amber-900)' }}>
+          {running
+            ? t('Качаю модель «{name}» — {percent}%. Запись начнётся, когда она будет на месте.', {
+                name: model.name,
+                percent
+              })
+            : t('Модель «{name}» ещё не скачана — расшифровывать будет нечем.', { name: model.name })}
+        </span>
+      </div>
+      {!running && (
+        <Button
+          size="sm"
+          disabled={asked}
+          onClick={() => {
+            setAsked(true)
+            void api.call('models:download', model.id)
+          }}
+        >
+          {model.paused ? t('Продолжить загрузку') : t('Скачать модель')}
+        </Button>
+      )}
+    </div>
   )
 }

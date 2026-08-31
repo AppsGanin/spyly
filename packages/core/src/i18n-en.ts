@@ -95,7 +95,6 @@ export const EN: Record<string, string> = {
   'Задачи': 'Tasks',
   'Замечать начало разговора': 'Notice when a call starts',
   'Записать': 'Record',
-  'Записать можно, но расшифровать пока нечем: {hint}. Звук сохранится, и текст появится, когда модель будет на месте.': 'You can record, but there is nothing to transcribe with yet: {hint}. The audio is saved and the text appears once the model is in place.',
   'Записи за последние семь дней': 'Recordings from the last seven days',
   'Записи за сегодня': 'Today\\\\\\\'s recordings',
   'Записи с тегом «{name}»': 'Recordings tagged “{name}”',
@@ -526,4 +525,11 @@ export const EN: Record<string, string> = {
   'Есть': 'Granted',
   'Открыть настройки системы': 'Open system settings',
   'Запросить': 'Ask',
+  'Нечем расшифровать: {hint}': 'Nothing to transcribe with: {hint}',
+  'Качаю модель «{name}» — {percent}%. Запись начнётся, когда она будет на месте.':
+    'Downloading the “{name}” model — {percent}%. Recording starts once it is in place.',
+  'Модель «{name}» ещё не скачана — расшифровывать будет нечем.':
+    'The “{name}” model has not been downloaded — there would be nothing to transcribe with.',
+  'Продолжить загрузку': 'Resume the download',
+  'Скачать модель': 'Download the model',
 }
