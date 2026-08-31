@@ -16,6 +16,7 @@ import { t,
   trimEchoedStart,
   SILENCE_RMS_THRESHOLD,
   suppressEcho,
+  suppressRemoteEcho,
   type AsrResult,
   type Meeting,
   type Speaker,
@@ -417,12 +418,22 @@ async function buildTranscript(
 
   // What is left is filtered further by text: echo can be loud too, when the
   // speakers are turned up.
-  const systemUtterances = byTrack.get('system') ?? []
+  const beforeSystemEcho = byTrack.get('system') ?? []
   const beforeEcho = byTrack.get('mic') ?? []
-  const micUtterances = suppressEcho(beforeEcho, systemUtterances)
+  const micUtterances = suppressEcho(beforeEcho, beforeSystemEcho)
   for (const u of beforeEcho) {
     if (!micUtterances.includes(u)) dropped(u, 'echo by text')
   }
+
+  // And the other direction: your own phrase coming back from the far end a
+  // second or two later, as ordinary incoming audio. Judged against what the
+  // microphone kept, so a phrase already dropped as echo cannot take a real one
+  // with it.
+  const systemUtterances = suppressRemoteEcho(beforeSystemEcho, micUtterances)
+  for (const u of beforeSystemEcho) {
+    if (!systemUtterances.includes(u)) dropped(u, 'the far side echoed us back')
+  }
+
   const utterances = mergeTracks(micUtterances, systemUtterances)
 
   // Two sides at most, and which is which follows from the track: the microphone

@@ -163,7 +163,11 @@ function createWindow(): void {
       preload: path.join(dirname, '../preload/index.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      // No spell checker: a transcript is speech as it was said, and the red and
+      // yellow squiggles under half of it say nothing — there is nothing to
+      // correct here, and they only make the text harder to read.
+      spellcheck: false
     }
   })
 
