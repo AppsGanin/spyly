@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { keepOwnVoice, levelAt, micIsOnlyEcho, micIsOwnVoice, trimEchoedStart, type LevelWindow } from '../src/echo.js'
-import { suppressRemoteEcho } from '../src/merge.js'
-import { Utterance, type Word } from '../src/types.js'
+import type { Utterance, Word } from '../src/types.js'
 
 /**
  * The numbers are taken from a real recording where the person was silent and
@@ -203,52 +202,5 @@ describe('your own speech inside an utterance with echo', () => {
       { mic: () => 0.02, system: (from: number) => (from > 98.05 && from < 98.9 ? 0 : 0.1) }
     )
     expect(result).toBeNull()
-  })
-})
-
-describe('your own voice coming back from the far side', () => {
-  function say(track: 'mic' | 'system', start: number, text: string): Utterance {
-    return Utterance.parse({
-      id: `${track}-${start}`, speakerId: track, track,
-      start, end: start + 1, text, words: [], provisional: false
-    })
-  }
-
-  /** Measured on a real call: the phrase came back a second and a half later. */
-  it('a phrase repeated by the system track after the microphone is dropped', () => {
-    const mic = [say('mic', 1186.2, 'Понимаешь мысль?')]
-    const system = [say('system', 1187.7, 'Понимаешь мысль?')]
-    expect(suppressRemoteEcho(system, mic)).toHaveLength(0)
-  })
-
-  /** The direction is the whole point: earlier is the original. */
-  it('a system phrase before the microphone one is left alone', () => {
-    const mic = [say('mic', 12, 'Понимаешь мысль?')]
-    const system = [say('system', 10, 'Понимаешь мысль?')]
-    expect(suppressRemoteEcho(system, mic)).toHaveLength(1)
-  })
-
-  it('coming back much later is a person saying it again, not an echo', () => {
-    const mic = [say('mic', 10, 'Надо переписать этот отчёт')]
-    const system = [say('system', 40, 'Надо переписать этот отчёт')]
-    expect(suppressRemoteEcho(system, mic)).toHaveLength(1)
-  })
-
-  /** People agree with each other for real; that is an answer, not an echo. */
-  it('short agreement is left alone', () => {
-    const mic = [say('mic', 10, 'да, точно')]
-    const system = [say('system', 11, 'да, точно')]
-    expect(suppressRemoteEcho(system, mic)).toHaveLength(1)
-  })
-
-  it('a different phrase at the same moment stays', () => {
-    const mic = [say('mic', 10, 'Понимаешь мысль?')]
-    const system = [say('system', 11, 'Да, я тебя понял, давай так и сделаем')]
-    expect(suppressRemoteEcho(system, mic)).toHaveLength(1)
-  })
-
-  it('with nothing on the microphone nothing is dropped', () => {
-    const system = [say('system', 10, 'Надо переписать этот отчёт')]
-    expect(suppressRemoteEcho(system, [])).toHaveLength(1)
   })
 })

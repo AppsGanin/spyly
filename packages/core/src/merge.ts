@@ -306,66 +306,6 @@ export function suppressEcho(
   })
 }
 
-/**
- * How long your own voice may take to come back from the far end.
- *
- * Not the speakers in the room — that path is under half a second. This is the
- * round trip: your voice reaches the other side, their microphone hears their
- * speakers, and it returns as ordinary incoming audio. On a real call it came
- * back one and a half seconds later.
- */
-export const REMOTE_ECHO_WINDOW_SEC = 4
-
-/**
- * How much text a returning phrase must carry to be recognised as one.
- *
- * By word count this does not work: "Понимаешь мысль?" is two words and came
- * back from the far end for real, while "да, точно" is also two and people say
- * it after each other in earnest. Length separates them — an echo of a real
- * phrase carries the letters, and the agreement people genuinely repeat is short.
- */
-export const REMOTE_ECHO_MIN_WORDS = 2
-export const REMOTE_ECHO_MIN_CHARS = 12
-
-/**
- * Remove your own voice returned by the other side.
- *
- * The mirror image of {@link suppressEcho}, and the direction is what tells
- * them apart. The speakers leaking into the microphone put the copy *after* the
- * original in the system track; a phrase coming back from the far end puts it
- * *before*, in the microphone. So of two identical phrases the earlier one is
- * the original and the later one is the echo, whichever track it lands in.
- *
- * Short utterances are left alone: in a conversation people repeat each other's
- * "yes" and "exactly" for real, and that is not an echo but an answer.
- */
-export function suppressRemoteEcho(
-  systemUtterances: readonly Utterance[],
-  micUtterances: readonly Utterance[],
-  options: { containment?: number; window?: number; minWords?: number; minChars?: number } = {}
-): Utterance[] {
-  if (micUtterances.length === 0) return [...systemUtterances]
-  const minContainment = options.containment ?? ECHO_CONTAINMENT_THRESHOLD
-  const window = options.window ?? REMOTE_ECHO_WINDOW_SEC
-  const minWords = options.minWords ?? REMOTE_ECHO_MIN_WORDS
-  const minChars = options.minChars ?? REMOTE_ECHO_MIN_CHARS
-
-  return systemUtterances.filter((system) => {
-    const words = system.text.trim().split(/\s+/).filter(Boolean)
-    if (words.length < minWords) return true
-    if (normalizeForCompare(system.text).length < minChars) return true
-
-    // Strictly earlier: a phrase that started later cannot be the source of this one.
-    const before = micUtterances.filter(
-      (mic) => mic.start < system.start && mic.start >= system.start - window
-    )
-    if (before.length === 0) return true
-
-    const saidBefore = before.map((mic) => mic.text).join(' ')
-    return containment(system.text, saidBefore) < minContainment
-  })
-}
-
 export interface SpeakingShare {
   speakerId: string
   seconds: number
