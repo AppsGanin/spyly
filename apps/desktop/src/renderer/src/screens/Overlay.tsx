@@ -28,15 +28,19 @@ export function Overlay() {
     return () => clearTimeout(timer)
   }, [marked])
 
-  // The last words, as one running line: the panel is a strip, and speaker
-  // labels and timestamps would leave no room for the words themselves.
+  /*
+   * Everything said so far, as one running line.
+   *
+   * Not the last N characters: that window slid forward with every new word, so
+   * the visible text started at a different place each time, rewrapped, and
+   * lines a person was in the middle of reading jumped. The whole text is kept
+   * instead and the box shows its end, which leaves earlier lines exactly where
+   * they were.
+   */
   const draft = live
     .map((u) => u.text.trim())
     .filter(Boolean)
     .join(' ')
-    // Roughly what five lines hold: the clamp cuts from the end, and the newest
-    // words are the ones worth seeing.
-    .slice(-300)
 
   // The window is transparent but still catches clicks, so it grows only while
   // there is something to show.

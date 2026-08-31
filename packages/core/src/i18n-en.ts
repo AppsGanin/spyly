@@ -505,4 +505,5 @@ export const EN: Record<string, string> = {
   'Пока тихо — текст появится, как только прозвучат первые слова.': 'Quiet so far. The text will appear as soon as the first words are spoken.',
   'О программе': 'About',
   'Живая расшифровка на лету и детектор речи. Без потоковой модели текст приходит кусками после пауз.': 'Live transcription on the fly, and speech detection. Without the streaming model the text arrives in lumps after pauses.',
+  'Расшифровать': 'Transcribe',
 }

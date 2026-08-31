@@ -1286,10 +1286,12 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   font-size: var(--text-sm);
   line-height: var(--leading-base);
   color: var(--ds-gray-900);
-  /* Пять строк: две обрезали фразу на середине, а ради этого панель и открыта. */
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
+  /* Пять строк, прижатых к низу: новые слова приходят снизу, а прочитанное
+     стоит на месте. Обрезка сверху — как в терминале. */
+  height: calc(5 * var(--leading-base));
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
   -webkit-app-region: drag;
   user-select: none;

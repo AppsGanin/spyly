@@ -10,7 +10,7 @@ import { t,
   type Utterance
 } from '@spyly/core'
 import { IconMore, IconUsers } from '../lib/icons'
-import { EmptyState, IconButton, Menu } from '../ui'
+import { Button, EmptyState, IconButton, Menu } from '../ui'
 
 /** Who is speaking: a filter over the transcript, not over the audio. */
 export type SpeakerFilter = 'all' | 'me' | 'others'
@@ -65,6 +65,8 @@ function withDoubts(utterance: Utterance, threshold: number): ReactNode {
 
 export interface TranscriptActions {
   onSeek: (seconds: number) => void
+  /** Start processing a recording that has none: the panel with that button is hidden then. */
+  onProcess?: () => void
   /**
    * Silencing a stretch of the recording.
    *
@@ -185,11 +187,20 @@ export function Transcript({
   }, [meeting.utterances, speakerFilter])
 
   if (meeting.utterances.length === 0) {
+    // A recording whose processing never ran ends up here, and it used to be a
+    // dead end: the only way to start it lived in a panel that is hidden while
+    // there is nothing to show.
+    const idle = !Object.values(meeting.stages).includes('running')
     return (
       <EmptyState
         icon={<IconUsers size={22} />}
         title={t('Расшифровки пока нет')}
         text={t('Расшифровка появится, когда обработка дойдёт до конца. Если она оборвалась, запустите её заново.')}
+        action={
+          idle && actions.onProcess ? (
+            <Button variant="primary" onClick={actions.onProcess}>{t('Расшифровать')}</Button>
+          ) : undefined
+        }
       />
     )
   }

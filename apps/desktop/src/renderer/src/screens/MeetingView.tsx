@@ -303,7 +303,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       {isRecordingThis && <RecordingStrip levels={levels} error={recording.error} />}
 
-      {(busy || anyFailed || meeting.utterances.length > 0) && !isRecordingThis && (
+      {(busy || anyFailed || meeting.stages.recording === 'done') && !isRecordingThis && (
         <div style={{ padding: '0 var(--space-6) var(--space-4)' }}>
           <div className="card stages__card">
             <div className="stages">
@@ -499,6 +499,10 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                   // to look.
                   setFollow(true)
                   seek(seconds)
+                },
+                onProcess: () => {
+                  setRetrying(true)
+                  void api.call('meetings:reprocess', id, 'transcribing')
                 },
                 onRemoveRange: setCutting
               }}
