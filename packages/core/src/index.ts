@@ -1,5 +1,6 @@
 export * from './types.js'
 export * from './merge.js'
+export * from './aec.js'
 export * from './echo.js'
 export * from './edit.js'
 export * from './due.js'

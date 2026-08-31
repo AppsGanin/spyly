@@ -11,6 +11,9 @@ import { t,
   stripHallucination,
   echoMatch,
   envelope,
+  removeSpeakers,
+  shiftAt,
+  shiftProfile,
   ECHO_CORRELATION_THRESHOLD,
   ECHO_LOUDNESS_LIMIT,
   levelAt,
@@ -32,13 +35,24 @@ import { send, showMainWindow } from '../index.js'
 import { getLlmProvider, providerForModel } from '../providers/registry.js'
 import type { LlmProvider } from '../providers/types.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
-import { levelWindows, readWavPcm16, speechSeconds } from '../audio/wav.js'
+import { levelWindows, readWavPcm16, speechSeconds, writeWavPcm16 } from '../audio/wav.js'
 import { readMeeting, updateMeeting, writeMeeting } from '../store/meetings.js'
-import { audioFile } from '../store/paths.js'
+import { rm } from 'node:fs/promises'
+import { audioFile, meetingFile } from '../store/paths.js'
 import { loadSettings } from '../store/settings.js'
 
 /** The step at which the outline of a sound is measured: fine enough to keep the pauses between words. */
 const ECHO_FRAME_SEC = 0.02
+
+/**
+ * How much agreement between the tracks counts as "there is echo here".
+ *
+ * Lower than the threshold for judging one utterance: over a whole hour the
+ * outlines are diluted by everything said in headphones' silence, and on the
+ * recording this was measured on an unmistakable echo gave 0.86 across the
+ * whole file.
+ */
+const ECHO_PRESENT_THRESHOLD = 0.4
 
 const running = new Set<string>()
 
@@ -224,9 +238,16 @@ async function transcribeTracks(
   const status = await provider.ready()
   if (!status.ready) throw new Error(t('расшифровка недоступна: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
 
+  // The other side is taken out of the microphone before recognition rather
+  // than after it. Sorting it out in the transcript works, but only whole
+  // utterances can be thrown away there, and one that holds both an echo and a
+  // person's own words has to be kept along with the echo. Here the echo is
+  // gone from the sound itself, and recognition never sees it.
+  const cleanedMic = await cleanMicrophone(meetingId)
+
   const out: AsrResult[] = []
   for (const [index, track] of tracks.entries()) {
-    const file = audioFile(meetingId, track)
+    const file = track === 'mic' && cleanedMic ? cleanedMic : audioFile(meetingId, track)
 
     // An empty track is never handed to recognition: on silence Whisper produces
     // subtitle credits out of its training data instead of admitting there is no speech.
@@ -242,7 +263,51 @@ async function transcribeTracks(
     })
     out.push(result)
   }
+
+  // The cleaned copy has done its work. The recording keeps what the microphone
+  // really heard, and this was only ever for recognition.
+  if (cleanedMic) await rm(cleanedMic, { force: true }).catch(() => undefined)
+
   return out
+}
+
+/**
+ * A copy of the microphone track with the speakers taken out of it.
+ *
+ * Written beside the recording as a separate file and removed once processing
+ * is done: what the microphone actually heard is the recording, and we do not
+ * overwrite it. Recognition, though, is better off without the other side in
+ * there — a phrase of theirs on top of a phrase of yours spoils both.
+ *
+ * Returns null when there is nothing to take out: no system track, or the
+ * outlines of the two show no echo at all, which is what headphones look like.
+ */
+async function cleanMicrophone(meetingId: string): Promise<string | null> {
+  const mic = await readWavPcm16(audioFile(meetingId, 'mic')).catch(() => null)
+  const system = await readWavPcm16(audioFile(meetingId, 'system')).catch(() => null)
+  if (!mic || !system || mic.samples.length === 0 || system.samples.length === 0) return null
+
+  const micEnvelope = envelope(mic.samples, mic.sampleRate, ECHO_FRAME_SEC)
+  const systemEnvelope = envelope(system.samples, system.sampleRate, ECHO_FRAME_SEC)
+
+  // Is there any echo at all? On a recording made in headphones the outlines of
+  // the two tracks have nothing in common, and cleaning would only take a
+  // little of the person's own voice for nothing.
+  const overall = echoMatch(micEnvelope, systemEnvelope, {
+    frameSec: ECHO_FRAME_SEC,
+    from: 0,
+    to: micEnvelope.length * ECHO_FRAME_SEC
+  })
+  if (overall.correlation < ECHO_PRESENT_THRESHOLD) return null
+
+  const profile = shiftProfile(micEnvelope, systemEnvelope, { frameSec: ECHO_FRAME_SEC })
+  const cleaned = removeSpeakers(mic.samples, system.samples, mic.sampleRate, (at) =>
+    shiftAt(profile, at)
+  )
+
+  const file = meetingFile(meetingId, 'mic-clean.wav')
+  await writeWavPcm16(file, cleaned, mic.sampleRate)
+  return file
 }
 
 /** The average energy of a stretch of recording, which shows whether there really was speech. */

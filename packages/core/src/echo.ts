@@ -196,6 +196,53 @@ export function echoMatch(
 }
 
 /**
+ * How the shift between the tracks changes over a recording.
+ *
+ * Measured in segments rather than once: on recordings made before the tracks
+ * were kept in step it grows over the hour, and a single number for the whole
+ * file fits the beginning or the end but not both. Segments where the speakers
+ * were silent, and there is nothing to measure against, inherit the last shift
+ * that was found.
+ */
+export function shiftProfile(
+  micEnvelope: Float32Array,
+  systemEnvelope: Float32Array,
+  options: { frameSec: number; segmentSec?: number; maxShiftSec?: number } = { frameSec: 0.02 }
+): { at: number; shiftSec: number }[] {
+  const { frameSec } = options
+  const segment = options.segmentSec ?? 60
+  const total = micEnvelope.length * frameSec
+  const out: { at: number; shiftSec: number }[] = []
+
+  let last = 0
+  for (let at = 0; at < total; at += segment) {
+    const match = echoMatch(micEnvelope, systemEnvelope, {
+      frameSec,
+      from: at,
+      to: Math.min(at + segment, total),
+      maxShiftSec: options.maxShiftSec
+    })
+    // A weak agreement means there was no echo to measure — the speakers were
+    // silent, or the person had headphones on. Keeping the previous shift is
+    // safer than believing a number found in noise.
+    if (match.correlation >= 0.5) last = -match.shiftSec
+    out.push({ at, shiftSec: last })
+  }
+  return out
+}
+
+/** Look the shift up for a moment in time. */
+export function shiftAt(profile: readonly { at: number; shiftSec: number }[], atSec: number): number {
+  if (profile.length === 0) return 0
+  let found = profile[0]!.shiftSec
+  for (const point of profile) {
+    if (point.at > atSec) break
+    found = point.shiftSec
+  }
+  return found
+}
+
+/**
  * Trim someone else's tail from the start of your own utterance.
  *
  * The two tracks are cut into pieces differently, and the other side's last
