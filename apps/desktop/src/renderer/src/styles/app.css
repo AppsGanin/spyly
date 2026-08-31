@@ -1320,6 +1320,9 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   -webkit-app-region: drag;
   user-select: none;
 }
+/* The waiting line is quieter than the text it will be replaced by. */
+.overlay__draft-wait { color: var(--ds-gray-700); }
+
 .overlay {
   flex: none;
   display: flex;

@@ -532,4 +532,5 @@ export const EN: Record<string, string> = {
     'The “{name}” model has not been downloaded — there would be nothing to transcribe with.',
   'Продолжить загрузку': 'Resume the download',
   'Скачать модель': 'Download the model',
+  'Слушаю…': 'Listening…',
 }

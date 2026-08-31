@@ -16,7 +16,7 @@ import { LevelMeter } from '../ui'
  * silently writing nothing.
  */
 export function Overlay() {
-  const { recording, levels, live } = useStore()
+  const { recording, levels, live, settings } = useStore()
   const [marked, setMarked] = useState<'ok' | 'fail' | null>(null)
   const paused = recording.status === 'paused'
 
@@ -42,11 +42,20 @@ export function Overlay() {
     .filter(Boolean)
     .join(' ')
 
-  // The window is transparent but still catches clicks, so it grows only while
-  // there is something to show.
+  /*
+   * The box is there from the first second, empty.
+   *
+   * It used to appear with the first recognised word, five to ten seconds in —
+   * exactly the stretch when a person is looking for proof that the recording
+   * has started. An empty box that says "listening" is that proof; a box that
+   * turns up later, on its own, reads as something having gone wrong earlier.
+   *
+   * When the live text is switched off there is nothing to wait for and no box.
+   */
+  const showDraft = settings?.liveTranscription !== false
   useEffect(() => {
-    void api.call('overlay:draft', draft.length > 0)
-  }, [draft.length > 0])
+    void api.call('overlay:draft', showDraft)
+  }, [showDraft])
 
   const mark = async () => {
     try {
@@ -90,7 +99,11 @@ export function Overlay() {
       </button>
       </div>
 
-      {draft && <div className="overlay__draft">{draft}</div>}
+      {showDraft && (
+        <div className="overlay__draft">
+          {draft || <span className="overlay__draft-wait">{t('Слушаю…')}</span>}
+        </div>
+      )}
     </div>
   )
 }
