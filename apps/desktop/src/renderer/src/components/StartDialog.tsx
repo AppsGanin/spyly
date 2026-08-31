@@ -83,12 +83,27 @@ export function StartDialog({
       // native helper exists there. We ask the browser itself.
       setMics(deviceList.length > 0 ? deviceList : await browserMics())
       setApps(appList)
-      setPermissions(perms)
       setMicDevice((current) => current || deviceList[0]?.id || '')
+
+      /*
+       * The question about the microphone is asked here, not at the start of a
+       * recording.
+       *
+       * Until it is asked, macOS neither refuses nor prompts: the capture opens
+       * and hands over exact zeros. Just below this dialog says "say something,
+       * the bar should come alive", and the bar stays dead however loudly one
+       * speaks. So the question comes before the promise.
+       */
+      const answered =
+        perms.microphone === 'not-determined' && micOn
+          ? await api.call('app:requestPermission', 'microphone')
+          : perms
+      if (cancelled) return
+      setPermissions(answered)
       // A source without permission is switched off: otherwise the recording starts
       // and silently writes silence.
-      if (perms.microphone === 'denied') setMicOn(false)
-      if (perms.systemAudio === 'denied') setSystemOn(false)
+      if (answered.microphone === 'denied') setMicOn(false)
+      if (answered.systemAudio === 'denied') setSystemOn(false)
     })()
     return () => {
       cancelled = true
@@ -96,9 +111,10 @@ export function StartDialog({
   }, [open])
 
   // The probe listens while the dialog is open and always stops on close,
-  // otherwise the microphone stays busy.
+  // otherwise the microphone stays busy. It waits for the permissions: a probe
+  // started before the answer goes on handing over silence after it.
   useEffect(() => {
-    if (!open) return
+    if (!open || !permissions) return
     void api.call('audio:startProbe', {
       micDeviceId: micDevice || undefined,
       systemApps: scope === 'apps' ? selectedApps : undefined
@@ -107,7 +123,7 @@ export function StartDialog({
       void api.call('audio:stopProbe')
       setLevels({ mic: 0, system: 0 })
     }
-  }, [open, micDevice, scope, selectedApps])
+  }, [open, micDevice, scope, selectedApps, permissions])
 
   const toggleApp = (key: string) => {
     setSelectedApps((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))

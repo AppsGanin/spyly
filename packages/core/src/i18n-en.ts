@@ -518,4 +518,12 @@ export const EN: Record<string, string> = {
     'The system audio is recording silence — check that the right application is picked',
   'Нет доступа к микрофону — он запишет тишину. Дайте доступ в настройках системы.':
     'No access to the microphone — it would record silence. Grant it in system settings.',
+  'Доступ к микрофону': 'Microphone access',
+  'Доступ к системному звуку': 'System audio access',
+  'Запрещено — включить можно только в настройках системы':
+    'Refused — it can only be turned on in system settings',
+  'Спросим перед первой записью': 'We will ask before the first recording',
+  'Есть': 'Granted',
+  'Открыть настройки системы': 'Open system settings',
+  'Запросить': 'Ask',
 }

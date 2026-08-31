@@ -1,6 +1,6 @@
 import { t } from '@spyly/core'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { AgentStatus, ModelInfo, ProviderInfo, Settings } from '@shared/ipc'
+import type { AgentStatus, ModelInfo, Permissions, ProviderInfo, Settings } from '@shared/ipc'
 import { api, useAsync, useIpcEvent } from '../lib/api'
 import { IconAlert, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
@@ -218,7 +218,85 @@ function GeneralTab({
         </Select>
       </Row>
 
+      <AccessRows />
     </section>
+  )
+}
+
+/**
+ * The state of the system permissions, and a way back from a refusal.
+ *
+ * macOS asks once. Press "Don't Allow" by accident and the application can no
+ * longer ask again: a repeat request returns a refusal without a word, the
+ * capture opens and writes silence. The only cure is system settings, so this
+ * is where the state is shown and the way there offered.
+ */
+function AccessRows() {
+  const [permissions, setPermissions] = useState<Permissions | null>(null)
+  const [asking, setAsking] = useState<'microphone' | 'systemAudio' | null>(null)
+
+  const refresh = async () => setPermissions(await api.call('app:permissions'))
+
+  const settled = permissions?.microphone === 'granted' && permissions.systemAudio === 'granted'
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  useEffect(() => {
+    // Coming back from system settings the state has changed, and nobody tells
+    // us about it: the window regaining focus is the signal. Once everything is
+    // granted we stop listening — finding out about the system audio means
+    // creating a capture tap, and doing that on every focus is not free.
+    if (settled) return
+    const reread = () => void refresh()
+    window.addEventListener('focus', reread)
+    return () => window.removeEventListener('focus', reread)
+  }, [settled])
+
+  const ask = async (which: 'microphone' | 'systemAudio') => {
+    setAsking(which)
+    try {
+      setPermissions(await api.call('app:requestPermission', which))
+    } finally {
+      setAsking(null)
+    }
+  }
+
+  const items = [
+    { id: 'microphone' as const, title: t('Доступ к микрофону'), state: permissions?.microphone },
+    { id: 'systemAudio' as const, title: t('Доступ к системному звуку'), state: permissions?.systemAudio }
+  ]
+
+  return (
+    <>
+      {items.map((item) => (
+        <Row
+          key={item.id}
+          title={item.title}
+          hint={
+            item.state === 'granted'
+              ? t('Разрешено')
+              : item.state === 'denied'
+                ? t('Запрещено — включить можно только в настройках системы')
+                : t('Спросим перед первой записью')
+          }
+          inline
+        >
+          {item.state === 'granted' ? (
+            <span className="badge badge--green">{t('Есть')}</span>
+          ) : item.state === 'denied' ? (
+            <Button size="sm" onClick={() => void api.call('app:openPrivacySettings', item.id)}>
+              {t('Открыть настройки системы')}
+            </Button>
+          ) : (
+            <Button size="sm" disabled={asking !== null} onClick={() => void ask(item.id)}>
+              {asking === item.id ? t('Жду ответа…') : t('Запросить')}
+            </Button>
+          )}
+        </Row>
+      ))}
+    </>
   )
 }
 
