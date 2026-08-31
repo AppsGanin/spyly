@@ -237,7 +237,10 @@ function createWindow(): void {
           await mainWindow!.webContents
             .executeJavaScript(
               `(() => {
-                 const target = document.querySelector(${JSON.stringify(click)})\n                 if (!target) return 'not found: ' + ${JSON.stringify(click)}\n                 target.dispatchEvent(new MouseEvent('click', { bubbles: true }))\n                 return 'clicked: ' + ${JSON.stringify(click)}
+                 const target = document.querySelector(${JSON.stringify(click)})\n                 if (!target) return 'not found: ' + ${JSON.stringify(click)}\n                 // Focus as well as click: the focus ring is a thing that can only be
+                 // checked with something focused, and a synthetic click does not focus.
+                 if (typeof target.focus === 'function') target.focus()
+                 target.dispatchEvent(new MouseEvent('click', { bubbles: true }))\n                 return 'clicked: ' + ${JSON.stringify(click)}
                })()`
             )
             .then((result: string) => process.stderr.write(`[screenshot] ${result}\n`))

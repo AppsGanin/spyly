@@ -265,3 +265,18 @@ kbd,
 /* A tag as a button, for picking a name quickly. */
 button.chip { cursor: pointer; font: inherit; }
 button.chip:hover { background: var(--ds-gray-200); }
+
+/* ── the focus ring ───────────────────────────────────────────── */
+/* The ring is drawn with a shadow, and so are the borders of fields, buttons
+   and cards. Those rules come later in the file, and at equal specificity the
+   later one wins: keyboard focus left no mark at all on anything with a border,
+   which is most of the settings screen. Here the ring comes back, after
+   everyone who was overriding it. */
+.input:focus-visible,
+.select:focus-visible,
+.textarea:focus-visible,
+.btn:focus-visible,
+.card:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+}

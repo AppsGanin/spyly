@@ -1357,3 +1357,16 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   margin-top: 5px;
 }
 .item__tags .badge { font-size: 11px; padding: 1px 6px; }
+
+/* Те же перебитые тени, но у контролов самого приложения. */
+.switch:focus-visible,
+.tab:focus-visible,
+.navitem:focus-visible,
+.item:focus-visible,
+.filter:focus-visible,
+.option:focus-visible,
+.check:focus-visible,
+.menu__item:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring);
+}
