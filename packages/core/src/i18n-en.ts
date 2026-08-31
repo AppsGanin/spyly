@@ -533,4 +533,6 @@ export const EN: Record<string, string> = {
   'Продолжить загрузку': 'Resume the download',
   'Скачать модель': 'Download the model',
   'Слушаю…': 'Listening…',
+  'Эхоподавление недоступно: собеседник будет слышен и через ваш микрофон. Наденьте наушники.':
+    'Echo cancellation is unavailable: the other side will be audible through your microphone too. Put headphones on.',
 }

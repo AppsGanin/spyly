@@ -85,8 +85,23 @@ function hasSound(chunk: Float32Array): boolean {
   return false
 }
 
-const DRIFT_TOLERANCE_SEC = 0.15
+/**
+ * How far a track may fall behind the clock before silence is written in.
+ *
+ * Measured on a real hour-long call: with a tolerance of 0.15 s the system
+ * track was padded on almost every check, because a tap hands audio over in
+ * bursts and is routinely a fraction of a second late. The burst then landed
+ * after the padding, and the same second was counted twice. The tracks came out
+ * 1.5 seconds apart, and echo appeared to precede the sound that caused it.
+ *
+ * So the tolerance is now wider than any normal buffering, and a track has to
+ * stay behind for several checks in a row before anything is written: a source
+ * that is genuinely silent stays behind, one that is merely late catches up.
+ */
+const DRIFT_TOLERANCE_SEC = 1.5
 const DRIFT_CHECK_MS = 1000
+/** How many checks in a row a track must be behind before silence is written. */
+const DRIFT_CONFIRMATIONS = 3
 
 /** Both ways of capturing give the same thing: events and a level. */
 type Capture = NativeCapture | RendererCapture
@@ -107,6 +122,10 @@ interface Track {
   retriedPlain: boolean
   /** When silence on this track stops being a pause and becomes a fault, in ms since the epoch. */
   judgeAt: number
+  /** Consecutive checks this track has been behind the clock. */
+  behindChecks: number
+  /** Told already that the speakers cannot be removed from the microphone. */
+  warnedEcho: boolean
 }
 
 /**
@@ -299,7 +318,9 @@ export class RecordingSession extends EventEmitter {
       gotAudio: false, gotSound: false, warnedDead: false, retriedPlain: false,
       // The microphone is judged sooner: it has a second attempt ahead of it,
       // and waiting the full time twice would cost half a minute of the call.
-      judgeAt: Date.now() + (id === 'mic' ? MIC_RETRY_TIMEOUT_MS : DEAD_SOURCE_TIMEOUT_MS)
+      judgeAt: Date.now() + (id === 'mic' ? MIC_RETRY_TIMEOUT_MS : DEAD_SOURCE_TIMEOUT_MS),
+      behindChecks: 0,
+      warnedEcho: false
     }
 
     this.wireCapture(track, capture)
@@ -338,6 +359,23 @@ export class RecordingSession extends EventEmitter {
     })
     capture.on('ready', () => {
       track.ready = true
+      this.emitState()
+    })
+
+    /*
+     * The system could not take the speakers out of the microphone.
+     *
+     * It needs the same device for input and output; with an external
+     * microphone, or speakers separate from it, the node simply does not start.
+     * Recording carries on — echo is better than nothing — but the other side
+     * will be audible through the microphone and will land in the transcript
+     * twice. That is worth saying while it can still be fixed by putting
+     * headphones on, not afterwards.
+     */
+    capture.on('echoCancel', (on: boolean) => {
+      if (id !== 'mic' || on || track.warnedEcho) return
+      track.warnedEcho = true
+      this.error = t('Эхоподавление недоступно: собеседник будет слышен и через ваш микрофон. Наденьте наушники.')
       this.emitState()
     })
     capture.on('level', () => this.emit('levels', this.levels()))
@@ -408,7 +446,18 @@ export class RecordingSession extends EventEmitter {
     const expected = this.totalSec()
     for (const track of this.tracks) {
       const behind = expected - track.writer.durationSec
-      if (behind > DRIFT_TOLERANCE_SEC) track.writer.writeSilence(behind)
+      if (behind <= DRIFT_TOLERANCE_SEC) {
+        track.behindChecks = 0
+        continue
+      }
+      track.behindChecks++
+      if (track.behindChecks < DRIFT_CONFIRMATIONS) continue
+
+      // Only what the source was behind by when we first noticed: audio that
+      // has arrived since then has already taken its place in the file, and
+      // padding for it again is what pushed the track out of step.
+      track.writer.writeSilence(behind)
+      track.behindChecks = 0
     }
   }
 

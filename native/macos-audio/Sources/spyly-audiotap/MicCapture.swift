@@ -48,12 +48,16 @@ final class MicCapture {
         if cancelEcho {
             do {
                 try startEngine(deviceUID: deviceUID, voiceProcessing: true)
-                emit(["type": "info", "message": "echo cancellation is on"])
+                emit(["type": "echo", "cancelled": true])
                 return
             } catch {
+                // The application needs to know, not just the log: without this
+                // node the other side is heard through the microphone, and the
+                // person can only be told to put headphones on.
                 emit([
-                    "type": "info",
-                    "message": "echo cancellation unavailable, recording as is: \(error.localizedDescription)"
+                    "type": "echo",
+                    "cancelled": false,
+                    "message": "echo cancellation unavailable: \(error.localizedDescription)"
                 ])
                 teardown()
             }

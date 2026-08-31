@@ -116,6 +116,8 @@ export interface CaptureEvents {
   samples: (chunk: Float32Array) => void
   level: (rms: number) => void
   ready: () => void
+  /** Whether the system removed the speakers from the microphone. Microphone only. */
+  echoCancel: (on: boolean) => void
   error: (message: string) => void
   exit: (code: number | null) => void
 }
@@ -223,6 +225,7 @@ export class NativeCapture extends EventEmitter {
         const msg = JSON.parse(trimmed) as {
           type: string
           rms?: number
+          cancelled?: boolean
           message?: string
           reason?: string
         }
@@ -231,6 +234,8 @@ export class NativeCapture extends EventEmitter {
           this.emit('level', msg.rms)
         } else if (msg.type === 'ready') {
           this.emit('ready')
+        } else if (msg.type === 'echo') {
+          this.emit('echoCancel', msg.cancelled === true)
         } else if (msg.type === 'error') {
           this.emit('error', captureErrorText(msg.reason, msg.message))
         }
