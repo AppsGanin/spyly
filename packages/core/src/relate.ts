@@ -65,13 +65,9 @@ export function meetingTerms(meeting: Meeting, limit = 60): Map<string, string> 
   return out
 }
 
+/** Who was in the conversation, as far as anything knows: the calendar. */
 function names(meeting: Meeting): Set<string> {
-  const out = new Set<string>()
-  for (const speaker of meeting.speakers) {
-    if (speaker.name) out.add(speaker.name.toLowerCase())
-  }
-  for (const name of meeting.calendarParticipants) out.add(name.toLowerCase())
-  return out
+  return new Set(meeting.calendarParticipants.map((name) => name.toLowerCase()))
 }
 
 function overlap(a: Iterable<string>, b: { has(key: string): boolean }, sizeA: number, sizeB: number): number {

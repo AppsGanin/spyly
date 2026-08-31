@@ -357,13 +357,9 @@ const isCheckRun =
   process.argv.includes('--selftest') ||
   Boolean(process.env.SPYLY_SCREENSHOT) ||
   Boolean(process.env.SPYLY_CHECK_CALENDAR) ||
-  Boolean(process.env.SPYLY_CHECK_DIARIZE) ||
   Boolean(process.env.SPYLY_CHECK_ASR) ||
   Boolean(process.env.SPYLY_CHECK_LIVE) ||
   Boolean(process.env.SPYLY_BENCH) ||
-  Boolean(process.env.SPYLY_CHECK_VOICE) ||
-  Boolean(process.env.SPYLY_DIAG_DIAR) ||
-  Boolean(process.env.SPYLY_DIAG_VOICEMAP) ||
   Boolean(process.env.SPYLY_REPROCESS)
 
 if (!isCheckRun && !app.requestSingleInstanceLock()) {
@@ -401,59 +397,6 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       return
     }
 
-    // How close a voice in a recording is to a stored voice print.
-    if (process.env.SPYLY_CHECK_VOICE) {
-      const { listVoices } = await import('./store/voices.js')
-      const { readMeeting } = await import('./store/meetings.js')
-      const { embedSpeaker, readWave } = await import('./providers/diarization/sherpa.js')
-      const { cosineSimilarity, VOICE_MATCH_THRESHOLD } = await import('@spyly/core')
-      const { audioFile } = await import('./store/paths.js')
-
-      const meeting = await readMeeting(process.env.SPYLY_CHECK_VOICE)
-      const profiles = await listVoices()
-      process.stdout.write(`[voice] prints ${profiles.length}, participants ${meeting?.speakers.length ?? 0}, threshold ${VOICE_MATCH_THRESHOLD}\n`)
-
-      for (const track of new Set((meeting?.speakers ?? []).map((s) => s.track))) {
-        const wave = await readWave(audioFile(meeting!.id, track))
-        const turns = meeting!.utterances
-          .filter((u) => u.track === track)
-          .map((u) => ({ start: u.start, end: u.end, cluster: Number(u.speakerId.split(':')[1] ?? 0) }))
-        for (const speaker of meeting!.speakers.filter((s) => s.track === track)) {
-          const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, speaker.cluster)
-          if (!embedding) {
-            process.stdout.write(`[voice] ${speaker.id}: the print could not be computed\n`)
-            continue
-          }
-          for (const profile of profiles) {
-            const score = cosineSimilarity(embedding, profile.embedding)
-            process.stdout.write(`[voice] ${speaker.id} ↔ "${profile.name}": ${score.toFixed(3)}\n`)
-          }
-        }
-      }
-            // How close the clusters are to each other: this shows whether separation
-            // split one person into several.
-      const own: { id: string; embedding: number[] }[] = []
-      for (const track of new Set((meeting?.speakers ?? []).map((sp) => sp.track))) {
-        const file = audioFile(process.env.SPYLY_CHECK_VOICE, track)
-        if (!existsSync(file)) continue
-        const wave = await readWave(file)
-        const turns = (meeting?.utterances ?? [])
-          .filter((u) => u.track === track)
-          .map((u) => ({ start: u.start, end: u.end, cluster: Number(u.speakerId.split(':')[1] ?? 0) }))
-        for (const speaker of (meeting?.speakers ?? []).filter((sp) => sp.track === track)) {
-          const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, speaker.cluster)
-          if (embedding) own.push({ id: speaker.id, embedding })
-        }
-      }
-      for (let a = 0; a < own.length; a++) {
-        for (let b = a + 1; b < own.length; b++) {
-          const score = cosineSimilarity(own[a]!.embedding, own[b]!.embedding)
-          process.stdout.write(`[similarity] ${own[a]!.id} ↔ ${own[b]!.id}: ${score.toFixed(3)}\n`)
-        }
-      }
-      setTimeout(() => app.exit(0), 200)
-      return
-    }
 
     // A one-off transcription run with a particular model on a particular file.
     // Live transcription: run a file as a stream and see how long after something
@@ -590,105 +533,26 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     if (process.env.SPYLY_REPROCESS) {
       const { processMeeting } = await import('./pipeline/run.js')
       const { readMeeting } = await import('./store/meetings.js')
-      // From the very beginning by default, but checking the summary or the voice
-      // separation on its own is far quicker than waiting for transcription every time.
-      const from = (process.env.SPYLY_REPROCESS_FROM ?? 'transcribing') as
-        | 'transcribing'
-        | 'diarizing'
-        | 'summarizing'
+      // From the very beginning by default, but checking the summary on its own is
+      // far quicker than waiting for transcription every time.
+      const from = (process.env.SPYLY_REPROCESS_FROM ?? 'transcribing') as 'transcribing' | 'summarizing'
       await processMeeting(process.env.SPYLY_REPROCESS, from)
       const meeting = await readMeeting(process.env.SPYLY_REPROCESS)
       process.stdout.write(
-        `[reprocess] "${meeting?.title ?? '—'}", participants ${meeting?.speakers.length ?? 0}, ` +
+        `[reprocess] "${meeting?.title ?? '—'}", sides ${meeting?.speakers.length ?? 0}, ` +
           `utterances ${meeting?.utterances.length ?? 0}\n`
       )
       for (const s of meeting?.speakers ?? []) {
         const own = (meeting?.utterances ?? []).filter((u) => u.speakerId === s.id)
         const seconds = own.reduce((sum, u) => sum + (u.end - u.start), 0)
-        process.stdout.write(`[participant] ${s.id} "${s.name ?? '—'}" ${own.length} utterances, ${seconds.toFixed(0)} s\n`)
+        process.stdout.write(`[side] ${s.id} ${own.length} utterances, ${seconds.toFixed(0)} s\n`)
       }
       setTimeout(() => app.exit(0), 300)
       return
     }
 
-    // How a voice changes over the course of a track: ten-second windows and
-    // pairwise similarity. Answers the question "is this one person or several".
-    if (process.env.SPYLY_DIAG_VOICEMAP) {
-      const { embedSpeaker, readWave } = await import('./providers/diarization/sherpa.js')
-      const { cosineSimilarity } = await import('@spyly/core')
-      const wave = await readWave(process.env.SPYLY_DIAG_VOICEMAP)
-      const step = Number(process.env.SPYLY_DIAG_WINDOW ?? 10)
-      const total = wave.samples.length / wave.sampleRate
 
-      const windows: { at: number; embedding: number[] }[] = []
-      for (let at = 0; at + step <= total; at += step) {
-        const turns = [{ start: at, end: at + step, cluster: 0 }]
-        const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, 0, step)
-        if (embedding) windows.push({ at, embedding })
-      }
 
-      process.stdout.write(`[voice map] windows ${windows.length} of ${step} s\n`)
-      process.stdout.write('        ' + windows.map((w) => String(w.at).padStart(5)).join('') + '\n')
-      for (const a of windows) {
-        const row = windows.map((b) =>
-          (a === b ? '    ·' : cosineSimilarity(a.embedding, b.embedding).toFixed(2).padStart(5))
-        )
-        process.stdout.write(String(a.at).padStart(6) + '  ' + row.join('') + '\n')
-      }
-      setTimeout(() => app.exit(0), 200)
-      return
-    }
-
-    // What voice separation actually returns: segments with times.
-    if (process.env.SPYLY_DIAG_DIAR) {
-      const { sherpa, segmentationModelPath, embeddingModelPath } = await import(
-        './providers/diarization/sherpa.js'
-      )
-      const { readWavPcm16 } = await import('./audio/wav.js')
-      const { OfflineSpeakerDiarization } = sherpa()
-      const wave = await readWavPcm16(process.env.SPYLY_DIAG_DIAR)
-      const engine = new OfflineSpeakerDiarization({
-        segmentation: { pyannote: { model: segmentationModelPath() }, numThreads: 4 },
-        embedding: { model: embeddingModelPath(), numThreads: 4 },
-        clustering: { numClusters: Number(process.env.SPYLY_DIAG_N ?? -1), threshold: 0.9 },
-        minDurationOn: 0.3,
-        minDurationOff: 0.5
-      })
-      process.stdout.write(
-        `[diagnostics] the model expects ${engine.sampleRate} Hz, the file ${wave.sampleRate} Hz, ` +
-          `length ${(wave.samples.length / wave.sampleRate).toFixed(0)} s\n`
-      )
-      const turns = engine.process(wave.samples)
-      for (const t of turns) {
-        process.stdout.write(
-          `[segment] ${t.start.toFixed(1)}–${t.end.toFixed(1)} (${(t.end - t.start).toFixed(1)} s) → speaker ${t.speaker}\n`
-        )
-      }
-      setTimeout(() => app.exit(0), 200)
-      return
-    }
-
-    // A one-off measurement of voice separation on a particular file.
-    if (process.env.SPYLY_CHECK_DIARIZE) {
-      const { getDiarizationProvider } = await import('./providers/registry.js')
-      const provider = getDiarizationProvider('sherpa-onnx')
-      const thresholds = (process.env.SPYLY_THRESHOLDS ?? '0.8')
-        .split(',')
-        .map(Number)
-        .filter((v) => Number.isFinite(v))
-      for (const threshold of thresholds) {
-        const started = Date.now()
-        const turns = (await provider?.diarize(process.env.SPYLY_CHECK_DIARIZE, { threshold })) ?? []
-        const clusters = new Set(turns.map((t) => t.cluster))
-        const longest = turns.reduce((max, t) => Math.max(max, t.end - t.start), 0)
-        process.stdout.write(
-          `[diarization] threshold ${threshold}: segments ${turns.length}, clusters ${clusters.size}, ` +
-            `longest ${longest.toFixed(0)} s, in ${((Date.now() - started) / 1000).toFixed(1)} s\n`
-        )
-      }
-      setTimeout(() => app.exit(0), 200)
-      return
-    }
 
     // A test run of calendar access: the system shows its own dialog, and from a
     // bare command line it never appears, so the application has to be launched.

@@ -3,15 +3,11 @@ import { t,
   buildAgentPrompt,
   containment,
   isLikelyHallucination,
-  learnedTerms,
   levelAt,
   MANUAL_SUMMARY_MODEL,
   micIsOwnVoice,
-  mergeSpeakers,
-  mergeUtterances,
   renderTranscriptMarkdown,
   SILENCE_RMS_THRESHOLD,
-  splitUtterance,
   textSimilarity,
   utterancesInRange,
   type LevelWindow,
@@ -72,7 +68,6 @@ import { trayActions, updateTray } from '../tray.js'
 import { processMeeting } from '../pipeline/run.js'
 import { listProviders } from '../providers/registry.js'
 import { listModels, downloadModel, pauseDownload, cancelDownload, removeModel } from '../pipeline/models.js'
-import { deleteVoice, finishEnrollment, listVoices, rememberSpeaker, startEnrollment } from '../store/voices.js'
 
 let session: RecordingSession | null = null
 let probes: NativeCapture[] = []
@@ -788,98 +783,6 @@ export function registerIpc(): void {
     return done
   })
 
-  handle('meetings:renameSpeaker', async (id, speakerId, name, rememberVoice) => {
-    const next = await editWithHistory(id, t('имя участника'), (meeting) => {
-      const clean = name.trim()
-      const speakers = meeting.speakers.map((s) =>
-        s.id === speakerId ? { ...s, name: clean || undefined, nameSource: 'manual' as const } : s
-      )
-
-      // Voice separation sometimes breaks one person into several. Giving them one
-      // name is exactly the statement "these are the same person": they are merged,
-      // otherwise the person would sit in the list twice and their share of the
-      // conversation would be halved.
-      const track = speakers.find((s) => s.id === speakerId)?.track
-      const twin = clean
-        ? speakers.find((s) => s.id !== speakerId && s.name === clean && s.track === track)
-        : undefined
-      if (!twin) return { ...meeting, speakers }
-      return mergeSpeakers({ ...meeting, speakers }, speakerId, twin.id)
-    })
-    if (rememberVoice) await rememberSpeaker(id, speakerId, name)
-    send('meetings:changed', { id })
-    return next
-  })
-
-  handle('meetings:editUtterance', async (id, utteranceId, text) => {
-    let before = ''
-    const next = await editWithHistory(id, t('правку реплики'), (meeting) => {
-      before = meeting.utterances.find((u) => u.id === utteranceId)?.text ?? ''
-      return {
-        ...meeting,
-        utterances: meeting.utterances.map((u) => (u.id === utteranceId ? { ...u, text } : u))
-      }
-    })
-    send('meetings:changed', { id })
-    // An edit is the most honest source of terms: the person has just shown how
-    // the word is really meant to look.
-    const settings = await loadSettings()
-    return { meeting: next, terms: learnedTerms(before, text, settings.vocabulary) }
-  })
-
-  handle('vocab:add', async (terms) => {
-    const settings = await loadSettings()
-    const known = new Set(settings.vocabulary.map((t) => t.toLowerCase()))
-    const added = terms.map((t) => t.trim()).filter((t) => t && !known.has(t.toLowerCase()))
-    if (added.length === 0) return settings.vocabulary
-    const next = await saveSettings({ vocabulary: [...settings.vocabulary, ...added] })
-    return next.vocabulary
-  })
-
-  handle('meetings:splitUtterance', async (id, utteranceId, charIndex) => {
-    const next = await editWithHistory(id, t('разделение реплики'), (meeting) => {
-      const index = meeting.utterances.findIndex((u) => u.id === utteranceId)
-      if (index === -1) throw new Error(t('реплика не найдена'))
-      const taken = new Set(meeting.utterances.map((u) => u.id))
-      const parts = splitUtterance(meeting.utterances[index]!, charIndex, taken)
-      if (!parts) throw new Error(t('в этом месте делить нечего'))
-      return {
-        ...meeting,
-        utterances: [...meeting.utterances.slice(0, index), ...parts, ...meeting.utterances.slice(index + 1)]
-      }
-    })
-    send('meetings:changed', { id })
-    return next
-  })
-
-  handle('meetings:mergeUtterance', async (id, utteranceId) => {
-    const next = await editWithHistory(id, t('склейку реплик'), (meeting) => {
-      const index = meeting.utterances.findIndex((u) => u.id === utteranceId)
-      if (index === -1) throw new Error(t('реплика не найдена'))
-      const second = meeting.utterances[index + 1]
-      if (!second) throw new Error(t('это последняя реплика — склеивать не с чем'))
-      const merged = mergeUtterances(meeting.utterances[index]!, second)
-      return {
-        ...meeting,
-        utterances: [...meeting.utterances.slice(0, index), merged, ...meeting.utterances.slice(index + 2)]
-      }
-    })
-    send('meetings:changed', { id })
-    return next
-  })
-
-  handle('meetings:reassignUtterance', async (id, utteranceId, speakerId) => {
-    const next = await editWithHistory(id, t('смену говорящего'), (meeting) => {
-      if (!meeting.speakers.some((s) => s.id === speakerId)) throw new Error(t('такого участника нет'))
-      return {
-        ...meeting,
-        utterances: meeting.utterances.map((u) => (u.id === utteranceId ? { ...u, speakerId } : u))
-      }
-    })
-    send('meetings:changed', { id })
-    return next
-  })
-
   /**
    * Cutting out a fragment.
    *
@@ -961,14 +864,10 @@ export function registerIpc(): void {
     return meeting ? renderTranscriptMarkdown(meeting) : ''
   })
 
-  handle('export:copyPrompt', async (id, templateId) => {
+  handle('export:copyPrompt', async (id) => {
     const meeting = await readMeeting(id)
     if (!meeting) throw new Error(t('встреча не найдена'))
-    const settings = await loadSettings()
-    const template =
-      settings.promptTemplates.find((t) => t.id === templateId) ?? settings.promptTemplates[0]
-    if (!template) throw new Error(t('нет ни одного шаблона промпта'))
-    const prompt = buildAgentPrompt({ template, meeting })
+    const prompt = buildAgentPrompt({ meeting })
     clipboard.writeText(prompt)
     send('toast', { kind: 'success', text: t('Промпт скопирован') })
     return prompt
@@ -1024,19 +923,6 @@ export function registerIpc(): void {
   handle('models:pause', (id) => pauseDownload(id))
   handle('models:cancel', (id) => cancelDownload(id))
   handle('models:remove', (id) => removeModel(id))
-
-  handle('voices:ready', async () => {
-    const { sherpaDiarizationProvider } = await import('../providers/diarization/sherpa.js')
-    const status = await sherpaDiarizationProvider.ready().catch(() => ({ ready: false }))
-    return status.ready
-      ? { ready: true }
-      : { ready: false, hint: t('нужна модель слепков голоса — скачайте её в настройках') }
-  })
-
-  handle('voices:list', () => listVoices())
-  handle('voices:delete', (id) => deleteVoice(id))
-  handle('voices:enrollStart', () => startEnrollment())
-  handle('voices:enrollStop', (name) => finishEnrollment(name))
 
   // The main window can be closed while recording, as the app lives in the tray.
   // But the floating panel stays on screen and its timer must not freeze, so the

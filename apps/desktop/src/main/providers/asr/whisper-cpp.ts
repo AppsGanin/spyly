@@ -87,7 +87,7 @@ export const whisperCppProvider: AsrProvider = {
   id: 'whisper-cpp',
   name: t('Whisper (локально)'),
   local: true,
-  capabilities: { streaming: true, diarization: false, wordTimestamps: true },
+  capabilities: { streaming: true, wordTimestamps: true },
 
   async ready() {
     if (!existsSync(binaryPath())) {
@@ -108,8 +108,6 @@ export const whisperCppProvider: AsrProvider = {
     if (!model || !existsSync(model)) throw new Error(t('модель Whisper не скачана'))
     if (!existsSync(wavPath)) throw new Error(t('нет файла записи: {wavPath}', { wavPath: wavPath }))
 
-    const prompt = await buildVocabularyPrompt()
-
     // On "detect automatically" whisper picks the language once, from the first
     // thirty seconds, and holds on to it after that: an English phrase in the
     // middle of a Russian conversation arrives transliterated. So we cut the
@@ -122,7 +120,7 @@ export const whisperCppProvider: AsrProvider = {
         try {
           for (const [index, part] of parts.entries()) {
             if (options.signal?.aborted) break
-            const result = await runWhisper(model, part.path, 'auto', prompt, {
+            const result = await runWhisper(model, part.path, 'auto', {
               ...options,
               onProgress: (value) => options.onProgress?.((index + value) / parts.length)
             })
@@ -138,7 +136,7 @@ export const whisperCppProvider: AsrProvider = {
       }
     }
 
-    const single = await runWhisper(model, wavPath, options.language, prompt, options)
+    const single = await runWhisper(model, wavPath, options.language, options)
     return assemble(single.words, track, single.language || options.language)
   }
 }
@@ -153,7 +151,6 @@ async function runWhisper(
   model: string,
   wavPath: string,
   language: string,
-  prompt: string,
   options: Pick<TranscribeOptions, 'signal' | 'onProgress'>
 ): Promise<{ words: Word[]; language: string }> {
   const outPrefix = path.join(os.tmpdir(), `spyly-${path.basename(wavPath, '.wav')}-${Date.now()}`)
@@ -165,7 +162,7 @@ async function runWhisper(
     '-of', outPrefix,
     '-pp',
     // Word-level splitting: without it the timestamps come for 5 to 30 second
-    // chunks, and diarization cannot lay them out by speaker.
+    // chunks, and the words could not be placed on the timeline.
     '-ml', '1',
     '-sow',
     '-t', String(Math.max(2, Math.min(8, os.cpus().length - 2))),
@@ -175,11 +172,7 @@ async function runWhisper(
     '-mc', '0',
     // The entropy threshold: on degeneration, decoding is retried at a different
     // temperature instead of getting stuck.
-    '-et', '2.8',
-    // A hint with words the model would otherwise not know: colleagues' names,
-    // project names, jargon. Without carry-initial-prompt it only affects the
-    // first thirty seconds, while a conversation runs for an hour.
-    ...(prompt ? ['--prompt', prompt, '--carry-initial-prompt'] : [])
+    '-et', '2.8'
   ]
 
   let detected = ''
@@ -232,7 +225,7 @@ function mostCommon(values: string[]): string | null {
 }
 
 /** The "default" order: larger is more accurate, so the largest is on top. */
-const WHISPER_MODELS = ['whisper-large-v3', 'whisper-large-v3-turbo', 'whisper-medium', 'whisper-small']
+const WHISPER_MODELS = ['whisper-large-v3', 'whisper-large-v3-turbo']
 
 let chosenModel = ''
 
@@ -249,29 +242,4 @@ export function preferredModel(): string {
   return 'whisper-large-v3-turbo'
 }
 
-/**
- * A hint to recognition: names and terms.
- *
- * Whisper does not know that "billing" is billing rather than "Belling" until
- * it sees the word in context. The names of remembered participants are filled
- * in automatically: the user has already entered them, no reason to ask again.
- */
-async function buildVocabularyPrompt(): Promise<string> {
-  const settings = await loadSettings()
-  const terms = new Set(settings.vocabulary.map((t) => t.trim()).filter(Boolean))
 
-  try {
-    const { listVoices } = await import('../../store/voices.js')
-    for (const voice of await listVoices()) {
-      if (voice.name.trim()) terms.add(voice.name.trim())
-    }
-  } catch {
-    // The voice registry is unavailable, so the dictionary alone will have to do.
-  }
-
-  if (terms.size === 0) return ''
-  // The model expects connected text rather than a list: the hint works better that way.
-  return t('В разговоре встречаются: {terms}.', { terms: [...terms].join(', ') })
-}
-
-export { buildVocabularyPrompt }

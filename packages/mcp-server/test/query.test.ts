@@ -13,18 +13,20 @@ const meeting = (patch: Partial<Meeting> = {}): Meeting =>
     durationSec: 600,
     language: 'ru',
     sources: { mic: true, system: true },
-    stages: { recording: 'done', transcribing: 'done', diarizing: 'done' },
+    stages: { recording: 'done', transcribing: 'done' },
     errors: {},
     providers: {},
     notes: '',
     tags: [],
+    // Names live in the calendar now: the transcript itself knows two sides.
+    calendarParticipants: ['Мария'],
     speakers: [
-      { id: 'mic:0', track: 'mic', cluster: 0, name: 'Дима', isMe: true, nameSource: 'manual' },
-      { id: 'system:0', track: 'system', cluster: 0, name: 'Мария', isMe: false, nameSource: 'manual' }
+      { id: 'mic', track: 'mic' },
+      { id: 'system', track: 'system' }
     ],
     utterances: [
-      { id: 'u1', speakerId: 'mic:0', track: 'mic', start: 0, end: 3, text: 'Нам нужно переделать биллинг', words: [], provisional: false },
-      { id: 'u2', speakerId: 'system:0', track: 'system', start: 4, end: 8, text: 'Согласна, возьму миграцию', words: [], provisional: false }
+      { id: 'u1', speakerId: 'mic', track: 'mic', start: 0, end: 3, text: 'Нам нужно переделать биллинг', words: [], provisional: false },
+      { id: 'u2', speakerId: 'system', track: 'system', start: 4, end: 8, text: 'Согласна, возьму миграцию', words: [], provisional: false }
     ],
     ...patch
   }) as Meeting
@@ -88,10 +90,10 @@ describe('findInMeeting', () => {
   it('finds utterances by text', () => {
     const hits = findInMeeting(meeting(), 'биллинг')
     expect(hits).toHaveLength(1)
-    expect(hits[0]!.speaker).toBe('Дима')
+    expect(hits[0]!.speaker).toBe('Вы')
   })
-  it('narrows by participant', () => {
-    expect(findInMeeting(meeting(), '', 'Мария')).toHaveLength(1)
+  it('narrows by side', () => {
+    expect(findInMeeting(meeting(), '', 'Собеседник')).toHaveLength(1)
   })
   it('an empty query with no participant returns everything', () => {
     expect(findInMeeting(meeting(), '')).toHaveLength(2)

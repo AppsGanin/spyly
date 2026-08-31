@@ -30,13 +30,16 @@ export function humanDuration(seconds: number): string {
   return rem === 0 ? `${h} ${hour}` : `${h} ${hour} ${rem} ${min}`
 }
 
-/** The display name: the name given, "You" for the owner, otherwise the cluster number. */
+/**
+ * The caption for a side of the conversation.
+ *
+ * The microphone is always you: it is your computer and your microphone. So
+ * there is nothing to guess, and the label follows from the track rather than
+ * from a voice print.
+ */
 export function speakerLabel(speaker: Speaker | undefined, fallbackId: string): string {
-  if (!speaker) return fallbackId
-  if (speaker.name) return speaker.name
-  if (speaker.isMe) return t('Вы')
-  const where = speaker.track === 'mic' ? t('В комнате') : t('Участник')
-  return `${where} ${speaker.number ?? speaker.cluster + 1}`
+  const track = speaker?.track ?? (fallbackId.startsWith('mic') ? 'mic' : 'system')
+  return track === 'mic' ? t('Вы') : t('Собеседник')
 }
 
 function speakerMap(meeting: Meeting): Map<string, Speaker> {

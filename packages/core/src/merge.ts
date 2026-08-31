@@ -1,4 +1,4 @@
-import type { AsrResult, AsrSegment, Meeting, SpeakerTurn, TrackId, Utterance, Word } from './types.js'
+import type { AsrResult, AsrSegment, TrackId, Utterance, Word } from './types.js'
 
 /** The length of the overlap between two stretches. Zero if they do not overlap. */
 export function overlap(aStart: number, aEnd: number, bStart: number, bEnd: number): number {
@@ -16,37 +16,6 @@ const UTTERANCE_MAX_SEC = 35
 
 const UTTERANCE_GAP_SEC = 1.5
 
-/**
- * The cluster a stretch belongs to: the one it overlaps most. If there is no
- * overlap at all (the word fell into a diarization pause), the nearest stretch
- * in time is taken, or the word would be lost.
- */
-export function clusterFor(start: number, end: number, turns: readonly SpeakerTurn[]): number | null {
-  if (turns.length === 0) return null
-
-  let bestCluster: number | null = null
-  let bestOverlap = 0
-  for (const t of turns) {
-    const o = overlap(start, end, t.start, t.end)
-    if (o > bestOverlap) {
-      bestOverlap = o
-      bestCluster = t.cluster
-    }
-  }
-  if (bestCluster !== null) return bestCluster
-
-  let nearest: SpeakerTurn | null = null
-  let nearestDist = Infinity
-  const mid = (start + end) / 2
-  for (const t of turns) {
-    const dist = mid < t.start ? t.start - mid : mid > t.end ? mid - t.end : 0
-    if (dist < nearestDist) {
-      nearestDist = dist
-      nearest = t
-    }
-  }
-  return nearest ? nearest.cluster : null
-}
 
 /** The words of a segment; if ASR gave no per-word timestamps, the segment itself as one "word". */
 /**
@@ -85,16 +54,15 @@ function joinWords(words: readonly Word[]): string {
 }
 
 /**
- * Lay the ASR result of one track out by speaker.
+ * Turn the ASR result of one track into utterances.
  *
- * Every word gets a cluster by its largest overlap with the diarization
- * stretches, and then consecutive words of one cluster are collected into an
- * utterance. An utterance breaks on a change of cluster and on a pause longer
- * than UTTERANCE_GAP_SEC.
+ * A track is one side of the conversation, so there is nothing to lay out by
+ * speaker here. Words are collected into utterances and broken on a pause
+ * longer than UTTERANCE_GAP_SEC; what one side said in a row is glued back
+ * together in mergeTracks.
  */
 export function assignSpeakers(
   asr: AsrResult,
-  turns: readonly SpeakerTurn[],
   opts: { provisional?: boolean; idPrefix?: string } = {}
 ): Utterance[] {
   const track: TrackId = asr.track
@@ -111,7 +79,6 @@ export function assignSpeakers(
 
   const out: Utterance[] = []
   let bucket: Word[] = []
-  let bucketCluster = 0
   let counter = 0
 
   const flush = () => {
@@ -122,7 +89,7 @@ export function assignSpeakers(
     if (text) {
       out.push({
         id: `${prefix}-${counter++}`,
-        speakerId: `${track}:${bucketCluster}`,
+        speakerId: track,
         track,
         start: first.start,
         end: last.end,
@@ -135,18 +102,14 @@ export function assignSpeakers(
   }
 
   for (const w of all) {
-    // With no diarization the whole track counts as one speaker.
-    const cluster = clusterFor(w.start, w.end, turns) ?? 0
     if (bucket.length === 0) {
-      bucketCluster = cluster
       bucket.push(w)
       continue
     }
     const prev = bucket[bucket.length - 1]!
     const gap = w.start - prev.end
-    if (cluster !== bucketCluster || gap > UTTERANCE_GAP_SEC) {
+    if (gap > UTTERANCE_GAP_SEC) {
       flush()
-      bucketCluster = cluster
     } else if (
       // One person can speak without pauses for minutes, and then an utterance grows
       // into a wall of text that can neither be read nor quoted. We split at the end
@@ -156,7 +119,6 @@ export function assignSpeakers(
       /[.!?…]$/.test(prev.text.trim())
     ) {
       flush()
-      bucketCluster = cluster
     }
     bucket.push(w)
   }
@@ -173,7 +135,30 @@ export function assignSpeakers(
 export function mergeTracks(...tracks: readonly Utterance[][]): Utterance[] {
   const all = tracks.flat()
   all.sort((a, b) => a.start - b.start || a.end - b.end || a.track.localeCompare(b.track))
-  return all
+  return glueRuns(all)
+}
+
+/**
+ * Join what one side said in a row into a single utterance.
+ *
+ * A pause is not a change of speaker. Cut at every pause, one person's turn
+ * fell into five lines of three words each, and the transcript read as a list
+ * rather than as a conversation. A new block starts only when the other side
+ * actually says something.
+ */
+function glueRuns(utterances: readonly Utterance[]): Utterance[] {
+  const out: Utterance[] = []
+  for (const u of utterances) {
+    const prev = out[out.length - 1]
+    if (!prev || prev.speakerId !== u.speakerId || prev.provisional !== u.provisional) {
+      out.push({ ...u })
+      continue
+    }
+    prev.end = Math.max(prev.end, u.end)
+    prev.text = `${prev.text} ${u.text}`.replace(/\s+/g, ' ').trim()
+    prev.words = [...prev.words, ...u.words]
+  }
+  return out
 }
 
 /** Every speaker identifier that actually occurs in the utterances. */
@@ -393,23 +378,4 @@ export function asrFromUtterances(
       ]
     }
   })
-}
-
-/**
- * Merge two participants into one.
- *
- * Voice separation sometimes breaks one person's speech into several clusters:
- * part said louder, part over the other side. The person then sits in the list
- * twice and their share of the conversation is halved. The utterances of the
- * one disappearing pass to the one that stays, and their order does not change.
- */
-export function mergeSpeakers(meeting: Meeting, fromId: string, toId: string): Meeting {
-  if (fromId === toId) return meeting
-  if (!meeting.speakers.some((s) => s.id === toId)) return meeting
-
-  return {
-    ...meeting,
-    speakers: meeting.speakers.filter((s) => s.id !== fromId),
-    utterances: meeting.utterances.map((u) => (u.speakerId === fromId ? { ...u, speakerId: toId } : u))
-  }
 }

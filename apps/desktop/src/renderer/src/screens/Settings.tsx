@@ -1,18 +1,16 @@
 import { t } from '@spyly/core'
 import { useEffect, useState, type ReactNode } from 'react'
 import type { AgentStatus, ModelInfo, ProviderInfo } from '@shared/ipc'
-import type { PromptTemplate, VoiceProfile } from '@spyly/core'
 import { api, useAsync, useIpcEvent } from '../lib/api'
-import { IconAlert, IconCalendar, IconCheck, IconClose, IconCopy, IconMic, IconPause, IconPencil, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
+import { IconAlert, IconCalendar, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
 import { Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
 
-type Tab = 'general' | 'transcription' | 'voices' | 'agents'
+type Tab = 'general' | 'transcription' | 'agents'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: t('Общее') },
   { id: 'transcription', label: t('Расшифровка') },
-  { id: 'voices', label: t('Голоса') },
   { id: 'agents', label: t('Агенты') }
 ]
 
@@ -47,17 +45,10 @@ export function SettingsScreen({ initialTab }: { initialTab?: string } = {}) {
   )
   const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [models, setModels] = useState<ModelInfo[]>([])
-  const [voices, setVoices] = useState<VoiceProfile[]>([])
-
   const refresh = async () => {
-    const [p, m, v] = await Promise.all([
-      api.call('settings:providers'),
-      api.call('models:list'),
-      api.call('voices:list')
-    ])
+    const [p, m] = await Promise.all([api.call('settings:providers'), api.call('models:list')])
     setProviders(p)
     setModels(m)
-    setVoices(v)
   }
 
   useEffect(() => {
@@ -102,7 +93,6 @@ export function SettingsScreen({ initialTab }: { initialTab?: string } = {}) {
           {tab === 'transcription' && (
             <TranscriptionTab settings={settings} saveSettings={saveSettings} models={models} />
           )}
-          {tab === 'voices' && <VoicesTab voices={voices} onRefresh={refresh} />}
           {tab === 'agents' && (
             <AgentsTab providers={providers} onRefresh={refresh} onCopy={copy} />
           )}
@@ -365,9 +355,7 @@ const ASR_MODELS = [
   'whisper-large-v3',
   'gigaam-v3-ru',
   'parakeet-tdt-v3',
-  'nemotron-3.5',
-  'whisper-medium',
-  'whisper-small'
+  'nemotron-3.5'
 ]
 
 function TranscriptionTab({
@@ -430,7 +418,7 @@ function TranscriptionTab({
         <div className="settings__row settings__row--stack">
           <div className="col" style={{ gap: 'var(--space-2)' }}>
             <div style={{ fontWeight: 500 }}>{t('Служебные модели')}</div>
-            <div className="field__hint">{t('Разделяют речь по голосам и узнают участников по слепку.')}</div>
+            <div className="field__hint">{t('Нужны живой расшифровке, чтобы отличать речь от тишины.')}</div>
             {shared.map((model) => (
               <SupportModel key={model.id} model={model} />
             ))}
@@ -438,14 +426,6 @@ function TranscriptionTab({
         </div>
       </section>
 
-      <section className="settings__group">
-        <div className="settings__groupTitle">{t('Словарь')}</div>
-        <VocabularyEditor
-          terms={settings.vocabulary}
-          onChange={(vocabulary) => void saveSettings({ vocabulary })}
-          supported
-        />
-      </section>
     </>
   )
 }
@@ -467,7 +447,7 @@ function QualityOption({
   selected: boolean
   onSelect: () => void
 }) {
-  const downloading = model.progress !== undefined && !model.downloaded
+  const downloading = model.downloading === true && !model.downloaded
   const paused = !model.downloaded && !downloading && (model.resumableBytes ?? 0) > 0
   const mb = (bytes: number) => t('{mb} МБ', { mb: Math.round(bytes / 1e6) })
 
@@ -554,7 +534,7 @@ function QualityOption({
 
 /** Support models: there is nothing to choose, only presence matters. */
 function SupportModel({ model }: { model: ModelInfo }) {
-  const downloading = model.progress !== undefined && !model.downloaded
+  const downloading = model.downloading === true && !model.downloaded
   return (
     <div className="support">
       <span className="support__icon" style={{ color: model.downloaded ? 'var(--ds-green-900)' : undefined }}>
@@ -581,78 +561,6 @@ function SupportModel({ model }: { model: ModelInfo }) {
  * transcription; the names of remembered participants are added to it
  * automatically.
  */
-function VocabularyEditor({
-  terms,
-  onChange,
-  supported
-}: {
-  terms: string[]
-  onChange: (next: string[]) => void
-  /** Not every engine accepts a hint. */
-  supported: boolean
-}) {
-  const [draft, setDraft] = useState('')
-
-  const add = () => {
-    const parts = draft
-      .split(/[,\n]/)
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .filter((t) => !terms.some((existing) => existing.toLowerCase() === t.toLowerCase()))
-    if (parts.length === 0) return
-    onChange([...terms, ...parts])
-    setDraft('')
-  }
-
-  return (
-    <div className="col" style={{ gap: 'var(--space-3)' }}>
-      <p className="field__hint">{t('Имена коллег, названия проектов, профессиональный жаргон — всё, что распознавание может расслышать неправильно. Имена участников из вкладки «Голоса» добавляются сами.')}</p>
-
-      {!supported && (
-        <div className="check">
-          <span className="check__icon" style={{ color: 'var(--ds-amber-900)' }}><IconAlert /></span>
-          <div className="check__body">
-            <div className="check__title">{t('Выбранный движок подсказку не принимает')}</div>
-            <div className="check__hint">{t('Словарь работает только с Whisper. Список сохранится и заработает, если вернуть эту модель.')}</div>
-          </div>
-        </div>
-      )}
-
-      <div className="row" style={{ gap: 'var(--space-2)' }}>
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t('Например: биллинг, Кафка, Мария Петрова')}
-          aria-label={t('Новый термин')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              add()
-            }
-          }}
-        />
-        <Button onClick={add} disabled={!draft.trim()}>{t('Добавить')}</Button>
-      </div>
-
-      {terms.length > 0 && (
-        <div className="chips">
-          {terms.map((term) => (
-            <span key={term} className="chip">
-              {term}
-              <button
-                className="chip__remove"
-                aria-label={t('Убрать {term}', { term: term })}
-                onClick={() => onChange(terms.filter((t) => t !== term))}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 /**
  * What to install so that summaries are made automatically.
@@ -855,139 +763,7 @@ function OpenAiCompatible({
 
 // ── voices ────────────────────────────────────────────────────────────────
 
-function VoicesTab({ voices, onRefresh }: { voices: VoiceProfile[]; onRefresh: () => Promise<void> }) {
-  const [ready, setReady] = useState<{ ready: boolean; hint?: string } | null>(null)
 
-  useEffect(() => {
-    void api.call('voices:ready').then(setReady)
-  }, [])
-
-  return (
-    <section className="settings__group">
-      <p className="field__hint">{t('Слепки голоса нужны, чтобы имена подставлялись сами. Это биометрия: она хранится только здесь и никуда не отправляется.')}</p>
-
-      <VoiceEnroll
-        onDone={onRefresh}
-        hasMine={voices.some((v) => v.isMe)}
-        blockedReason={ready && !ready.ready ? (ready.hint ?? t('модель слепков не готова')) : null}
-      />
-
-      {voices.length === 0 ? (
-        <p className="dim">{t('Пока никого не запомнили. Свой голос можно записать кнопкой выше, чужие — на странице встречи: нажмите на имя участника и поставьте галочку «Запомнить голос».')}</p>
-      ) : (
-        <div className="col" style={{ gap: 'var(--space-1)' }}>
-          {voices.map((voice) => (
-            <div key={voice.id} className="appitem">
-              <span className="grow">
-                {voice.name}
-                <span
-                  className="dim"
-                  title={t('Чем больше записей голоса, тем увереннее узнавание: слепки усредняются')}
-                >
-                  {' '}
-                  {t('· записей голоса: {n}', { n: voice.samples })}
-                </span>
-              </span>
-              <IconButton
-                aria-label={t('Забыть {voice_name}', { voice_name: voice.name })}
-                onClick={() => void api.call('voices:delete', voice.id).then(onRefresh)}
-              >
-                <IconTrash />
-              </IconButton>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-/**
- * Recording your own voice print.
- *
- * Without it the transcript cannot tell the owner from other people in the
- * room: both microphone tracks look the same.
- */
-function VoiceEnroll({
-  onDone,
-  hasMine,
-  blockedReason
-}: {
-  onDone: () => Promise<void>
-  hasMine: boolean
-  /** Why a voice cannot be recorded right now. */
-  blockedReason: string | null
-}) {
-  const { notify } = useStore()
-  const [name, setName] = useState('')
-  const [recording, setRecording] = useState(false)
-  const [seconds, setSeconds] = useState(0)
-
-  useEffect(() => {
-    if (!recording) return
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(timer)
-  }, [recording])
-
-  const start = async () => {
-    setSeconds(0)
-    setRecording(true)
-    await api.call('voices:enrollStart')
-  }
-
-  const stop = async () => {
-    setRecording(false)
-    const profile = await api.call('voices:enrollStop', name.trim() || t('Вы'))
-    if (profile) {
-      notify('success', t('Голос запомнен: {profile_name}', { profile_name: profile.name }))
-      setName('')
-      await onDone()
-    } else {
-      notify('error', t('Слишком короткая запись: говорите хотя бы несколько секунд'))
-    }
-  }
-
-  return (
-    <div className="check">
-      <span className="check__icon">{recording ? <Spinner /> : <IconMic />}</span>
-      <div className="check__body">
-        <div className="spread">
-          <div className="grow">
-            <div className="check__title">
-              {recording ? t('Говорите… {seconds} с', { seconds: seconds }) : hasMine ? t('Перезаписать свой голос') : t('Записать свой голос')}
-            </div>
-            <div className="check__hint" style={blockedReason ? { color: 'var(--ds-amber-900)' } : undefined}>
-              {blockedReason
-                ? blockedReason
-                : recording
-                  ? t('Расскажите что-нибудь обычным голосом, секунд пятнадцать')
-                  : t('Тогда в расшифровках вы будете отмечены отдельно от других людей в комнате')}
-            </div>
-          </div>
-          <div className="row" style={{ gap: 'var(--space-2)' }}>
-            {!recording && (
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={t('Вы')}
-                style={{ width: 130 }}
-                aria-label={t('Как подписывать')}
-              />
-            )}
-            <Button
-              size="sm"
-              variant={recording ? 'danger' : 'default'}
-              disabled={Boolean(blockedReason)}
-              onClick={() => void (recording ? stop() : start())}
-            >
-              {recording ? t('Готово') : t('Записать')}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ── agents ────────────────────────────────────────────────────────────────
 
@@ -1144,7 +920,6 @@ function AgentsTab({
 
       <p className="field__hint">{t('После подключения перезапустите агента: настройки он читает при старте.')}</p>
 
-      <PromptTemplates />
     </section>
     </>
   )
@@ -1159,110 +934,3 @@ function AgentsTab({
  * client. Letting the text be rewritten is easier than guessing.
  */
 
-function PromptTemplates() {
-  const { settings, saveSettings, notify } = useStore()
-  const [editing, setEditing] = useState<PromptTemplate | null>(null)
-  const templates = settings?.promptTemplates ?? []
-
-  const save = async (next: PromptTemplate[]) => {
-    await saveSettings({ promptTemplates: next })
-  }
-
-  const commit = async () => {
-    if (!editing) return
-    const name = editing.name.trim()
-    const instruction = editing.instruction.trim()
-    if (!name || !instruction) {
-      notify('error', t('Название и текст не должны быть пустыми'))
-      return
-    }
-    const clean = { ...editing, name, instruction }
-    const exists = templates.some((t) => t.id === clean.id)
-    await save(exists ? templates.map((t) => (t.id === clean.id ? clean : t)) : [...templates, clean])
-    setEditing(null)
-  }
-
-  const remove = async (id: string) => {
-    // The last template cannot be deleted: without one the "Hand to an agent"
-    // button would have nothing to work with.
-    if (templates.length <= 1) {
-      notify('error', t('Нужен хотя бы один шаблон'))
-      return
-    }
-    await save(templates.filter((t) => t.id !== id))
-  }
-
-  return (
-    <>
-      <div className="settings__row settings__row--inline" style={{ marginTop: 'var(--space-4)' }}>
-        <div>
-          <div style={{ fontWeight: 500 }}>{t('Шаблоны промпта')}</div>
-          <div className="field__hint">{t('С этим текстом запись уходит агенту')}</div>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setEditing({ id: `custom-${Date.now().toString(36)}`, name: '', instruction: '' })}
-        >{t('Добавить')}</Button>
-      </div>
-
-      <div className="tmpl-list">
-        {templates.map((template) => (
-          <div key={template.id} className="tmpl">
-            <div className="grow">
-              <div className="check__title">{t(template.name)}</div>
-              <div className="check__hint tmpl__text">{t(template.instruction)}</div>
-            </div>
-            <div className="row" style={{ gap: 'var(--space-1)' }}>
-              <IconButton aria-label={t('Изменить')} title={t('Изменить')} onClick={() => setEditing({ ...template, name: t(template.name), instruction: t(template.instruction) })}>
-                <IconPencil />
-              </IconButton>
-              <IconButton
-                aria-label={t('Удалить')}
-                title={templates.length <= 1 ? t('Нужен хотя бы один шаблон') : t('Удалить')}
-                disabled={templates.length <= 1}
-                onClick={() => void remove(template.id)}
-              >
-                <IconTrash />
-              </IconButton>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Modal
-        open={editing !== null}
-        onClose={() => setEditing(null)}
-        title={templates.some((t) => t.id === editing?.id) ? t('Изменить шаблон') : t('Новый шаблон')}
-        actions={
-          <>
-            <Button onClick={() => setEditing(null)}>{t('Отмена')}</Button>
-            <Button variant="primary" onClick={() => void commit()}>{t('Сохранить')}</Button>
-          </>
-        }
-      >
-        {editing && (
-          <>
-            <Field label={t('Название')} hint={t('Так шаблон будет называться в списке промптов')}>
-              <Input
-                value={editing.name}
-                autoFocus
-                placeholder={t('Например: тикеты в трекер')}
-                onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-              />
-            </Field>
-
-            <Field label={t('Текст')} hint={t('Расшифровка подставится следом, писать про неё не нужно')}>
-              <textarea
-                className="input textarea"
-                rows={7}
-                value={editing.instruction}
-                placeholder={t('Ниже расшифровка разговора. Собери из неё…')}
-                onChange={(e) => setEditing({ ...editing, instruction: e.target.value })}
-              />
-            </Field>
-          </>
-        )}
-      </Modal>
-    </>
-  )
-}

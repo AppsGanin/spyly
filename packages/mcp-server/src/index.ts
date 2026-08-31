@@ -7,6 +7,7 @@ import {
   lastDays,
   renderSummaryMarkdown,
   renderTranscriptMarkdown,
+  speakerLabel,
   setLang,
   timecode
 } from '@spyly/core'
@@ -239,19 +240,17 @@ server.registerTool(
   },
   async (filter) => {
     const meetings = await filtered(filter)
-    const people = new Map<string, { meetings: number; lastAt: string; seconds: number }>()
+    // Names come from the calendar. The transcript itself knows only two sides,
+    // you and the other one: guessing who that was by voice was removed, because
+    // it was wrong more often than right.
+    const people = new Map<string, { meetings: number; lastAt: string }>()
 
     for (const meeting of meetings) {
-      const named = meeting.speakers.filter((s) => s.name)
-      for (const speaker of named) {
-        const seconds = meeting.utterances
-          .filter((u) => u.speakerId === speaker.id)
-          .reduce((sum, u) => sum + (u.end - u.start), 0)
-        const previous = people.get(speaker.name!) ?? { meetings: 0, lastAt: meeting.startedAt, seconds: 0 }
-        people.set(speaker.name!, {
+      for (const name of new Set(meeting.calendarParticipants)) {
+        const previous = people.get(name) ?? { meetings: 0, lastAt: meeting.startedAt }
+        people.set(name, {
           meetings: previous.meetings + 1,
-          lastAt: previous.lastAt > meeting.startedAt ? previous.lastAt : meeting.startedAt,
-          seconds: previous.seconds + seconds
+          lastAt: previous.lastAt > meeting.startedAt ? previous.lastAt : meeting.startedAt
         })
       }
     }
@@ -259,13 +258,13 @@ server.registerTool(
     if (people.size === 0) {
       return {
         content: [
-          { type: 'text', text: 'No participants have been named yet: names are given in the application, on a recording page.' }
+          { type: 'text', text: 'No participants are known: they come from calendar events, and none of these recordings is linked to one.' }
         ]
       }
     }
     const rows = [...people.entries()]
       .sort((a, b) => b[1].meetings - a[1].meetings)
-      .map(([name, info]) => `- ${name}: recordings ${info.meetings}, speech ${humanDuration(info.seconds)}, last ${new Date(info.lastAt).toLocaleDateString('ru-RU')}`)
+      .map(([name, info]) => `- ${name}: recordings ${info.meetings}, last ${new Date(info.lastAt).toLocaleDateString('en-GB')}`)
     return { content: [{ type: 'text', text: rows.join('\n') }] }
   }
 )
@@ -604,7 +603,7 @@ server.registerTool(
       return { isError: true, content: [{ type: 'text', text: `Recording ${id} not found` }] }
     }
 
-    const names = new Map(meeting.speakers.map((s) => [s.id, s.name ?? (s.isMe ? 'You' : s.id)]))
+    const names = new Map(meeting.speakers.map((s) => [s.id, speakerLabel(s, s.id)]))
     const terms = questionTerms(question)
 
     // Utterances are scored by how many of the question's words they match and

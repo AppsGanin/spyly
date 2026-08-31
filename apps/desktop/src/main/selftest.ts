@@ -4,12 +4,8 @@ import path from 'node:path'
 import { app } from 'electron'
 import {
   t,
-  doubtThreshold,
-  doubtfulWords,
-  mergeUtterances,
   renderTranscriptMarkdown,
   speakerLabel,
-  splitUtterance,
   timecode,
   utterancesInRange,
   type Meeting,
@@ -20,15 +16,14 @@ import { SpeechChunker, encodeWav } from './pipeline/live.js'
 import { LiveTranscriber, isLiveModelReady, warmLiveModel } from './pipeline/live-stream.js'
 import { startWhisperServer, stopWhisperServer, transcribeChunk } from './pipeline/whisper-server.js'
 import { processMeeting } from './pipeline/run.js'
-import { readMeeting, writeMeeting, writeMeta } from './store/meetings.js'
+import { readMeeting, writeMeta } from './store/meetings.js'
 import { appendFile } from 'node:fs/promises'
 import { readWavPcm16 } from './audio/wav.js'
-import { listVoices, rememberSpeaker } from './store/voices.js'
 import { audioFile, meetingDir, meetingFile } from './store/paths.js'
 import { loadSettings } from './store/settings.js'
 
 /**
- * The end-to-end check: a real recording, transcription, voice separation.
+ * The end-to-end check: a real recording, transcription, summary.
  *
  * Started as `electron apps/desktop --selftest <file.wav>`: the file is played
  * by an external process, so what gets checked is the actual system audio
@@ -214,9 +209,8 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   }
 
   check(meeting.stages.transcribing === 'done', 'transcription went through', meeting.errors.transcribing ?? '')
-  check(meeting.stages.diarizing === 'done', 'voice separation went through', meeting.errors.diarizing ?? '')
   check(meeting.utterances.length > 0, 'utterances were produced', `${meeting.utterances.length} of them`)
-  check(meeting.speakers.length > 0, 'participants were worked out', `${meeting.speakers.length} of them`)
+  check(meeting.speakers.length > 0, 'the sides of the conversation were worked out', `${meeting.speakers.length} of them`)
 
   const systemUtterances = meeting.utterances.filter((u) => u.track === 'system')
   check(systemUtterances.length > 0, 'the system track was recognised', `${systemUtterances.length} utterances`)
@@ -312,95 +306,12 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     // processing goes, hit that window constantly.
     const { updateMeeting } = await import('./store/meetings.js')
     await Promise.all([
-      updateMeeting(session.meetingId, (m) => ({ ...m, speakerCount: 3 })),
       updateMeeting(session.meetingId, (m) => ({ ...m, tags: ['a mark'] })),
       updateMeeting(session.meetingId, (m) => ({ ...m, title: 'Queue check' }))
     ])
     const after = await readMeeting(session.meetingId)
-    check(after?.speakerCount === 3, 'a simultaneous edit of the participant count survived')
     check(after?.tags[0] === 'a mark', 'a simultaneous edit of the marks survived')
     check(after?.title === 'Queue check', 'a simultaneous rename survived')
-  }
-
-  // --- rebuilding from somewhere other than the start ---
-  {
-    // There was data loss here: starting processing "from voice separation"
-    // assembled the transcript out of nothing and erased it entirely.
-    const before = (await readMeeting(session.meetingId))?.utterances.length ?? 0
-    if (before > 0) {
-      await processMeeting(session.meetingId, 'diarizing')
-      const after = (await readMeeting(session.meetingId))?.utterances.length ?? 0
-      check(after > 0, 'the transcript survives a rebuild from voice separation', `${before} → ${after} utterances`)
-    }
-  }
-
-
-  // ── recognising participants by voice ─────────────────────────────────
-  // The state is read afresh: the check above rebuilds the participants, and a
-  // list read earlier is no longer the same by this point. In the packaged app
-  // voice separation gave different clusters, and the print was taken from an
-  // identifier that no longer exists.
-  const fresh = await readMeeting(session.meetingId)
-  const firstSpeaker = fresh?.speakers[0]
-  if (firstSpeaker) {
-    const before = (await listVoices()).length
-    const profile = await rememberSpeaker(session.meetingId, firstSpeaker.id, 'Test participant')
-    check(profile !== null, 'the voice print was saved')
-    check((await listVoices()).length === before + 1, 'the profile appeared in the registry')
-
-    // A participant's voice may not be recognised by itself: a noisy print, too
-    // few utterances. Then it is linked to a voice already known, by picking a
-    // name from a list. No second print is created; the existing one is refined by
-    // this recording.
-    const again = await rememberSpeaker(session.meetingId, firstSpeaker.id, 'Test participant')
-    check((await listVoices()).length === before + 1, 'linking to a known voice does not breed prints')
-    check(
-      (again?.samples ?? 0) > (profile?.samples ?? 0),
-      'the print was refined by the new recording',
-      `${profile?.samples} → ${again?.samples}`
-    )
-
-    if (profile) {
-      // Recognition is run over the same recording: the participant should be identified.
-      const renamed = await readMeeting(session.meetingId)
-      if (renamed) {
-        await writeMeeting({
-          ...renamed,
-          speakers: renamed.speakers.map((sp) => ({ ...sp, name: undefined, nameSource: 'none' as const }))
-        })
-      }
-      await processMeeting(session.meetingId, 'identifying')
-      const identified = await readMeeting(session.meetingId)
-      const match = identified?.speakers.find((sp) => sp.id === firstSpeaker.id)
-      check(match?.name === 'Test participant', 'the participant was recognised by voice', `name: ${match?.name ?? 'none'}`)
-      check((match?.matchScore ?? 0) > 0.6, 'the recognition confidence is sensible', `${(match?.matchScore ?? 0).toFixed(2)}`)
-
-      const { deleteVoice } = await import('./store/voices.js')
-      await deleteVoice(profile.id)
-    }
-  }
-
-  // ── the dictionary reaches the engine ─────────────────────────────────
-  {
-    const { buildVocabularyPrompt } = await import('./providers/asr/whisper-cpp.js')
-    const { listVoices: voices } = await import('./store/voices.js')
-    const prompt = await buildVocabularyPrompt()
-    // The hint carries more than the dictionary: names from the voice registry go
-    // in too, and they are much of the reason it exists. By this point the test
-    // has already recorded a print, so the hint must not be empty.
-    const expected = [
-      ...settings.vocabulary.filter(Boolean),
-      ...(await voices()).map((v) => v.name).filter(Boolean)
-    ]
-    if (expected.length > 0) {
-      check(
-        expected.every((term) => prompt.includes(term)),
-        'the dictionary and participant names reach the hint',
-        prompt.slice(0, 90)
-      )
-    } else {
-      check(prompt === '', 'without a dictionary or prints the hint is empty')
-    }
   }
 
   // ── marks ─────────────────────────────────────────────────────────────
@@ -584,50 +495,6 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     await deleteMeeting(quiet.meetingId)
   }
 
-  // ── editing the transcript ────────────────────────────────────────────
-  // Split, join, reassign the speaker, cut. All of that writes to disk, so it is
-  // checked on real files rather than on made-up data.
-  {
-    const before = await readMeeting(session.meetingId)
-    const target = before?.utterances[0]
-    if (!before || !target) {
-      check(false, 'there is an utterance to edit')
-    } else {
-      // Split at a space: in the middle of a word the split legitimately inserts a
-      // boundary, and comparing the join against the original text would be meaningless.
-      const middle = Math.floor(target.text.length / 2)
-      const at = target.text.indexOf(' ', middle) + 1 || middle
-      const split = splitUtterance(target, at)
-      check(split !== null, 'an utterance splits in two')
-
-      if (split) {
-        const [head, tail] = split
-        check(head.end <= tail.start + 0.001, 'the halves do not overlap in time',
-          `${head.end.toFixed(2)} and ${tail.start.toFixed(2)}`)
-        check(head.start === target.start && tail.end === target.end, 'the bounds of the original utterance are kept')
-        check(
-          `${head.text} ${tail.text}`.replace(/\s+/g, ' ') === target.text.replace(/\s+/g, ' '),
-          'no text was lost in the split'
-        )
-
-        const merged = mergeUtterances(head, tail)
-        check(merged.text === target.text.trim(), 'joining returns the original text')
-        check(merged.start === target.start && merged.end === target.end, 'joining returns the original bounds')
-      }
-
-      // Per-word confidence is what highlights the doubtful places.
-      const withConfidence = before.utterances.filter((u) =>
-        u.words.some((w) => typeof w.confidence === 'number')
-      )
-      check(withConfidence.length > 0, 'the words carry the model confidence', `${withConfidence.length} utterances`)
-      const level = doubtThreshold(before)
-      check(level >= 0.5 && level <= 0.9, 'the doubt threshold is within sensible bounds', level.toFixed(2))
-      const doubted = before.utterances.reduce((sum, u) => sum + doubtfulWords(u, level).size, 0)
-      const total = before.utterances.reduce((sum, u) => sum + u.words.length, 0)
-      check(doubted < total / 3, 'fewer than a third of the words are underlined', `${doubted} of ${total}`)
-    }
-  }
-
   // ── cutting out a fragment ────────────────────────────────────────────
   // The most dangerous operation: it spoils audio already recorded and cannot be undone.
   {
@@ -797,21 +664,6 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
 
     await copyFile(backup, meetingFile(victim, 'meta.json'))
     await remove(backup, { force: true })
-  }
-
-  // ── the dictionary learns from edits ──────────────────────────────────
-  {
-    const { learnedTerms } = await import('@spyly/core')
-    check(
-      // Russian text on purpose: the dictionary learns from Russian speech,
-      // and a Latin word among Cyrillic is exactly what makes it a term.
-      learnedTerms('поднимем кубернетес', 'поднимем Kubernetes').includes('Kubernetes'),
-      'an edit to the transcript yields a term for the dictionary'
-    )
-    check(
-      learnedTerms('он сказал что придет', 'он сказал что приедет').length === 0,
-      'ordinary words do not ask to join the dictionary'
-    )
   }
 
   // ── a summary from a real model ───────────────────────────────────────

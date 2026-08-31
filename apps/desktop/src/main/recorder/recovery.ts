@@ -108,7 +108,7 @@ async function rebuildBrokenMeetings(): Promise<void> {
  * "Process again" button is already on the recording page.
  */
 async function unstickProcessing(): Promise<void> {
-  const stages = ['transcribing', 'diarizing', 'identifying', 'summarizing'] as const
+  const stages = ['transcribing', 'summarizing'] as const
 
   for (const meta of await listMeetings()) {
     const stuck = stages.filter((stage) => meta.stages[stage] === 'running')

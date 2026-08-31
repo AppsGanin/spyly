@@ -4,7 +4,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   buildAgentPrompt,
-  DEFAULT_PROMPT_TEMPLATES,
   humanDuration,
   renderPlainText,
   renderSummaryMarkdown,
@@ -19,12 +18,11 @@ const HELP = `spyly — your calls in the terminal
   spyly show <id>               the transcript of a recording
   spyly summary <id>            the summary alone
   spyly search <query>          search the transcripts
-  spyly prompt <id> [template]  a ready prompt for a coding agent
+  spyly prompt <id>             the conversation, ready for a coding agent
   spyly where                   where the recordings are kept
   spyly mcp                     start the MCP server (stdio)
 
 Formats: --format md|txt|json (md by default)
-Prompt templates: ${DEFAULT_PROMPT_TEMPLATES.map((tpl) => tpl.id).join(', ')}
 
 Example: spyly last | claude -p "turn this into tickets"
 `
@@ -111,10 +109,7 @@ async function main(): Promise<void> {
     case 'prompt': {
       const id = rest[0]
       if (!id) return void process.stderr.write('Give a recording identifier\n')
-      const templateId = rest[1] ?? 'tasks'
-      const template =
-        DEFAULT_PROMPT_TEMPLATES.find((t) => t.id === templateId) ?? DEFAULT_PROMPT_TEMPLATES[0]!
-      process.stdout.write(buildAgentPrompt({ template, meeting: await resolveMeeting(id) }))
+      process.stdout.write(buildAgentPrompt({ meeting: await resolveMeeting(id) }))
       return
     }
 

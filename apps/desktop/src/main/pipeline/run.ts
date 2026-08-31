@@ -1,18 +1,15 @@
 import { existsSync } from 'node:fs'
 import { t,
   Summary,
-  applyIdentification,
   assignSpeakers,
   buildSummaryPrompt,
   asrFromUtterances,
   buildTitlePrompt,
   cleanTitle,
   isAutoTitle,
-  identifySpeakers,
   isLikelyHallucination,
   stripHallucination,
   levelAt,
-  mergeSpeakers,
   mergeTracks,
   micIsOnlyEcho,
   keepOwnVoice,
@@ -22,23 +19,20 @@ import { t,
   type AsrResult,
   type Meeting,
   type Speaker,
-  type SpeakerTurn,
   type Stage,
   type TrackId,
   type Word
 } from '@spyly/core'
 import { Notification } from 'electron'
 import { send, showMainWindow } from '../index.js'
-import { getDiarizationProvider, getLlmProvider, providerForModel } from '../providers/registry.js'
+import { getLlmProvider, providerForModel } from '../providers/registry.js'
 import { forgetHistory } from '../store/history.js'
 import type { LlmProvider } from '../providers/types.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
-import { embedSpeaker, readWave } from '../providers/diarization/sherpa.js'
 import { levelWindows, readWavPcm16, speechSeconds } from '../audio/wav.js'
 import { readMeeting, updateMeeting, writeMeeting } from '../store/meetings.js'
 import { audioFile } from '../store/paths.js'
 import { loadSettings } from '../store/settings.js'
-import { listVoices } from '../store/voices.js'
 
 const running = new Set<string>()
 
@@ -77,7 +71,7 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
   forgetHistory(meetingId)
 
   const settings = await loadSettings()
-  const order: Stage[] = ['transcribing', 'diarizing', 'identifying', 'summarizing']
+  const order: Stage[] = ['transcribing', 'summarizing']
   const startAt = Math.max(0, order.indexOf(from))
 
   // An earlier error has nothing to do with a new run: leaving it on screen means
@@ -104,7 +98,6 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
   // transcript out of nothing and erased it, on exactly the button offered by
   // the question "how many people were speaking".
   let asrResults: AsrResult[] = startAt > order.indexOf('transcribing') ? asrFromUtterances(meeting.utterances, meeting.language) : []
-  let turnsByTrack = new Map<TrackId, SpeakerTurn[]>()
 
   for (let i = startAt; i < order.length; i++) {
     const stage = order[i]!
@@ -120,16 +113,7 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
         meeting = await save(meeting, {
           providers: { ...meeting.providers, asr: settings.asrModel || preferredModel() }
         })
-      } else if (stage === 'diarizing') {
-        turnsByTrack = await diarizeTracks(
-          meetingId,
-          tracks,
-          settings.diarizationProvider,
-          meeting.speakerCount
-        )
-        meeting = await buildTranscript(meetingId, asrResults, turnsByTrack)
-      } else if (stage === 'identifying') {
-        meeting = await identify(meetingId)
+        meeting = await buildTranscript(meetingId, asrResults)
       } else if (stage === 'summarizing') {
         // A summary is optional. If no model is configured, that is not a transcription
         // failure but simply a step not taken: no reason to alarm anyone in red.
@@ -287,39 +271,6 @@ function loudestSecond(samples: Float32Array, sampleRate: number, from: number, 
 }
 
 /**
- * The tracks are diarized independently.
- *
- * Cluster 0 of the microphone and cluster 0 of the system audio are different
- * people and must not be mixed. On the other hand one person cannot be on both
- * tracks at once, so matching clusters across tracks is not needed either.
- */
-async function diarizeTracks(
-  meetingId: string,
-  tracks: TrackId[],
-  providerId: string,
-  speakerCount?: number
-): Promise<Map<TrackId, SpeakerTurn[]>> {
-  const provider = getDiarizationProvider(providerId)
-  const status = await provider.ready()
-  if (!status.ready) throw new Error(t('разделение по голосам недоступно: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
-
-  const out = new Map<TrackId, SpeakerTurn[]>()
-  for (const [index, track] of tracks.entries()) {
-    report(meetingId, 'diarizing', 'running', index / tracks.length)
-    // The number of participants, when it has been given, is set firmly. It is
-    // split in half between the tracks with room to spare: the microphone carries
-    // whoever is in the room, the system audio the remote people, and nobody knows
-    // the exact split in advance.
-    const perTrack = speakerCount
-      ? Math.max(1, Math.min(speakerCount, tracks.length > 1 ? Math.ceil(speakerCount / 2) + 1 : speakerCount))
-      : undefined
-    const turns = await provider.diarize(audioFile(meetingId, track), { numSpeakers: perTrack })
-    out.set(track, turns)
-  }
-  return out
-}
-
-/**
  * A report of what did not make it into the transcript, and why.
  *
  * There are several filters along the way, and when an utterance disappears no
@@ -368,15 +319,14 @@ function withText<T extends { text: string; words: Word[]; start: number; end: n
 
 async function buildTranscript(
   meetingId: string,
-  asrResults: AsrResult[],
-  turnsByTrack: Map<TrackId, SpeakerTurn[]>
+  asrResults: AsrResult[]
 ): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
 
   const byTrack = new Map<TrackId, ReturnType<typeof assignSpeakers>>()
   for (const asr of asrResults) {
-    const utterances = assignSpeakers(asr, turnsByTrack.get(asr.track) ?? [])
+    const utterances = assignSpeakers(asr)
 
     // Filtering out invented text, by the text and by the audio under the
     // utterance. The text alone is not enough, as the model sometimes makes up a
@@ -480,103 +430,18 @@ async function buildTranscript(
   }
   const utterances = mergeTracks(micUtterances, systemUtterances)
 
-  // Participants come from the utterances rather than from the diarization
-  // segments: once echo is removed some microphone clusters disappear, and they
-  // must not stay in the participant list as empty lines.
+  // Two sides at most, and which is which follows from the track: the microphone
+  // is whoever sits at the computer. A track that produced nothing after the
+  // echo filter is not listed at all.
   const speakers: Speaker[] = []
-  // A speaker may be left without diarization segments, if the whole track went
-  // to one speaker for instance; then they appear only in the utterances.
   for (const u of utterances) {
     if (speakers.some((s) => s.id === u.speakerId)) continue
-    const [track, cluster] = u.speakerId.split(':')
-    speakers.push({
-      id: u.speakerId,
-      track: (track as TrackId) ?? 'system',
-      cluster: Number(cluster ?? 0),
-      isMe: false,
-      nameSource: 'none'
-    })
-  }
-
-  // The utterances are already in time order, so numbering follows first
-  // appearance: that way "Speaker 2" really is the second one in the conversation.
-  const counters = new Map<TrackId, number>()
-  for (const speaker of speakers) {
-    const next = (counters.get(speaker.track) ?? 0) + 1
-    counters.set(speaker.track, next)
-    speaker.number = next
+    speakers.push({ id: u.speakerId, track: u.track })
   }
 
   const next: Meeting = { ...meeting, speakers, utterances }
   await writeMeeting(next)
   return next
-}
-
-/** Fill in the names of regular participants from their voice prints. */
-async function identify(meetingId: string): Promise<Meeting> {
-  const meeting = await readMeeting(meetingId)
-  if (!meeting) throw new Error(t('встреча не найдена'))
-
-  const profiles = await listVoices()
-  if (profiles.length === 0 || meeting.speakers.length === 0) return meeting
-
-  const clusters: { speakerId: string; embedding: number[]; ownTrack: boolean }[] = []
-  for (const track of new Set(meeting.speakers.map((s) => s.track))) {
-    const file = audioFile(meetingId, track)
-    if (!existsSync(file)) continue
-    const wave = await readWave(file)
-    // The voice print is taken from a participant's utterances rather than from
-    // the separation segments. Once echo is removed these are no longer the same
-    // thing: some segments were left without utterances, and a print over them was
-    // either not computed at all or computed over somebody else's speech. On a
-    // real recording this left the second microphone cluster without a print and
-    // nameless, even though by its utterances it matched at 0.502.
-    const turns = meeting.utterances
-      .filter((u) => u.track === track)
-      .map((u) => ({ start: u.start, end: u.end, cluster: Number(u.speakerId.split(':')[1] ?? 0) }))
-
-    for (const speaker of meeting.speakers.filter((s) => s.track === track)) {
-      const embedding = embedSpeaker(wave.samples, wave.sampleRate, turns, speaker.cluster)
-      // The microphone track is whoever sits at the computer: the recognition
-      // threshold for your own print is gentler there.
-      if (embedding) clusters.push({ speakerId: speaker.id, embedding, ownTrack: track === 'mic' })
-    }
-  }
-
-  const matches = identifySpeakers(clusters, profiles)
-  const identified = applyIdentification(meeting.speakers, matches)
-  const next = mergeSameSpeaker({ ...meeting, speakers: identified })
-  await writeMeeting(next)
-  return next
-}
-
-/**
- * Merge clusters recognised as the same person.
- *
- * Voice separation can break one person's speech into several clusters. While
- * they are nameless this shows only as extra "Speaker 4" and "In the room 6";
- * but if both matched the same voice print there is no reason to keep them
- * apart, as the person appeared twice in the participant list and their share
- * of the conversation was halved.
- */
-function mergeSameSpeaker(meeting: Meeting): Meeting {
-  const keep = new Map<string, string>()
-  const remap = new Map<string, string>()
-
-  for (const speaker of meeting.speakers) {
-    if (!speaker.name || speaker.nameSource !== 'voice-match') continue
-    // The same person cannot be on two tracks at once, so merging happens only
-    // within one track.
-    const key = `${speaker.track}:${speaker.name}`
-    const first = keep.get(key)
-    if (first === undefined) keep.set(key, speaker.id)
-    else remap.set(speaker.id, first)
-  }
-  if (remap.size === 0) return meeting
-
-  let out = meeting
-  for (const [from, to] of remap) out = mergeSpeakers(out, from, to)
-  return out
 }
 
 async function summarize(meetingId: string, providerId: string): Promise<Meeting> {

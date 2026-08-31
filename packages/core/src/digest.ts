@@ -46,14 +46,9 @@ export function buildDigest(meetings: readonly Meeting[], from: Date, to: Date, 
   for (const meeting of inRange) {
     seconds += meeting.durationSec
 
-    // One person in one recording is counted once: otherwise a talkative
-    // participant would look like several different people.
+    // Names come from the calendar: the transcript itself knows only "you" and
+    // "the other side", and guessing who that was by voice was removed.
     const seen = new Set<string>()
-    for (const speaker of meeting.speakers) {
-      if (!speaker.name || speaker.isMe || seen.has(speaker.name)) continue
-      seen.add(speaker.name)
-      people.set(speaker.name, (people.get(speaker.name) ?? 0) + 1)
-    }
     for (const name of meeting.calendarParticipants) {
       if (seen.has(name)) continue
       seen.add(name)

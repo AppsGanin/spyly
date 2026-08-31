@@ -54,22 +54,17 @@ describe('marking up the marked moments', () => {
   })
 })
 
-describe('the participant caption', () => {
-  it('a name beats everything', () => {
-    expect(speakerLabel(Speaker.parse({ id: 'system:0', track: 'system', cluster: 0, name: 'Мария' }), 'system:0'))
-      .toBe('Мария')
+describe('the caption for a side', () => {
+  it('the microphone is you', () => {
+    expect(speakerLabel(Speaker.parse({ id: 'mic', track: 'mic' }), 'mic')).toBe('Вы')
   })
 
-  it('your own speech is called "You"', () => {
-    expect(speakerLabel(Speaker.parse({ id: 'mic:0', track: 'mic', cluster: 0, isMe: true }), 'mic:0')).toBe('Вы')
+  it('the system audio is the other side', () => {
+    expect(speakerLabel(Speaker.parse({ id: 'system', track: 'system' }), 'system')).toBe('Собеседник')
   })
 
-  it('with no name, a number by track', () => {
-    expect(speakerLabel(Speaker.parse({ id: 'system:1', track: 'system', cluster: 1 }), 'system:1')).toBe('Участник 2')
-    expect(speakerLabel(Speaker.parse({ id: 'mic:1', track: 'mic', cluster: 1 }), 'mic:1')).toBe('В комнате 2')
-  })
-
-  it('an unknown participant is shown by their identifier', () => {
-    expect(speakerLabel(undefined, 'system:7')).toBe('system:7')
+  it('without a speaker the track is read off the identifier', () => {
+    expect(speakerLabel(undefined, 'mic')).toBe('Вы')
+    expect(speakerLabel(undefined, 'system')).toBe('Собеседник')
   })
 })

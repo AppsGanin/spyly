@@ -1,10 +1,8 @@
 import type {
   Meeting,
   MeetingMeta,
-  PromptTemplate,
   Related,
-  Summary,
-  VoiceProfile
+  Summary
 } from '@spyly/core'
 
 /** What the level meter and the recording pill show. */
@@ -76,7 +74,7 @@ export interface CalendarEventInfo {
 export interface ProviderInfo {
   id: string
   name: string
-  kind: 'asr' | 'diarization' | 'llm'
+  kind: 'asr' | 'llm'
   local: boolean
   /** Ready to work: the model downloaded or the key entered. */
   ready: boolean
@@ -92,8 +90,6 @@ export interface Settings {
   /** Which recognition model to use; empty means the largest one downloaded. */
   asrModel: string
   /** Names, terms and project names, a hint for recognition. */
-  vocabulary: string[]
-  diarizationProvider: string
   llmProvider: string
   /**
    * A service with an API like OpenAI's: OpenRouter, Groq, a local vLLM and the
@@ -105,7 +101,6 @@ export interface Settings {
   autoSummarize: boolean
   autoDetectCalls: 'off' | 'notify' | 'auto'
   storageDir: string
-  promptTemplates: PromptTemplate[]
   onboardingDone: boolean
   /** Record system audio from the chosen applications only, by default. */
   preferredApps: string[]
@@ -116,13 +111,22 @@ export interface ModelInfo {
   name: string
   sizeBytes: number
   downloaded: boolean
+  /**
+   * Whether a download is running right now.
+   *
+   * Kept apart from `progress`, because zero is a legitimate value at the very
+   * start of one. Deleting a model reported progress 0, the interface read that
+   * as a download in progress, and a model that had just been removed showed
+   * "downloading, 0%".
+   */
+  downloading?: boolean
   /** 0..1 while the download runs. */
   progress?: number
   /** The download is stopped but what was downloaded is kept, so it can be resumed. */
   paused?: boolean
   /** How many bytes are already in the partial file. */
   resumableBytes?: number
-  purpose: 'asr' | 'diarization' | 'embedding' | 'vad'
+  purpose: 'asr' | 'vad'
   /** A human name for the variant: the user chooses quality, not a file. */
   tier?: string
   /** What the variant does differently in practice. */
@@ -179,7 +183,6 @@ export interface IpcRequests {
   'meetings:search': (query: string) => { meeting: MeetingMeta; snippet: string }[]
   'meetings:delete': (id: string) => void
   'meetings:update': (id: string, patch: Partial<MeetingMeta>) => MeetingMeta
-  'meetings:renameSpeaker': (id: string, speakerId: string, name: string, remember: boolean) => Meeting
   /**
    * Undo and redo of edits to a recording.
    *
@@ -189,32 +192,19 @@ export interface IpcRequests {
   'edit:history': (id: string) => { canUndo: boolean; canRedo: boolean }
   'edit:undo': (id: string) => { meeting: Meeting; label: string } | null
   'edit:redo': (id: string) => { meeting: Meeting; label: string } | null
-  'meetings:editUtterance': (
-    id: string,
-    utteranceId: string,
-    text: string
-  ) => { meeting: Meeting; terms: string[] }
-  /** Adding to the term dictionary; returns the resulting list. */
-  'vocab:add': (terms: string[]) => string[]
-  /** Split an utterance at the given character. */
-  'meetings:splitUtterance': (id: string, utteranceId: string, charIndex: number) => Meeting
-  /** Join an utterance with the next one. */
-  'meetings:mergeUtterance': (id: string, utteranceId: string) => Meeting
-  /** Reassign an utterance to another participant. */
-  'meetings:reassignUtterance': (id: string, utteranceId: string, speakerId: string) => Meeting
   /** The draft transcript that was visible during the recording. */
   'meetings:live': (id: string) => { track: 'mic' | 'system'; text: string; start: number; end: number }[]
-  /** Recordings on the same subject, by shared words and participants. */
+  /** Recordings on the same subject, by shared words and calendar participants. */
   'meetings:related': (id: string) => Related[]
   /** Silence a stretch and remove the utterances that fall inside it. */
   'meetings:removeRange': (id: string, from: number, to: number) => { meeting: Meeting; removed: number }
   /** Editing the summary by hand: the machine makes mistakes, and they have to be fixable. */
   'meetings:updateSummary': (id: string, summary: Summary) => Meeting
-  'meetings:reprocess': (id: string, from: 'transcribing' | 'diarizing' | 'summarizing') => void
+  'meetings:reprocess': (id: string, from: 'transcribing' | 'summarizing') => void
   'meetings:audioPath': (id: string, track: 'mic' | 'system' | 'mix') => string | null
 
   'export:markdown': (id: string) => string
-  'export:copyPrompt': (id: string, templateId: string) => string
+  'export:copyPrompt': (id: string) => string
   'export:revealFolder': (id: string) => void
   'agents:status': () => AgentStatus[]
   'agents:setConnection': (id: AgentId, connect: boolean) => { ok: boolean; message: string }
@@ -233,12 +223,6 @@ export interface IpcRequests {
   'models:cancel': (id: string) => void
   'models:remove': (id: string) => void
 
-  'voices:list': () => VoiceProfile[]
-  'voices:delete': (id: string) => void
-  /** Whether the print model is ready: without it there is nothing to remember a voice with. */
-  'voices:ready': () => { ready: boolean; hint?: string }
-  'voices:enrollStart': () => void
-  'voices:enrollStop': (name: string) => VoiceProfile | null
 
   /**
    * Audio from the renderer, the path for Windows and Linux.

@@ -78,7 +78,7 @@ export function parseWhen(input: string | undefined, now = new Date()): Date | n
 export function meetingStatus(meeting: Pick<Meeting, 'stages' | 'utterances' | 'summary'>): MeetingStatus {
   const stages = meeting.stages ?? {}
   if (Object.values(stages).includes('running')) return 'processing'
-  if (stages.transcribing === 'failed' || stages.diarizing === 'failed') return 'failed'
+  if (stages.transcribing === 'failed') return 'failed'
   if ((meeting.utterances?.length ?? 0) === 0) return 'no-transcript'
   if (!meeting.summary) return 'no-summary'
   return 'done'
@@ -94,8 +94,10 @@ export function matchesFilter(meeting: Meeting, filter: MeetingFilter, now = new
   if (filter.status && meetingStatus(meeting) !== filter.status) return false
 
   if (filter.speaker) {
+    // The transcript knows two sides and no names; who was on the other end is
+    // known only from the calendar, so that is what a name is matched against.
     const needle = filter.speaker.toLowerCase()
-    const found = meeting.speakers.some((s) => (s.name ?? '').toLowerCase().includes(needle))
+    const found = meeting.calendarParticipants.some((name) => name.toLowerCase().includes(needle))
     if (!found) return false
   }
   return true

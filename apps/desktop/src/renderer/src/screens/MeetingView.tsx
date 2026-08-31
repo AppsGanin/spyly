@@ -6,7 +6,6 @@ import { t,
   speakingShares,
   timecode,
   type Meeting,
-  type Speaker,
   type Utterance
 } from '@spyly/core'
 import { api, useAsync, useIpcEvent } from '../lib/api'
@@ -14,7 +13,7 @@ import { useShortcuts } from '../lib/shortcuts'
 import { fullDateLabel, uiLocale } from '../lib/dates'
 import { IconAlert, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconChevron, IconContinueRecord, IconSearch, IconStop, IconTag, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Button, Field, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
+import { Button, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
 import { ExportBar } from '../components/ExportBar'
 import { LiveTranscript } from '../components/LiveTranscript'
 import { Player, type PlayerTrack } from '../components/Player'
@@ -30,15 +29,11 @@ const MODEL_LABELS: Record<string, string> = {
   'gigaam-v3-ru': 'GigaAM v3',
   'parakeet-tdt-v3': 'Parakeet TDT v3',
   'nemotron-3.5': 'Nemotron Speech 3.5',
-  'whisper-medium': 'Whisper medium',
-  'whisper-small': 'Whisper small'
 }
 
 const STAGE_LABELS: Record<string, string> = {
   recording: t('Запись'),
   transcribing: t('Расшифровка'),
-  diarizing: t('Разделение по голосам'),
-  identifying: t('Узнавание участников'),
   summarizing: t('Конспект')
 }
 
@@ -58,15 +53,11 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   const [inMeetingQuery, setInMeetingQuery] = useState('')
   const [matchIndex, setMatchIndex] = useState(0)
   const [speakerFilter, setSpeakerFilter] = useState<SpeakerFilter>('all')
-  const [reassigning, setReassigning] = useState<Utterance | null>(null)
   const [cutting, setCutting] = useState<Utterance | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
-  const [renaming, setRenaming] = useState<Speaker | null>(null)
-  const [learned, setLearned] = useState<string[]>([])
   // Not following to begin with: on opening a recording the list should stay
   // where it is rather than scroll to the first utterance and hide the player.
   const [follow, setFollow] = useState(false)
-  const { data: voicesReady } = useAsync(() => api.call('voices:ready'), [id])
   const isRecordingThis =
     recording.meetingId === id && (recording.status === 'recording' || recording.status === 'paused')
   // The draft is written up to the moment of stopping, so it is read again once
@@ -214,13 +205,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     )
   }
 
-  const rename = async (name: string, remember: boolean) => {
-    if (!renaming) return
-    await api.call('meetings:renameSpeaker', id, renaming.id, name, remember)
-    setRenaming(null)
-    reload()
-  }
-
   const regenerate = async () => {
     // The flag is needed exactly until the first pipeline event: after that the
     // state comes from the recording itself. It used to come off on a timer after a
@@ -256,12 +240,12 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   // Plus a short "just pressed" flag: the first event does not arrive instantly.
   const summarizing = reallyRunning || justAsked
 
-  const stages = ['recording', 'transcribing', 'diarizing', 'identifying', 'summarizing'] as const
+  const stages = ['recording', 'transcribing', 'summarizing'] as const
   const busy = stages.some((s) => meeting.stages[s] === 'running')
   // The stage panel takes up half the screen, so it is shown only while work is
   // under way or something substantial has broken. A summary that was never made
   // is explained right on the "Summary" tab.
-  const broken = meeting.stages.transcribing === 'failed' || meeting.stages.diarizing === 'failed'
+  const broken = meeting.stages.transcribing === 'failed'
   const anyFailed = broken
 
   return (
@@ -374,7 +358,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                 }
                 items={[
                   { label: t('Всё заново, начиная с расшифровки'), stage: 'transcribing' as const },
-                  { label: t('Разделение по голосам и дальше'), stage: 'diarizing' as const },
                   { label: t('Только конспект'), stage: 'summarizing' as const }
                 ].map((item) => ({
                   label: item.label,
@@ -407,7 +390,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       <div className="main__scroll" style={{ paddingTop: 'var(--space-5)' }}>
         {tab === 'live' ? (
-          <LiveDraft lines={draft} speakers={meeting.speakers} onSeek={seek} />
+          <LiveDraft lines={draft} onSeek={seek} />
         ) : tab === 'summary' ? (
           <SummaryPanel
             meeting={meeting}
@@ -510,7 +493,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
             )}
 
             <TranscriptSelection meeting={meeting} />
-            <SpeakerCount meeting={meeting} onDone={reload} />
             <SpeakingStats meeting={meeting} />
             <Transcript
               meeting={meeting}
@@ -528,26 +510,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
                   setFollow(true)
                   seek(seconds)
                 },
-                onRenameSpeaker: setRenaming,
-                onEditUtterance: async (utteranceId, text) => {
-                  const { terms } = await api.call('meetings:editUtterance', id, utteranceId, text)
-                  if (terms.length > 0) setLearned(terms)
-                },
-                onSplit: async (utteranceId, charIndex) => {
-                  try {
-                    await api.call('meetings:splitUtterance', id, utteranceId, charIndex)
-                  } catch (error) {
-                    notify('error', error instanceof Error ? error.message : t('Не получилось разделить'))
-                  }
-                },
-                onMergeNext: async (utteranceId) => {
-                  try {
-                    await api.call('meetings:mergeUtterance', id, utteranceId)
-                  } catch (error) {
-                    notify('error', error instanceof Error ? error.message : t('Не получилось склеить'))
-                  }
-                },
-                onReassign: setReassigning,
                 onRemoveRange: setCutting
               }}
             />
@@ -555,24 +517,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
         )}
       </div>
 
-      <LearnedTerms terms={learned} onClose={() => setLearned([])} />
-
-      <ReassignDialog
-        meetingId={id}
-        utterance={reassigning}
-        speakers={meeting.speakers}
-        onClose={() => setReassigning(null)}
-      />
-
       <CutDialog meetingId={id} utterance={cutting} onClose={() => setCutting(null)} />
-
-      <SpeakerDialog
-        speaker={renaming}
-        meeting={meeting}
-        canRemember={voicesReady?.ready ?? false}
-        onClose={() => setRenaming(null)}
-        onSave={(name, remember) => void rename(name, remember)}
-      />
 
       <Modal
         open={confirmDelete}
@@ -685,18 +630,11 @@ function shortWhen(iso: string): string {
  */
 function LiveDraft({
   lines,
-  speakers,
   onSeek
 }: {
   lines: { track: 'mic' | 'system'; text: string; start: number; end: number }[]
-  speakers: Speaker[]
   onSeek: (seconds: number) => void
 }) {
-  // The names come from the final transcript when there already is one: "You"
-  // and "The other side" beat nothing, but a name is better.
-  const mine = speakers.find((s) => s.isMe)?.name
-  const remote = speakers.find((s) => !s.isMe && s.name)?.name
-
   return (
     <div className="col" style={{ gap: 'var(--space-4)', maxWidth: 780 }}>
       <p className="field__hint">{t('Так расшифровка выглядела во время записи: она собиралась на лету и по частям, поэтому менее точна. Полный текст — на вкладке «Расшифровка».')}</p>
@@ -718,7 +656,7 @@ function LiveDraft({
                   style={{ background: `var(--ds-${line.track === 'mic' ? 'blue' : 'green'}-900)` }}
                 />
                 <span style={{ color: `var(--ds-${line.track === 'mic' ? 'blue' : 'green'}-900)` }}>
-                  {line.track === 'mic' ? (mine ?? t('Вы')) : (remote ?? t('Собеседник'))}
+                  {line.track === 'mic' ? t('Вы') : t('Собеседник')}
                 </span>
               </div>
               <div className="utterance__text">{line.text}</div>
@@ -802,68 +740,6 @@ function ContinueButton({ meeting }: { meeting: Meeting }) {
   )
 }
 
-function ReassignDialog({
-  meetingId,
-  utterance,
-  speakers,
-  onClose
-}: {
-  meetingId: string
-  utterance: Utterance | null
-  speakers: Speaker[]
-  onClose: () => void
-}) {
-  const { notify } = useStore()
-  const [busy, setBusy] = useState(false)
-
-  const assign = async (speakerId: string) => {
-    if (!utterance) return
-    setBusy(true)
-    try {
-      await api.call('meetings:reassignUtterance', meetingId, utterance.id, speakerId)
-      onClose()
-    } catch (error) {
-      notify('error', error instanceof Error ? error.message : t('Не получилось. Попробуйте ещё раз'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal
-      open={utterance !== null}
-      onClose={onClose}
-      title={t('Кто это сказал?')}
-      actions={<Button onClick={onClose}>{t('Отмена')}</Button>}
-    >
-      {utterance && (
-        <>
-          <p className="field__hint" style={{ marginBottom: 'var(--space-3)' }}>
-            «{utterance.text.slice(0, 120)}
-            {utterance.text.length > 120 ? '…' : ''}»
-          </p>
-          <div className="picklist">
-            {speakers.map((speaker, index) => (
-              <button
-                key={speaker.id}
-                className={`picklist__item ${speaker.id === utterance.speakerId ? 'picklist__item--on' : ''}`}
-                disabled={busy}
-                onClick={() => void assign(speaker.id)}
-              >
-                <span
-                  className="speaker-dot"
-                  style={{ background: `var(--ds-${accentFor(speaker.id, index)}-900)` }}
-                />
-                <span className="grow">{speakerLabel(speaker, speaker.id)}</span>
-                {speaker.id === utterance.speakerId && <span className="dim">{t('сейчас')}</span>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </Modal>
-  )
-}
 
 /**
  * Cutting out a fragment.
@@ -927,51 +803,6 @@ function CutDialog({
   )
 }
 
-function LearnedTerms({ terms, onClose }: { terms: string[]; onClose: () => void }) {
-  const { notify } = useStore()
-  const [picked, setPicked] = useState<string[]>([])
-
-  useEffect(() => setPicked(terms), [terms])
-
-  const save = async () => {
-    if (picked.length > 0) {
-      await api.call('vocab:add', picked)
-      notify('success', picked.length === 1 ? t('«{term}» в словаре', { term: picked[0] ?? '' }) : t('Терминов в словаре: +{n}', { n: picked.length }))
-    }
-    onClose()
-  }
-
-  return (
-    <Modal
-      open={terms.length > 0}
-      onClose={onClose}
-      title={t('Запомнить термин?')}
-      actions={
-        <>
-          <Button onClick={onClose}>{t('Отмена')}</Button>
-          <Button variant="primary" onClick={() => void save()} disabled={picked.length === 0}>{t('Запомнить')}</Button>
-        </>
-      }
-    >
-      <p className="field__hint">{t('В следующих записях расшифровщик будет знать эти слова и реже их исказит.')}</p>
-      <div className="chips">
-        {terms.map((term) => {
-          const on = picked.includes(term)
-          return (
-            <button
-              key={term}
-              className={`chip chip--toggle ${on ? 'chip--on' : ''}`}
-              aria-pressed={on}
-              onClick={() => setPicked(on ? picked.filter((t) => t !== term) : [...picked, term])}
-            >
-              {term}
-            </button>
-          )
-        })}
-      </div>
-    </Modal>
-  )
-}
 
 function TagEditor({ tags, onChange }: { tags: string[]; onChange: (next: string[]) => Promise<void> }) {
   const [open, setOpen] = useState(false)
@@ -1041,59 +872,6 @@ function TagEditor({ tags, onChange }: { tags: string[]; onChange: (next: string
  * the answer becomes exact. We only offer this when the result is plainly
  * implausible: in the ordinary case an extra question is pointless.
  */
-function SpeakerCount({ meeting, onDone }: { meeting: Meeting; onDone: () => void }) {
-  const { notify } = useStore()
-  const [busy, setBusy] = useState(false)
-  const found = meeting.speakers.length
-
-  // More than six voices on an ordinary call nearly always means a separation
-  // error rather than a meeting room with eight people in it.
-  const suspicious = found > 6
-  if (!suspicious && !meeting.speakerCount) return null
-
-  const apply = async (count: number) => {
-    setBusy(true)
-    try {
-      await api.call('meetings:update', meeting.id, { speakerCount: count })
-      await api.call('meetings:reprocess', meeting.id, 'diarizing')
-      notify('info', t('Пересобираю участников, это займёт около минуты'))
-      onDone()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="card" style={{ padding: 'var(--space-3) var(--space-4)' }}>
-      <div className="spread" style={{ gap: 'var(--space-3)' }}>
-        <div className="grow">
-          <div style={{ fontWeight: 500 }}>
-            {meeting.speakerCount
-              ? t('Участников указано: {meeting_speakerCount}', { meeting_speakerCount: meeting.speakerCount })
-              : t('Нашлось голосов: {found}', { found: found })}
-          </div>
-          <div className="field__hint">
-            {meeting.speakerCount
-              ? t('Можно поменять, разделение пересоберётся')
-              : t('Похоже на ошибку разделения. Укажите, сколько человек говорило, и оно пересоберётся')}
-          </div>
-        </div>
-        <div className="row" style={{ gap: 'var(--space-1)' }}>
-          {[2, 3, 4, 5, 6].map((count) => (
-            <button
-              key={count}
-              className={`segmented__item ${meeting.speakerCount === count ? 'segmented__item--active' : ''}`}
-              disabled={busy}
-              onClick={() => void apply(count)}
-            >
-              {count}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function SpeakingStats({ meeting }: { meeting: Meeting }) {
   const shares = speakingShares(meeting.utterances)
@@ -1256,102 +1034,3 @@ function EditableTitle({ value, onChange }: { value: string; onChange: (next: st
   )
 }
 
-function SpeakerDialog({
-  speaker,
-  meeting,
-  canRemember,
-  onClose,
-  onSave
-}: {
-  speaker: Speaker | null
-  meeting: Meeting
-  /** Whether the print model is there: without it there is nothing to remember a voice with. */
-  canRemember: boolean
-  onClose: () => void
-  onSave: (name: string, remember: boolean) => void
-}) {
-  const [name, setName] = useState('')
-  const [remember, setRemember] = useState(true)
-  // Prints are read again on every open: a voice may have been remembered just
-  // now, on a neighbouring recording.
-  const { data: voices } = useAsync(() => api.call('voices:list'), [speaker?.id])
-
-  useEffect(() => {
-    setName(speaker?.name ?? '')
-    setRemember(canRemember)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speaker?.id, canRemember])
-
-  if (!speaker) return null
-  const where = speaker.track === 'mic' ? t('говорит рядом с вами') : t('на том конце звонка')
-  // The calendar already knows who was expected at the meeting, so there is no reason to type names.
-  const taken = new Set(meeting.speakers.map((s) => s.name).filter(Boolean))
-  const suggestions = meeting.calendarParticipants.filter((p) => !taken.has(p))
-  // Voices already taken by other participants of this recording are not offered:
-  // one person cannot speak in two places at once.
-  const known = (voices ?? []).filter((v) => v.name === speaker.name || !taken.has(v.name))
-
-  return (
-    <Modal
-      open={Boolean(speaker)}
-      onClose={onClose}
-      title={t('Кто это?')}
-      actions={
-        <>
-          <Button onClick={onClose}>{t('Отмена')}</Button>
-          <Button variant="primary" onClick={() => onSave(name, remember)} disabled={!name.trim()}>{t('Сохранить')}</Button>
-        </>
-      }
-    >
-      <p className="muted">
-        {t('Участник {who} — {where}. В расшифровке у него {n} реплик.', { who: speakerLabel(speaker, speaker.id), where, n: meeting.utterances.filter((u) => u.speakerId === speaker.id).length })}
-      </p>
-      <Field label={t('Имя')}>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Например, Дима')} autoFocus />
-      </Field>
-
-      {/* Голос мог не узнаться: слепок шумный, реплик мало, человек говорил
-          тише обычного. Тогда участника привязывают к уже знакомому голосу
-          руками — выбором из списка, а не угадыванием написания имени. */}
-      {known.length > 0 && (
-        <div className="col" style={{ gap: 'var(--space-2)' }}>
-          <span className="field__hint">{t('Знакомые голоса. Выберите, если это кто-то из них — слепок уточнится по этой записи:')}</span>
-          <div className="chips">
-            {known.map((voice) => (
-              <button
-                key={voice.id}
-                className={`chip ${name.trim().toLowerCase() === voice.name.toLowerCase() ? 'chip--on' : ''}`}
-                onClick={() => {
-                  setName(voice.name)
-                  setRemember(canRemember)
-                }}
-              >
-                {voice.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {suggestions.length > 0 && (
-        <div className="col" style={{ gap: 'var(--space-2)' }}>
-          <span className="field__hint">{t('События из календаря. Нажмите, чтобы подставить:')}</span>
-          <div className="chips">
-            {suggestions.map((suggestion) => (
-              <button key={suggestion} className="chip" onClick={() => setName(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {canRemember && (
-        <label className="row" style={{ gap: 'var(--space-2)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-          <span className="grow">{t('Запомнить голос')}<span className="dim">{t('— в следующий раз имя подставится само')}</span>
-          </span>
-        </label>
-      )}
-    </Modal>
-  )
-}

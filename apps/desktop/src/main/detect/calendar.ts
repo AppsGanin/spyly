@@ -10,7 +10,7 @@ import { app } from 'electron'
  * They are read by the native helper: Electron has no access to EventKit. The
  * calendar is there for exactly one thing, so that a recording is called
  * "Billing call" straight away rather than "Recording, 27 August", and the
- * participants are known before diarization.
+ * participants are known before the conversation is processed.
  */
 
 export interface CalendarEvent {

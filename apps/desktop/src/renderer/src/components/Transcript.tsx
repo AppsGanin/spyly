@@ -7,10 +7,9 @@ import { t,
   timecode,
   type Mark,
   type Meeting,
-  type Speaker,
   type Utterance
 } from '@spyly/core'
-import { IconMore, IconUsers, IconVoiceMatch } from '../lib/icons'
+import { IconMore, IconUsers } from '../lib/icons'
 import { EmptyState, IconButton, Menu } from '../ui'
 
 /** Who is speaking: a filter over the transcript, not over the audio. */
@@ -63,25 +62,16 @@ function withDoubts(utterance: Utterance, threshold: number): ReactNode {
   ))
 }
 
-/** The caret offset in characters from the start of the element, needed for "split here". */
-function caretOffset(root: HTMLElement): number | null {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return null
-  const range = selection.getRangeAt(0)
-  if (!root.contains(range.startContainer)) return null
-  const before = range.cloneRange()
-  before.selectNodeContents(root)
-  before.setEnd(range.startContainer, range.startOffset)
-  return before.toString().length
-}
 
 export interface TranscriptActions {
   onSeek: (seconds: number) => void
-  onRenameSpeaker: (speaker: Speaker) => void
-  onEditUtterance: (utteranceId: string, text: string) => void
-  onSplit: (utteranceId: string, charIndex: number) => void
-  onMergeNext: (utteranceId: string) => void
-  onReassign: (utterance: Utterance) => void
+  /**
+   * Silencing a stretch of the recording.
+   *
+   * The only thing that still changes a transcript. Editing the text by hand
+   * was removed: a record of what was said stops being one as soon as it can be
+   * rewritten. This is not editing but redaction, and it takes the audio with it.
+   */
   onRemoveRange: (utterance: Utterance) => void
 }
 
@@ -112,7 +102,6 @@ export function Transcript({
 }) {
   const activeRef = useRef<HTMLDivElement>(null)
   const matchRef = useRef<HTMLElement>(null)
-  const caretRef = useRef<{ id: string; at: number } | null>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
   // The threshold is measured over the whole recording rather than a single
@@ -187,20 +176,13 @@ export function Transcript({
     matchRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [current?.id, current?.at])
 
-  // Nobody was recognised by voice, so "mine" is the microphone track: whoever's
-  // microphone it is, they are the one at the computer. This used to be `??`, but
-  // `isMe` defaults to `false` rather than `undefined`, so the fallback never
-  // fired: the "Only mine" filter showed nothing even where the person had spoken.
-  const anyoneIsMe = useMemo(() => meeting.speakers.some((s) => s.isMe), [meeting.speakers])
-
+  // Yours is the microphone track: it is your computer and your microphone.
   const shown = useMemo(() => {
     if (speakerFilter === 'all') return meeting.utterances
-    return meeting.utterances.filter((u) => {
-      const speaker = speakers.get(u.speakerId)
-      const mine = anyoneIsMe ? (speaker?.isMe ?? false) : u.track === 'mic'
-      return speakerFilter === 'me' ? mine : !mine
-    })
-  }, [meeting.utterances, speakerFilter, speakers, anyoneIsMe])
+    return meeting.utterances.filter((u) =>
+      speakerFilter === 'me' ? u.track === 'mic' : u.track !== 'mic'
+    )
+  }, [meeting.utterances, speakerFilter])
 
   if (meeting.utterances.length === 0) {
     return (
@@ -232,7 +214,6 @@ export function Transcript({
         const isCurrentMatch = current?.id === utterance.id
         // While a search is running the text is not editable: highlighting lives in
         // the markup, and an edit would mix it into the content.
-        const editable = !needle
 
         return (
           <div
@@ -252,43 +233,17 @@ export function Transcript({
             </button>
             <div style={{ minWidth: 0 }}>
               {!sameSpeaker && (
-                <button
-                  className="utterance__speaker"
-                  onClick={() => speaker && actions.onRenameSpeaker(speaker)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}
-                  title={t('Назвать участника')}
-                >
+                <div className="utterance__speaker">
                   <span className="speaker-dot" style={{ background: `var(--ds-${accent}-900)` }} />
                   <span style={{ color: `var(--ds-${accent}-900)` }}>
                     {speakerLabel(speaker, utterance.speakerId)}
                   </span>
                   {marked && <span className="badge badge--amber">{t('важное')}</span>}
-                  {/* Подпись «узнан по голосу» повторялась у каждой реплики и
-                      забивала строку — оставили значок с подсказкой. */}
-                  {speaker?.nameSource === 'voice-match' && (
-                    <span className="voicemark" title={t('Имя подставлено по слепку голоса')} role="img" aria-label={t('узнан по голосу')}>
-                      <IconVoiceMatch size={13} />
-                    </span>
-                  )}
-                </button>
+                </div>
               )}
               <div
                 ref={isCurrentMatch ? (matchRef as React.RefObject<HTMLDivElement>) : undefined}
                 className="utterance__text"
-                contentEditable={editable}
-                suppressContentEditableWarning
-                onKeyUp={(e) => {
-                  const at = caretOffset(e.currentTarget)
-                  if (at !== null) caretRef.current = { id: utterance.id, at }
-                }}
-                onMouseUp={(e) => {
-                  const at = caretOffset(e.currentTarget)
-                  if (at !== null) caretRef.current = { id: utterance.id, at }
-                }}
-                onBlur={(e) => {
-                  const next = e.currentTarget.textContent ?? ''
-                  if (next.trim() !== utterance.text.trim()) actions.onEditUtterance(utterance.id, next.trim())
-                }}
               >
                 {needle
                   ? highlight(utterance.text, query, isCurrentMatch ? current.at : null)
@@ -308,28 +263,6 @@ export function Transcript({
                   </IconButton>
                 }
                 items={[
-                  {
-                    label: t('Это говорил кто-то другой'),
-                    onSelect: () => actions.onReassign(utterance),
-                    disabled: meeting.speakers.length < 2,
-                    hint: meeting.speakers.length < 2 ? t('В записи только один участник') : undefined
-                  },
-                  {
-                    label: t('Разделить здесь'),
-                    onSelect: () => {
-                      const caret = caretRef.current
-                      actions.onSplit(utterance.id, caret?.id === utterance.id ? caret.at : 0)
-                    },
-                    disabled: !editable,
-                    hint: editable
-                      ? t('Поставьте курсор в текст, где нужно разделить')
-                      : t('Во время поиска реплики не правятся')
-                  },
-                  {
-                    label: t('Склеить со следующей'),
-                    onSelect: () => actions.onMergeNext(utterance.id),
-                    disabled: index === shown.length - 1
-                  },
                   {
                     label: t('Вырезать этот фрагмент'),
                     onSelect: () => actions.onRemoveRange(utterance),

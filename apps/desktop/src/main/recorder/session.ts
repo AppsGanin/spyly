@@ -67,8 +67,8 @@ interface Track {
  * One recording session.
  *
  * The tracks are written separately and never mixed: that gives the "room
- * versus remote" split for free, removes echo and lets each track be diarized
- * independently.
+ * versus remote" split for free and removes echo: the microphone is you, the
+ * system audio is the other side.
  */
 export class RecordingSession extends EventEmitter {
   private tracks: Track[] = []

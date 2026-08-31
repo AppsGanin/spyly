@@ -51,41 +51,23 @@ function EditableLine({
   )
 }
 
+/**
+ * A list from the summary: the model writes it, a person corrects what is there.
+ *
+ * Adding a line of your own was removed. A summary is what was said in the
+ * conversation; a thought typed into it afterwards looks the same as a thought
+ * that was spoken, and a month later there is no telling them apart.
+ */
 function ListSection({
   title,
   items,
-  placeholder,
   onChange
 }: {
   title: string
   items: string[]
-  placeholder: string
   onChange: (next: string[]) => void
 }) {
-  const [draft, setDraft] = useState('')
-
-  const add = () => {
-    if (!draft.trim()) return
-    onChange([...items, draft.trim()])
-    setDraft('')
-  }
-
-  if (items.length === 0 && !draft) {
-    return (
-      <section className="summary__section">
-        <h4>{title}</h4>
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={placeholder}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') add()
-          }}
-          onBlur={add}
-        />
-      </section>
-    )
-  }
+  if (items.length === 0) return null
 
   return (
     <section className="summary__section">
@@ -102,15 +84,6 @@ function ListSection({
             onRemove={() => onChange(items.filter((_, i) => i !== index))}
           />
         ))}
-        <Input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={placeholder}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') add()
-          }}
-          onBlur={add}
-        />
       </div>
     </section>
   )
@@ -254,13 +227,11 @@ export function SummaryPanel({
       <ListSection
         title={t('Основное')}
         items={draft.keyPoints}
-        placeholder={t('Добавить тезис')}
         onChange={(keyPoints) => patch({ keyPoints })}
       />
       <ListSection
         title={t('Решили')}
         items={draft.decisions}
-        placeholder={t('Добавить решение')}
         onChange={(decisions) => patch({ decisions })}
       />
 
@@ -277,17 +248,12 @@ export function SummaryPanel({
               onRemove={() => patch({ actionItems: draft.actionItems.filter((_, i) => i !== index) })}
             />
           ))}
-          <Button
-            size="sm"
-            onClick={() => patch({ actionItems: [...draft.actionItems, { text: t('Новая задача'), done: false }] })}
-          >{t('Добавить задачу')}</Button>
         </div>
       </section>
 
       <ListSection
         title={t('Осталось решить')}
         items={draft.questions}
-        placeholder={t('Добавить вопрос')}
         onChange={(questions) => patch({ questions })}
       />
 

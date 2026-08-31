@@ -32,11 +32,18 @@ exports.default = async function afterPack(context) {
 
   // Nested binaries are signed before the outer bundle, otherwise the
   // application signature comes out invalid.
+  //
+  // The capture helper gets the entitlements too. It is signed with the
+  // hardened runtime like everything else, and under that runtime EventKit
+  // refuses without ever reaching the permission system: the calendar dialog
+  // never appeared, the request came back false, and the state stayed "not
+  // asked". Entitlements are granted per binary, so the ones on the outer
+  // bundle do nothing for a separate executable inside it.
   const binDir = path.join(appPath, 'Contents', 'Resources', 'bin')
   if (existsSync(binDir)) {
     for (const name of readdirSync(binDir)) {
       const file = path.join(binDir, name)
-      if (statSync(file).isFile()) sign(file, false)
+      if (statSync(file).isFile()) sign(file, name === 'spyly-audiotap')
     }
   }
 

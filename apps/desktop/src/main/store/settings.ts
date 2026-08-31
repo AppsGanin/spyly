@@ -2,7 +2,6 @@ import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
-import { DEFAULT_PROMPT_TEMPLATES } from '@spyly/core'
 import type { Settings } from '../../shared/ipc.js'
 import { storageRoot } from './paths.js'
 
@@ -16,15 +15,12 @@ function defaults(): Settings {
     theme: 'dark',
     uiLang: 'ru',
     asrModel: '',
-    vocabulary: [],
-    diarizationProvider: 'sherpa-onnx',
     llmProvider: 'anthropic',
     openAiCompatible: { baseUrl: '', model: '' },
     liveTranscription: true,
     autoSummarize: true,
     autoDetectCalls: 'notify',
     storageDir: storageRoot(),
-    promptTemplates: DEFAULT_PROMPT_TEMPLATES,
     onboardingDone: false,
     preferredApps: []
   }
@@ -44,9 +40,6 @@ export async function loadSettings(): Promise<Settings> {
     }
   }
   const merged = { ...defaults(), ...stored }
-  merged.promptTemplates = merged.promptTemplates?.length
-    ? merged.promptTemplates
-    : DEFAULT_PROMPT_TEMPLATES
   merged.openAiCompatible = merged.openAiCompatible ?? defaults().openAiCompatible
   cache = merged
   return merged

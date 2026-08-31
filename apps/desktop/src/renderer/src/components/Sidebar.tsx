@@ -302,7 +302,7 @@ function MeetingItem({
   onClick: () => void
 }) {
   // A summary is optional: without one a recording is not "broken", and there is no need to alarm.
-  const broken = meeting.stages.transcribing === 'failed' || meeting.stages.diarizing === 'failed'
+  const broken = meeting.stages.transcribing === 'failed'
   const noSummary = !broken && meeting.stages.summarizing === 'failed'
 
   // The state is shown by a dot rather than a caption: in words it took a whole

@@ -6,7 +6,7 @@ export type TrackId = z.infer<typeof TrackId>
 
 /** Processing stages. Each lives its own life and is restarted on its own:
  *  a failed transcription must not require recording the call again. */
-export const Stage = z.enum(['recording', 'transcribing', 'diarizing', 'identifying', 'summarizing', 'done'])
+export const Stage = z.enum(['recording', 'transcribing', 'summarizing', 'done'])
 export type Stage = z.infer<typeof Stage>
 
 export const StageState = z.enum(['pending', 'running', 'done', 'failed', 'skipped'])
@@ -36,36 +36,19 @@ export const AsrResult = z.object({
 })
 export type AsrResult = z.infer<typeof AsrResult>
 
-/** A stretch of speech from one cluster within one track.
- *  Cluster numbering is local to a track: system:0 and mic:0 are different people. */
-export const SpeakerTurn = z.object({
-  start: z.number(),
-  end: z.number(),
-  cluster: z.number().int().nonnegative()
-})
-export type SpeakerTurn = z.infer<typeof SpeakerTurn>
-
+/**
+ * A side of the conversation.
+ *
+ * There are exactly two, and which is which follows from the track: the
+ * microphone is whoever sits at the computer, the system audio is the other
+ * side. Splitting a track further by voice was removed: on a real half-hour
+ * conversation between three people it produced fifty "participants", and the
+ * names it guessed from voice prints were wrong more often than not.
+ */
 export const Speaker = z.object({
-  /** A global identifier of the form `mic:0` / `system:1`. */
+  /** `mic` or `system`, the same value as the track. */
   id: z.string(),
-  track: TrackId,
-  cluster: z.number().int().nonnegative(),
-  /**
-   * The number for the caption: "Speaker 2".
-   *
-   * Kept apart from the cluster, because the cluster is voice separation's
-   * internal number and is also what a voice print is taken by. In a
-   * conversation with two other people the clusters may well come out as 0 and 3,
-   * and "Speaker 4" would only confuse the person.
-   */
-  number: z.number().int().positive().optional(),
-  name: z.string().optional(),
-  /** Matched the voice profile of the application's owner. */
-  isMe: z.boolean().default(false),
-  /** Where the name came from: filled in from a voice print or entered by hand. */
-  nameSource: z.enum(['manual', 'voice-match', 'none']).default('none'),
-  /** Cosine closeness to the profile in the registry, if the name was filled in automatically. */
-  matchScore: z.number().optional()
+  track: TrackId
 })
 export type Speaker = z.infer<typeof Speaker>
 
@@ -85,7 +68,12 @@ export type Utterance = z.infer<typeof Utterance>
 
 export const ActionItem = z.object({
   text: z.string(),
-  /** A speaker identifier or a free-form name: the LLM does not always hit the registry. */
+  /**
+   * Who took it on, only when a name was actually spoken.
+   *
+   * The model is told to leave it empty otherwise: a task signed "Speaker 3"
+   * says nothing a person can act on.
+   */
   assignee: z.string().optional(),
   due: z.string().optional(),
   /**
@@ -165,24 +153,15 @@ export const MeetingMeta = z.object({
   errors: z.record(z.string(), z.string()).default({}),
   providers: z.object({
     asr: z.string().optional(),
-    diarization: z.string().optional(),
     llm: z.string().optional()
   }).default({}),
   /** The project folder this call is handed to a coding agent in. */
   projectPath: z.string().optional(),
-  /**
-   * How many people were in the conversation, when that is known.
-   *
-   * Voice separation itself guesses this badly: on a half-hour recording of three
-   * people it found fifty "participants". When the number is known it is set
-   * firmly, and the answer becomes exact.
-   */
-  speakerCount: z.number().int().min(1).max(20).optional(),
   /** Marks on important moments, placed during the recording. */
   marks: z.array(Mark).default([]),
   /** The calendar event the title and the participants came from. */
   calendarEventId: z.string().optional(),
-  /** Who the calendar expected at the meeting, a hint when naming participants. */
+  /** Who the calendar expected at the meeting. */
   calendarParticipants: z.array(z.string()).default([]),
   tags: z.array(z.string()).default([])
 })
@@ -195,17 +174,3 @@ export const Meeting = MeetingMeta.extend({
   summary: Summary.optional()
 })
 export type Meeting = z.infer<typeof Meeting>
-
-/** The voice print of a known person. Biometrics, so local only. */
-export const VoiceProfile = z.object({
-  id: z.string(),
-  name: z.string(),
-  isMe: z.boolean().default(false),
-  /** The averaged embedding; its length depends on the model. */
-  embedding: z.array(z.number()),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  /** How many times the profile has been confirmed: the more, the steadier the average. */
-  samples: z.number().int().default(1)
-})
-export type VoiceProfile = z.infer<typeof VoiceProfile>

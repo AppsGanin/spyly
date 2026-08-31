@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  doubtThreshold,
-  doubtfulWords,
-  mergeUtterances,
-  splitUtterance,
-  utteranceConfidence
-} from '../src/edit.js'
+import {doubtThreshold, doubtfulWords, utteranceConfidence } from '../src/edit.js'
 import type { Utterance } from '../src/types.js'
 
 function make(overrides: Partial<Utterance> = {}): Utterance {
@@ -21,81 +15,6 @@ function make(overrides: Partial<Utterance> = {}): Utterance {
     ...overrides
   }
 }
-
-describe('splitUtterance', () => {
-  it('splits at a word boundary when there are timestamps', () => {
-    const utterance = make({
-      words: [
-        { text: 'привет', start: 10, end: 11 },
-        { text: 'как', start: 12, end: 12.5 },
-        { text: 'дела', start: 13, end: 14 },
-        { text: 'нормально', start: 17, end: 19 }
-      ]
-    })
-    const parts = splitUtterance(utterance, 'привет как дела '.length)
-    expect(parts).not.toBeNull()
-    const [head, tail] = parts!
-    expect(head.text).toBe('привет как дела')
-    expect(tail.text).toBe('нормально')
-    expect(head.end).toBe(17)
-    expect(tail.start).toBe(17)
-    expect(head.words).toHaveLength(3)
-    expect(tail.words).toHaveLength(1)
-  })
-
-  it('without timestamps it splits in proportion to length', () => {
-    const [head, tail] = splitUtterance(make({ text: 'абвг', words: [] }), 2)!
-    expect(head.text).toBe('аб')
-    expect(tail.text).toBe('вг')
-    expect(head.end).toBe(15)
-  })
-
-  it('does not split when one half would be empty', () => {
-    expect(splitUtterance(make(), 0)).toBeNull()
-    expect(splitUtterance(make(), 999)).toBeNull()
-  })
-
-  // Splitting an utterance twice easily gives two identical identifiers, and
-  // after that an edit would land on the wrong utterance.
-  it('a second split does not repeat an identifier already taken', () => {
-    const base = make({ text: 'один два три четыре' })
-    const [head, tail] = splitUtterance(base, 9, new Set([base.id]))!
-    const taken = new Set([head.id, tail.id])
-    const [again, extra] = splitUtterance(head, 4, taken)!
-    const ids = [again.id, extra.id, tail.id]
-    expect(new Set(ids).size).toBe(ids.length)
-  })
-
-  it('the halves stay inside the bounds of the original utterance', () => {
-    const [head, tail] = splitUtterance(make({ text: 'раз два' }), 3)!
-    expect(head.start).toBe(10)
-    expect(tail.end).toBe(20)
-    expect(head.end).toBeGreaterThanOrEqual(10)
-    expect(head.end).toBeLessThanOrEqual(20)
-  })
-})
-
-describe('mergeUtterances', () => {
-  it('joins the text and stretches the bounds', () => {
-    const merged = mergeUtterances(
-      make({ text: 'первая', start: 10, end: 12 }),
-      make({ id: 'u2', speakerId: 'local:0', text: 'вторая', start: 12, end: 15 })
-    )
-    expect(merged.text).toBe('первая вторая')
-    expect(merged.start).toBe(10)
-    expect(merged.end).toBe(15)
-    // The speaker stays from the first: joining happens when the second was attributed to the wrong person.
-    expect(merged.speakerId).toBe('remote:0')
-  })
-
-  it('the words stay in time order', () => {
-    const merged = mergeUtterances(
-      make({ words: [{ text: 'б', start: 12, end: 13 }] }),
-      make({ id: 'u2', words: [{ text: 'а', start: 10, end: 11 }] })
-    )
-    expect(merged.words.map((w) => w.text)).toEqual(['а', 'б'])
-  })
-})
 
 describe('confidence', () => {
   it('finds the words the model was unsure about', () => {

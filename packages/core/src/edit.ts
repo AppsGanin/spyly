@@ -1,89 +1,17 @@
-import type { Meeting, Utterance, Word } from './types.js'
+import type { Meeting, Utterance } from './types.js'
 
 /**
- * Editing the transcript: split, join, cut out.
+ * What the transcript view needs beyond the text itself.
  *
- * Voice separation goes wrong predictably: on interruptions two phrases stick
- * together into one, and one long phrase falls apart into two. A person has to
- * be the one to fix that, and to fix it quickly, so the operations live here,
- * apart from the interface, and are covered by tests.
+ * Editing an utterance by hand was removed: the transcript is a record of what
+ * was said, and correcting it made the file disagree with the audio next to it.
+ * What is left is reading: the range under a cut, and the words the model was
+ * unsure about.
  */
 
-/** A moment inside an utterance by character position, in proportion to the text length. */
-function timeAt(utterance: Utterance, charIndex: number): number {
-  const { start, end, text, words } = utterance
 
-  // When there are words with timestamps, we take the start of the first word
-  // that falls into the second half: a linear estimate by characters lies more
-  // the longer the utterance is.
-  if (words.length > 0) {
-    let at = 0
-    for (const word of words) {
-      if (at >= charIndex) return word.start
-      at += word.text.length + 1
-    }
-    return words[words.length - 1]!.end
-  }
 
-  const ratio = text.length > 0 ? Math.min(1, Math.max(0, charIndex / text.length)) : 0
-  return start + (end - start) * ratio
-}
 
-/**
- * A free identifier based on the original.
- *
- * A plain suffix will not do: splitting an utterance twice would give two
- * identical `u1b`, after which an edit would land on the wrong utterance and
- * React would render the list with duplicate keys.
- */
-export function uniqueId(base: string, taken: ReadonlySet<string>): string {
-  if (!taken.has(base)) return base
-  for (let n = 2; ; n++) {
-    const candidate = `${base}${n}`
-    if (!taken.has(candidate)) return candidate
-  }
-}
-
-/**
- * Splitting an utterance at the given place.
- *
- * Returns null when there is nothing to cut: an empty half is worse than a
- * refusal. `taken` are the identifiers already in use in this recording.
- */
-export function splitUtterance(
-  utterance: Utterance,
-  charIndex: number,
-  taken: ReadonlySet<string> = new Set()
-): [Utterance, Utterance] | null {
-  const head = utterance.text.slice(0, charIndex).trim()
-  const tail = utterance.text.slice(charIndex).trim()
-  if (!head || !tail) return null
-
-  const at = Math.min(Math.max(timeAt(utterance, charIndex), utterance.start), utterance.end)
-  const headWords: Word[] = utterance.words.filter((w) => w.start < at)
-  const tailWords: Word[] = utterance.words.filter((w) => w.start >= at)
-
-  return [
-    { ...utterance, text: head, end: at, words: headWords },
-    { ...utterance, id: uniqueId(`${utterance.id}b`, taken), text: tail, start: at, words: tailWords }
-  ]
-}
-
-/**
- * Joining two neighbouring utterances.
- *
- * The speaker is taken from the first: joining usually happens because the
- * second half was attributed to somebody else by mistake.
- */
-export function mergeUtterances(first: Utterance, second: Utterance): Utterance {
-  return {
-    ...first,
-    text: `${first.text.trim()} ${second.text.trim()}`.trim(),
-    start: Math.min(first.start, second.start),
-    end: Math.max(first.end, second.end),
-    words: [...first.words, ...second.words].sort((a, b) => a.start - b.start)
-  }
-}
 
 /**
  * The utterances that fall inside the stretch being cut out.

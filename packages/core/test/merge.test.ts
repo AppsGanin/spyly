@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { mergeSpeakers, asrFromUtterances, assignSpeakers, clusterFor, containment, mergeTracks, overlap, speakingShares, speakingTime, suppressEcho, textSimilarity, usedSpeakerIds } from '../src/merge.js'
+import { asrFromUtterances, assignSpeakers, containment, mergeTracks, overlap, speakingShares, speakingTime, suppressEcho, textSimilarity, usedSpeakerIds } from '../src/merge.js'
 import { timecode } from '../src/format.js'
-import { Meeting } from '../src/types.js'
-import type { AsrResult, SpeakerTurn, Utterance, Word } from '../src/types.js'
+import type { AsrResult, Utterance, Word } from '../src/types.js'
 
 const w = (text: string, start: number, end: number) => ({ text, start, end })
 
@@ -21,64 +20,23 @@ describe('overlap', () => {
   })
 })
 
-describe('clusterFor', () => {
-  const turns: SpeakerTurn[] = [
-    { start: 0, end: 5, cluster: 0 },
-    { start: 5, end: 10, cluster: 1 }
-  ]
-
-  it('picks the stretch with the largest overlap', () => {
-    expect(clusterFor(1, 2, turns)).toBe(0)
-    expect(clusterFor(6, 7, turns)).toBe(1)
-  })
-
-  it('a word on a boundary goes where more of it lies', () => {
-    expect(clusterFor(4, 6.5, turns)).toBe(1)
-    expect(clusterFor(3.5, 5.5, turns)).toBe(0)
-  })
-
-  it('a word in a diarization pause is not lost: it goes to the nearest', () => {
-    const gapped: SpeakerTurn[] = [
-      { start: 0, end: 2, cluster: 0 },
-      { start: 8, end: 10, cluster: 1 }
-    ]
-    expect(clusterFor(3, 3.5, gapped)).toBe(0)
-    expect(clusterFor(7, 7.5, gapped)).toBe(1)
-  })
-
-  it('with no stretches it returns null', () => {
-    expect(clusterFor(0, 1, [])).toBeNull()
-  })
-})
-
 describe('assignSpeakers', () => {
-  it('lays words out by speaker and joins consecutive ones', () => {
-    const turns: SpeakerTurn[] = [
-      { start: 0, end: 2, cluster: 0 },
-      { start: 2, end: 4, cluster: 1 }
-    ]
-    const out = assignSpeakers(asr('system', [w('привет', 0, 0.5), w('как', 0.6, 1), w('дела', 1.1, 1.6), w('нормально', 2.1, 3)]), turns)
-    expect(out).toHaveLength(2)
-    expect(out[0]).toMatchObject({ speakerId: 'system:0', text: 'привет как дела' })
-    expect(out[1]).toMatchObject({ speakerId: 'system:1', text: 'нормально' })
+  it('the whole track is one side', () => {
+    const out = assignSpeakers(asr('system', [w('привет', 0, 0.5), w('как', 0.6, 1), w('дела', 1.1, 1.6)]))
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ speakerId: 'system', text: 'привет как дела' })
   })
 
-  it('breaks an utterance at a long pause by the same speaker', () => {
-    const turns: SpeakerTurn[] = [{ start: 0, end: 30, cluster: 0 }]
-    const out = assignSpeakers(asr('mic', [w('раз', 0, 0.4), w('два', 0.5, 0.9), w('три', 10, 10.4)]), turns)
+  it('breaks at a long pause; the merge glues it back', () => {
+    const out = assignSpeakers(asr('mic', [w('раз', 0, 0.4), w('два', 0.5, 0.9), w('три', 10, 10.4)]))
     expect(out).toHaveLength(2)
     expect(out[0]!.text).toBe('раз два')
     expect(out[1]!.text).toBe('три')
   })
 
-  it('with no diarization it counts the track as one speaker', () => {
-    const out = assignSpeakers(asr('mic', [w('соло', 0, 1)]), [])
-    expect(out).toHaveLength(1)
-    expect(out[0]!.speakerId).toBe('mic:0')
-  })
 
   it('an empty track gives an empty result rather than a crash', () => {
-    expect(assignSpeakers({ track: 'system', language: 'ru', segments: [] }, [])).toEqual([])
+    expect(assignSpeakers({ track: 'system', language: 'ru', segments: [] })).toEqual([])
   })
 
   it('works without per-word timestamps, by segment', () => {
@@ -90,61 +48,78 @@ describe('assignSpeakers', () => {
         { text: 'вторая фраза', start: 2.1, end: 4, words: [] }
       ]
     }
-    const turns: SpeakerTurn[] = [
-      { start: 0, end: 2, cluster: 0 },
-      { start: 2, end: 4, cluster: 1 }
-    ]
-    const out = assignSpeakers(noWords, turns)
-    expect(out.map((u) => u.speakerId)).toEqual(['system:0', 'system:1'])
+    const out = assignSpeakers(noWords)
+    expect(out.map((u) => u.text)).toEqual(['первая фраза вторая фраза'])
+    expect(out.map((u) => u.speakerId)).toEqual(['system'])
   })
 
   it('does not glue a space before punctuation', () => {
-    const out = assignSpeakers(asr('mic', [w('да', 0, 0.3), w(',', 0.3, 0.35), w('конечно', 0.4, 1)]), [])
+    const out = assignSpeakers(asr('mic', [w('да', 0, 0.3), w(',', 0.3, 0.35), w('конечно', 0.4, 1)]))
     expect(out[0]!.text).toBe('да, конечно')
   })
 
   it('throws out empty words', () => {
-    const out = assignSpeakers(asr('mic', [w('  ', 0, 0.1), w('текст', 0.2, 0.6)]), [])
+    const out = assignSpeakers(asr('mic', [w('  ', 0, 0.1), w('текст', 0.2, 0.6)]))
     expect(out).toHaveLength(1)
     expect(out[0]!.text).toBe('текст')
   })
 
   it('marks live-mode drafts', () => {
-    const out = assignSpeakers(asr('mic', [w('черновик', 0, 1)]), [], { provisional: true })
+    const out = assignSpeakers(asr('mic', [w('черновик', 0, 1)]), { provisional: true })
     expect(out[0]!.provisional).toBe(true)
   })
 })
 
 describe('mergeTracks', () => {
   it('merges the tracks by time', () => {
-    const mic = assignSpeakers(asr('mic', [w('я', 0, 1), w('говорю', 4, 5)]), [])
-    const sys = assignSpeakers(asr('system', [w('они', 2, 3)]), [])
+    const mic = assignSpeakers(asr('mic', [w('я', 0, 1), w('говорю', 4, 5)]))
+    const sys = assignSpeakers(asr('system', [w('они', 2, 3)]))
     const merged = mergeTracks(mic, sys)
     expect(merged.map((u) => u.text)).toEqual(['я', 'они', 'говорю'])
   })
 
-  it('clusters of different tracks do not mix', () => {
-    const mic = assignSpeakers(asr('mic', [w('комната', 0, 1)]), [{ start: 0, end: 1, cluster: 0 }])
-    const sys = assignSpeakers(asr('system', [w('звонок', 1, 2)]), [{ start: 1, end: 2, cluster: 0 }])
+  it('the two tracks stay two sides', () => {
+    const mic = assignSpeakers(asr('mic', [w('комната', 0, 1)]))
+    const sys = assignSpeakers(asr('system', [w('звонок', 1, 2)]))
     const merged = mergeTracks(mic, sys)
-    expect(usedSpeakerIds(merged)).toEqual(['mic:0', 'system:0'])
+    expect(usedSpeakerIds(merged)).toEqual(['mic', 'system'])
+  })
+
+  it('what one side said in a row becomes one utterance', () => {
+    // Pauses inside a turn used to cut it into a list of three-word lines.
+    const mic = assignSpeakers(asr('mic', [w('это', 0, 1), w('потом', 5, 6), w('соберу', 10, 11)]))
+    expect(mic.length).toBeGreaterThan(1)
+    const merged = mergeTracks(mic)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]!.text).toBe('это потом соберу')
+    expect(merged[0]!.start).toBe(0)
+    expect(merged[0]!.end).toBe(11)
+    expect(merged[0]!.words).toHaveLength(3)
+  })
+
+  it('the other side speaking starts a new block, and so does coming back', () => {
+    const mic = assignSpeakers(asr('mic', [w('раз', 0, 1), w('три', 10, 11)]))
+    const sys = assignSpeakers(asr('system', [w('два', 5, 6)]))
+    const merged = mergeTracks(mic, sys)
+    expect(merged.map((u) => u.text)).toEqual(['раз', 'два', 'три'])
+  })
+
+  it('a draft is not glued to a finished utterance', () => {
+    const finished = assignSpeakers(asr('mic', [w('готово', 0, 1)]))
+    const draft = assignSpeakers(asr('mic', [w('ещё', 2, 3)]), { provisional: true, idPrefix: 'live' })
+    expect(mergeTracks(finished, draft)).toHaveLength(2)
   })
 
   it('empty tracks do not break the merge', () => {
-    expect(mergeTracks([], [])).toEqual([])
+    expect(mergeTracks([])).toEqual([])
   })
 })
 
 describe('speakingTime', () => {
-  it('sums the duration per speaker', () => {
-    const turns: SpeakerTurn[] = [
-      { start: 0, end: 2, cluster: 0 },
-      { start: 2, end: 6, cluster: 1 }
-    ]
-    const out = assignSpeakers(asr('system', [w('а', 0, 1), w('б', 3, 5)]), turns)
+  it('sums the duration of one side', () => {
+    const out = assignSpeakers(asr('system', [w('а', 0, 1), w('б', 3, 5)]))
     const t = speakingTime(out)
-    expect(t.get('system:0')).toBeCloseTo(1)
-    expect(t.get('system:1')).toBeCloseTo(2)
+    expect(t.get('system')).toBeCloseTo(3)
   })
 })
 
@@ -335,7 +310,6 @@ describe('long utterances', () => {
   it('cuts at the end of a sentence rather than mid-phrase', () => {
     const result = assignSpeakers(
       { track: 'mic', language: 'ru', segments: [{ text: '', start: 0, end: 90, words: speech(90, 10) }] },
-      [],
       { idPrefix: 'u' }
     )
     expect(result.length).toBeGreaterThan(1)
@@ -348,7 +322,6 @@ describe('long utterances', () => {
   it('a short conversation is not broken into scraps', () => {
     const result = assignSpeakers(
       { track: 'mic', language: 'ru', segments: [{ text: '', start: 0, end: 20, words: speech(20, 5) }] },
-      [],
       { idPrefix: 'u' }
     )
     expect(result).toHaveLength(1)
@@ -367,10 +340,10 @@ describe('a transcript back into a recognition result', () => {
     track: 'mic' | 'system',
     start: number,
     text: string,
-    words: Word[]
+    words: Word[] = []
   ): Utterance => ({
     id: `${track}-${start}`,
-    speakerId: `${track}:0`,
+    speakerId: track,
     track,
     start,
     end: start + 2,
@@ -407,7 +380,7 @@ describe('a transcript back into a recognition result', () => {
   })
 
   it('an utterance with no per-word markup is not lost', () => {
-    const result = asrFromUtterances([utterance('mic', 3, 'сказал что-то', [])], 'ru')
+    const result = asrFromUtterances([utterance('mic', 3, 'сказал что-то')], 'ru')
     const words = result[0]!.segments[0]!.words
     expect(words).toHaveLength(1)
     expect(words[0]).toEqual({ text: 'сказал что-то', start: 3, end: 5 })
@@ -454,8 +427,7 @@ describe('stretched words', () => {
         w('перед', 61, 71),
         w('после', 71, 71.5),
         w('тишины', 71.5, 72)
-      ]),
-      []
+      ])
     )
     expect(result.length).toBe(2)
     expect(result[0]!.end).toBeLessThan(64)
@@ -464,7 +436,7 @@ describe('stretched words', () => {
 
   it('ordinary words are left alone', () => {
     const words = [w('раз', 0, 0.4), w('два', 0.5, 0.9), w('три', 1, 1.4)]
-    const result = assignSpeakers(asr(words), [])
+    const result = assignSpeakers(asr(words))
     expect(result).toHaveLength(1)
     expect(result[0]!.end).toBeCloseTo(1.4)
   })
@@ -472,8 +444,7 @@ describe('stretched words', () => {
   it('an utterance with no per-word markup is not clamped', () => {
     // There is one "word" for the whole stretch, and its duration is meaningful.
     const result = assignSpeakers(
-      { track: 'system', language: 'ru', segments: [{ text: 'длинная реплика целиком', start: 0, end: 30, words: [] }] },
-      []
+      { track: 'system', language: 'ru', segments: [{ text: 'длинная реплика целиком', start: 0, end: 30, words: [] }] }
     )
     expect(result).toHaveLength(1)
     expect(result[0]!.end).toBe(30)
@@ -485,45 +456,3 @@ describe('stretched words', () => {
  * On a real recording one participant came out as both "Speaker 1" and
  * "Speaker 2", and their share of the conversation was halved.
  */
-describe('merging participants', () => {
-  const meeting = (): Meeting =>
-    Meeting.parse({
-      id: '2026-08-28--test--aaaa',
-      title: 'Разговор',
-      startedAt: '2026-08-28T10:00:00.000Z',
-      durationSec: 60,
-      sources: { mic: true, system: true },
-      speakers: [
-        { id: 'system:0', track: 'system', cluster: 0, name: 'Иван', number: 1 },
-        { id: 'system:3', track: 'system', cluster: 3, name: 'Иван', number: 2 }
-      ],
-      utterances: [
-        { id: 'u0', speakerId: 'system:0', track: 'system', start: 0, end: 10,
-          text: 'первая половина', words: [], provisional: false },
-        { id: 'u1', speakerId: 'system:3', track: 'system', start: 10, end: 20,
-          text: 'вторая половина', words: [], provisional: false }
-      ]
-    })
-
-  it('one participant remains and the utterances pass to them', () => {
-    const result = mergeSpeakers(meeting(), 'system:3', 'system:0')
-    expect(result.speakers).toHaveLength(1)
-    expect(result.speakers[0]!.id).toBe('system:0')
-    expect(result.utterances.every((u) => u.speakerId === 'system:0')).toBe(true)
-  })
-
-  it('the utterances are not lost and do not change order', () => {
-    const result = mergeSpeakers(meeting(), 'system:3', 'system:0')
-    expect(result.utterances.map((u) => u.text)).toEqual(['первая половина', 'вторая половина'])
-  })
-
-  it('merging with itself changes nothing', () => {
-    const before = meeting()
-    expect(mergeSpeakers(before, 'system:0', 'system:0')).toBe(before)
-  })
-
-  it('a target that does not exist changes nothing', () => {
-    const before = meeting()
-    expect(mergeSpeakers(before, 'system:0', 'system:9')).toBe(before)
-  })
-})

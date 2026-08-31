@@ -85,43 +85,6 @@ export const MODELS: ModelSpec[] = [
       t('35 языков, включая русский. Расшифровывает на лету — на ней работает живой текст по ходу разговора')
   },
   {
-    id: 'whisper-medium',
-    name: 'Whisper medium',
-    purpose: 'asr',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin',
-    file: 'ggml-medium-q5_0.bin',
-    sizeBytes: 539_000_000,
-    tier: t('Средняя'),
-    tradeoff: t('Быстрее large, но чаще ошибается в именах и терминах')
-  },
-  {
-    id: 'whisper-small',
-    name: 'Whisper small',
-    purpose: 'asr',
-    url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin',
-    file: 'ggml-small-q5_1.bin',
-    sizeBytes: 190_000_000,
-    tier: t('Лёгкая'),
-    tradeoff: t('Самая быстрая: для слабых машин и черновиков')
-  },
-  {
-    id: 'segmentation',
-    name: t('Разделение по голосам (pyannote)'),
-    purpose: 'diarization',
-    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2',
-    file: 'sherpa-onnx-pyannote-segmentation-3-0',
-    sizeBytes: 7_300_000,
-    archive: 'tar.bz2'
-  },
-  {
-    id: 'embedding',
-    name: t('Слепки голоса (3D-Speaker)'),
-    purpose: 'embedding',
-    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx',
-    file: '3dspeaker_eres2net_base.onnx',
-    sizeBytes: 39_800_000
-  },
-  {
     id: 'vad',
     name: t('Детектор речи (Silero)'),
     purpose: 'vad',
@@ -164,6 +127,7 @@ export async function listModels(): Promise<ModelInfo[]> {
       name: spec.name,
       sizeBytes: size,
       downloaded,
+      downloading: inFlight.has(spec.id),
       progress: inFlight.get(spec.id)?.progress,
       purpose: spec.purpose,
       tier: spec.tier,
@@ -209,6 +173,8 @@ function report(spec: ModelSpec, progress: number, downloaded: boolean): void {
     name: spec.name,
     sizeBytes: spec.sizeBytes,
     downloaded,
+    // Whether anything is actually running, rather than a guess from the number.
+    downloading: inFlight.has(spec.id),
     progress: downloaded ? 1 : progress,
     purpose: spec.purpose,
     paused: false,
@@ -325,6 +291,10 @@ export async function removeModel(id: string): Promise<void> {
   await cancelDownload(id)
   const p = modelPath(id)
   if (p && existsSync(p)) await rm(p, { recursive: true, force: true })
+  // Reported after the file is gone, so the interface hears the final state and
+  // not the one from the middle of the removal.
+  const spec = MODELS.find((m) => m.id === id)
+  if (spec) report(spec, 0, false)
 }
 
 /** tar ships with macOS and most distributions; no separate dependency needed. */
@@ -344,15 +314,13 @@ export function asrModels(): string[] {
     'whisper-large-v3',
     'gigaam-v3-ru',
     'parakeet-tdt-v3',
-    'nemotron-3.5',
-    'whisper-medium',
-    'whisper-small'
+    'nemotron-3.5'
   ]
 }
 
 /** Nothing will be transcribed until the bare minimum has been downloaded. */
 export function missingRequiredModels(asrModelId: string): ModelSpec[] {
   return MODELS.filter(
-    (m) => (m.id === asrModelId || m.purpose === 'diarization' || m.purpose === 'embedding' || m.purpose === 'vad') && !isDownloaded(m.id)
+    (m) => (m.id === asrModelId || m.purpose === 'vad') && !isDownloaded(m.id)
   )
 }

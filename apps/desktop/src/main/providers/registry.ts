@@ -2,9 +2,8 @@ import { t } from '@spyly/core'
 import type { ProviderInfo } from '../../shared/ipc.js'
 import { whisperCppProvider } from './asr/whisper-cpp.js'
 import { SHERPA_ASR_PROVIDERS, sherpaProviderFor } from './asr/sherpa-asr.js'
-import { sherpaDiarizationProvider } from './diarization/sherpa.js'
 import { LLM_PROVIDERS, getLlmProvider } from './llm/index.js'
-import type { AsrProvider, DiarizationProvider, LlmProvider } from './types.js'
+import type { AsrProvider, LlmProvider } from './types.js'
 
 /**
  * Recognition is whisper.cpp only.
@@ -25,14 +24,8 @@ export const ASR_PROVIDERS: AsrProvider[] = [whisperCppProvider, ...SHERPA_ASR_P
 export function providerForModel(modelId: string): AsrProvider {
   return sherpaProviderFor(modelId) ?? whisperCppProvider
 }
-export const DIARIZATION_PROVIDERS: DiarizationProvider[] = [sherpaDiarizationProvider]
-
 export function getAsrProvider(id: string): AsrProvider {
   return ASR_PROVIDERS.find((p) => p.id === id) ?? whisperCppProvider
-}
-
-export function getDiarizationProvider(id: string): DiarizationProvider {
-  return DIARIZATION_PROVIDERS.find((p) => p.id === id) ?? sherpaDiarizationProvider
 }
 
 export { getLlmProvider }
@@ -41,7 +34,7 @@ export { getLlmProvider }
 export async function listProviders(): Promise<ProviderInfo[]> {
   const out: ProviderInfo[] = []
   const collect = async (
-    providers: (AsrProvider | DiarizationProvider | LlmProvider)[],
+    providers: (AsrProvider | LlmProvider)[],
     kind: ProviderInfo['kind']
   ) => {
     for (const provider of providers) {
@@ -57,7 +50,6 @@ export async function listProviders(): Promise<ProviderInfo[]> {
     }
   }
   await collect(ASR_PROVIDERS, 'asr')
-  await collect(DIARIZATION_PROVIDERS, 'diarization')
   await collect(LLM_PROVIDERS, 'llm')
   return out
 }

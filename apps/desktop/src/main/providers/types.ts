@@ -1,8 +1,7 @@
-import type { AsrResult, SpeakerTurn } from '@spyly/core'
+import type { AsrResult } from '@spyly/core'
 
 export interface AsrCapabilities {
   streaming: boolean
-  diarization: boolean
   wordTimestamps: boolean
 }
 
@@ -21,23 +20,6 @@ export interface AsrProvider {
   /** Whether it is ready to work: the model downloaded or the key entered. */
   ready(): Promise<{ ready: boolean; hint?: string }>
   transcribe(wavPath: string, track: 'mic' | 'system', options: TranscribeOptions): Promise<AsrResult>
-}
-
-export interface DiarizationProvider {
-  id: string
-  name: string
-  local: boolean
-  ready(): Promise<{ ready: boolean; hint?: string }>
-  /** Stretches of speech by cluster within one track. */
-  diarize(
-    wavPath: string,
-    options?: {
-      numSpeakers?: number
-      /** The cluster merging threshold; higher means fewer "participants". */
-      threshold?: number
-      onProgress?: (p: number) => void
-    }
-  ): Promise<SpeakerTurn[]>
 }
 
 export interface LlmMessage {

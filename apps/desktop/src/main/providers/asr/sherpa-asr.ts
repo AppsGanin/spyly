@@ -64,7 +64,7 @@ function sherpaProvider(spec: SherpaSpec): AsrProvider {
     id: spec.id,
     name: spec.name,
     local: true,
-    capabilities: { streaming: false, diarization: false, wordTimestamps: false },
+    capabilities: { streaming: false, wordTimestamps: false },
 
     async ready() {
       if (!isDownloaded(spec.id)) return { ready: false, hint: t('модель не скачана') }

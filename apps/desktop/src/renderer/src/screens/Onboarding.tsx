@@ -4,11 +4,11 @@ import type { ModelInfo, Permissions } from '@shared/ipc'
 import { api, useIpcEvent } from '../lib/api'
 import { IconAlert, IconCheck, IconMic, IconSparkle, IconSpeaker, IconUsers } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Button, Field, Input, Meter, Spinner } from '../ui'
+import { Button, Meter, Spinner } from '../ui'
 
-type Step = 'welcome' | 'permissions' | 'check' | 'voice' | 'models' | 'done'
+type Step = 'welcome' | 'permissions' | 'check' | 'models' | 'done'
 
-const STEPS: Step[] = ['welcome', 'permissions', 'check', 'voice', 'models', 'done']
+const STEPS: Step[] = ['welcome', 'permissions', 'check', 'models', 'done']
 
 export function Onboarding() {
   const { saveSettings, notify } = useStore()
@@ -33,9 +33,8 @@ export function Onboarding() {
 
         {step === 'welcome' && <Welcome onNext={() => go('permissions')} />}
         {step === 'permissions' && <PermissionsStep onNext={() => go('check')} onBack={() => go('welcome')} />}
-        {step === 'check' && <SoundCheck onNext={() => go('voice')} onBack={() => go('permissions')} />}
-        {step === 'voice' && <VoiceStep onNext={() => go('models')} onBack={() => go('check')} />}
-        {step === 'models' && <ModelsStep onNext={() => go('done')} onBack={() => go('voice')} />}
+        {step === 'check' && <SoundCheck onNext={() => go('models')} onBack={() => go('permissions')} />}
+        {step === 'models' && <ModelsStep onNext={() => go('done')} onBack={() => go('check')} />}
         {step === 'done' && <Done onFinish={() => void finish()} />}
       </div>
     </div>
@@ -234,82 +233,6 @@ function CheckLine({ title, heard, level, hint }: { title: string; heard: boolea
         <div className="check__hint">{heard ? t('Звук поступает') : hint}</div>
       </div>
     </div>
-  )
-}
-
-function VoiceStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
-  const { notify } = useStore()
-  const [name, setName] = useState('')
-  const [recording, setRecording] = useState(false)
-  const [seconds, setSeconds] = useState(0)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    if (!recording) return
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(timer)
-  }, [recording])
-
-  const start = async () => {
-    setSeconds(0)
-    setRecording(true)
-    await api.call('voices:enrollStart')
-  }
-
-  const stop = async () => {
-    setRecording(false)
-    const profile = await api.call('voices:enrollStop', name.trim() || t('Вы'))
-    if (profile) {
-      setSaved(true)
-      notify('success', t('Голос запомнен'))
-    } else {
-      notify('error', t('Слишком короткая запись: нужно хотя бы несколько секунд речи'))
-    }
-  }
-
-  return (
-    <>
-      <div className="col" style={{ gap: 'var(--space-3)' }}>
-        <h1 className="onboarding__title">{t('Ваш голос')}</h1>
-        <p className="onboarding__lead">{t('Запишите 15–20 секунд своей речи. Тогда в расшифровке вы будете отмечены как «Вы», даже если рядом в комнате говорит кто-то ещё.')}</p>
-      </div>
-
-      <Field label={t('Как вас подписывать')} hint={t('Это имя будет стоять в расшифровках')}>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Я')} />
-      </Field>
-
-      <div className="check">
-        <span className="check__icon">{recording ? <Spinner /> : saved ? <IconCheck /> : <IconMic />}</span>
-        <div className="check__body">
-          <div className="spread">
-            <div>
-              <div className="check__title">
-                {recording ? t('Записываю… {seconds} с', { seconds: seconds }) : saved ? t('Голос сохранён') : t('Запись профиля')}
-              </div>
-              <div className="check__hint">
-                {recording
-                  ? t('Говорите обычным голосом: например, расскажите, чем занимались сегодня')
-                  : t('Достаточно 15 секунд обычной речи')}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant={recording ? 'danger' : 'default'}
-              onClick={() => void (recording ? stop() : start())}
-            >
-              {recording ? t('Готово') : saved ? t('Перезаписать') : t('Записать')}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="onboarding__actions">
-        <Button onClick={onBack}>{t('Назад')}</Button>
-        <Button variant="primary" onClick={onNext}>
-          {saved ? t('Дальше') : t('Пропустить')}
-        </Button>
-      </div>
-    </>
   )
 }
 
