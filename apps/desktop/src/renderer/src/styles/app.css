@@ -1156,9 +1156,9 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   box-shadow: var(--ds-shadow-border), var(--ds-shadow-menu);
   animation: menu-in var(--duration-fast) var(--ease-swift);
 }
-.menu__list--end { transform: translateX(-100%); }
+/* Горизонталь считает сам компонент, чтобы прижать меню к краю окна;
+   сдвиг остаётся только вертикальный, когда меню раскрывается вверх. */
 .menu__list--up { transform: translateY(-100%); }
-.menu__list--end.menu__list--up { transform: translate(-100%, -100%); }
 .menu__item {
   display: block;
   width: 100%;

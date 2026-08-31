@@ -199,10 +199,16 @@ export function Menu({
     const button = root.current?.getBoundingClientRect()
     if (!button) return
     const height = list.current?.offsetHeight ?? 0
+    const width = list.current?.offsetWidth ?? 0
     const flip = height > 0 && button.bottom + 4 + height > window.innerHeight - 8
+    // The horizontal edge is computed here rather than left to a transform: a
+    // menu is wider than the button that opens it, and next to the right edge of
+    // the window it used to hang off the screen with its items cut in half.
+    const wanted = align === 'end' ? button.right - width : button.left
+    const left = width > 0 ? Math.max(8, Math.min(wanted, window.innerWidth - width - 8)) : wanted
     setAt({
       top: flip ? button.top - 4 : button.bottom + 4,
-      left: align === 'end' ? button.right : button.left,
+      left,
       flip
     })
   }

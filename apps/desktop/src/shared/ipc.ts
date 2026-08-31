@@ -125,7 +125,7 @@ export interface ModelInfo {
   paused?: boolean
   /** How many bytes are already in the partial file. */
   resumableBytes?: number
-  purpose: 'asr' | 'vad'
+  purpose: 'asr' | 'live' | 'vad'
   /** A human name for the variant: the user chooses quality, not a file. */
   tier?: string
   /** What the variant does differently in practice. */

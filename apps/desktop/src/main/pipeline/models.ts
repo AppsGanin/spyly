@@ -64,7 +64,7 @@ export const MODELS: ModelSpec[] = [
   {
     id: 'nemotron-3.5',
     name: 'Nemotron Speech 3.5',
-    purpose: 'asr',
+    purpose: 'live',
     url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11.tar.bz2',
     file: 'sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-320ms-int8-2026-06-11',
     sizeBytes: 475_000_000,
@@ -301,8 +301,7 @@ export function asrModels(): string[] {
   return [
     'whisper-large-v3-turbo',
     'whisper-large-v3',
-    'parakeet-tdt-v3',
-    'nemotron-3.5'
+    'parakeet-tdt-v3'
   ]
 }
 

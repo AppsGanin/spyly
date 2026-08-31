@@ -1,17 +1,18 @@
 import { t } from '@spyly/core'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { AgentStatus, ModelInfo, ProviderInfo } from '@shared/ipc'
+import type { AgentStatus, ModelInfo, ProviderInfo, Settings } from '@shared/ipc'
 import { api, useAsync, useIpcEvent } from '../lib/api'
 import { IconAlert, IconCalendar, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
 import { Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
 
-type Tab = 'general' | 'transcription' | 'agents'
+type Tab = 'general' | 'transcription' | 'agents' | 'about'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'general', label: t('Общее') },
   { id: 'transcription', label: t('Расшифровка') },
-  { id: 'agents', label: t('Агенты') }
+  { id: 'agents', label: t('Агенты') },
+  { id: 'about', label: t('О программе') }
 ]
 
 /** A "caption on the left, control on the right" row, the basic unit of settings. */
@@ -93,6 +94,7 @@ export function SettingsScreen({ initialTab }: { initialTab?: string } = {}) {
           {tab === 'transcription' && (
             <TranscriptionTab settings={settings} saveSettings={saveSettings} models={models} />
           )}
+          {tab === 'about' && <AboutTab settings={settings} />}
           {tab === 'agents' && (
             <AgentsTab providers={providers} onRefresh={refresh} onCopy={copy} />
           )}
@@ -193,6 +195,21 @@ function GeneralTab({
 
       <CalendarAccess />
 
+    </section>
+  )
+}
+
+
+/**
+ * Everything about the application rather than about recording.
+ *
+ * The shortcuts, where the recordings live and which version this is used to
+ * sit at the bottom of "General", under the settings a person actually changes:
+ * a screen of reference material in the way of two switches.
+ */
+function AboutTab({ settings }: { settings: Settings }) {
+  return (
+    <section className="settings__group">
       <div className="settings__row settings__row--stack">
         <div className="col" style={{ gap: 'var(--space-2)' }}>
           <div style={{ fontWeight: 500 }}>{t('Горячие клавиши')}</div>
@@ -202,8 +219,6 @@ function GeneralTab({
               ['\u2318\u21E7R', t('Начать или остановить запись из любого приложения')],
               ['\u2318M', t('Отметить важное место во время записи')],
               ['\u2318F', t('Поиск по записям')],
-              ['\u2318Z', t('Отменить правку записи')],
-              ['\u2318\u21E7Z', t('Вернуть отменённое')],
               ['\u2318R', t('Запись, когда окно активно')],
               ['\u2318,', t('Настройки')]
             ].map(([combo, what]) => (
@@ -353,8 +368,7 @@ function CalendarAccess() {
 const ASR_MODELS = [
   'whisper-large-v3-turbo',
   'whisper-large-v3',
-  'parakeet-tdt-v3',
-  'nemotron-3.5'
+  'parakeet-tdt-v3'
 ]
 
 function TranscriptionTab({
@@ -417,7 +431,7 @@ function TranscriptionTab({
         <div className="settings__row settings__row--stack">
           <div className="col" style={{ gap: 'var(--space-2)' }}>
             <div style={{ fontWeight: 500 }}>{t('Служебные модели')}</div>
-            <div className="field__hint">{t('Нужны живой расшифровке, чтобы отличать речь от тишины.')}</div>
+            <div className="field__hint">{t('Живая расшифровка на лету и детектор речи. Без потоковой модели текст приходит кусками после пауз.')}</div>
             {shared.map((model) => (
               <SupportModel key={model.id} model={model} />
             ))}

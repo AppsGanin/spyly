@@ -101,11 +101,13 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     if (reallyRunning) setJustAsked(false)
   }, [reallyRunning])
 
-  // The pipeline has taken the work, so the temporary retry flag is no longer needed.
-  const pipelineBusy = stage?.state === 'running'
+  // Any answer from the pipeline clears the flag, not just "running". Waiting for
+  // that one state left the button dead whenever the work finished faster than
+  // the first event reached the screen: the stage read done, and the button
+  // stayed disabled with nothing left to wait for.
   useEffect(() => {
-    if (pipelineBusy) setRetrying(false)
-  }, [pipelineBusy])
+    if (stage) setRetrying(false)
+  }, [stage])
 
   useIpcEvent('meetings:changed', (payload) => {
     if (payload.id === id) reload()
@@ -308,7 +310,12 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
               {stages.map((key) => {
                 const state = meeting.stages[key] ?? 'pending'
                 const isRunning = state === 'running'
-                const detail = stage?.stage === key && stage.progress !== undefined ? ` · ${Math.round(stage.progress * 100)}%` : ''
+                // Only while it runs: the last event stays around after the work is
+                // done, and a finished stage went on showing "100%" for good.
+                const detail =
+                  isRunning && stage?.stage === key && stage.progress !== undefined
+                    ? ` · ${Math.round(stage.progress * 100)}%`
+                    : ''
                 return (
                   <div key={key} className={`stage stage--${state}`}>
                     <span className="stage__mark">
