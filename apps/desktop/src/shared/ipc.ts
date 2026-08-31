@@ -184,15 +184,6 @@ export interface IpcRequests {
   'meetings:search': (query: string) => { meeting: MeetingMeta; snippet: string }[]
   'meetings:delete': (id: string) => void
   'meetings:update': (id: string, patch: Partial<MeetingMeta>) => MeetingMeta
-  /**
-   * Undo and redo of edits to a recording.
-   *
-   * History lives in the main process's memory and does not survive a restart,
-   * the same as in any editor.
-   */
-  'edit:history': (id: string) => { canUndo: boolean; canRedo: boolean }
-  'edit:undo': (id: string) => { meeting: Meeting; label: string } | null
-  'edit:redo': (id: string) => { meeting: Meeting; label: string } | null
   /** The draft transcript that was visible during the recording. */
   'meetings:live': (id: string) => { track: 'mic' | 'system'; text: string; start: number; end: number }[]
   /** Recordings on the same subject, by shared words and calendar participants. */

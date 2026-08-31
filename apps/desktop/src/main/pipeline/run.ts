@@ -26,7 +26,6 @@ import { t,
 import { Notification } from 'electron'
 import { send, showMainWindow } from '../index.js'
 import { getLlmProvider, providerForModel } from '../providers/registry.js'
-import { forgetHistory } from '../store/history.js'
 import type { LlmProvider } from '../providers/types.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
 import { levelWindows, readWavPcm16, speechSeconds } from '../audio/wav.js'
@@ -65,10 +64,6 @@ export function isProcessing(meetingId: string): boolean {
 async function runStages(meetingId: string, from: Stage): Promise<void> {
   let meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
-
-  // Processing rewrites the transcript from scratch, and earlier edits no longer
-  // apply to it: undo would bring back utterances the new transcript does not have.
-  forgetHistory(meetingId)
 
   const settings = await loadSettings()
   const order: Stage[] = ['transcribing', 'summarizing']

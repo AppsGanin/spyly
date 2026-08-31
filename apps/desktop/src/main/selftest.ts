@@ -247,57 +247,6 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   check(markdown.includes(`## ${t('Расшифровка')}`), 'the markdown transcript was assembled')
   check(markdown === renderTranscriptMarkdown(meeting), 'the markdown on disk matches the current state')
 
-  // --- undo and redo ---
-  {
-    const { editWithHistory, undo, redo, historyState, forgetHistory } = await import('./store/history.js')
-
-    const start = await readMeeting(session.meetingId)
-    const target = start?.utterances[0]
-    if (!target) {
-      log('nothing to edit, so the undo check is skipped')
-    } else {
-      const wasText = target.text
-      check(!historyState(session.meetingId).canUndo, 'before any edit there is nothing to undo')
-
-      await editWithHistory(session.meetingId, 'an utterance edit', (m) => ({
-        ...m,
-        utterances: m.utterances.map((u) => (u.id === target.id ? { ...u, text: 'replaced text' } : u))
-      }))
-      check(historyState(session.meetingId).canUndo, 'after an edit there is something to undo')
-
-      const back = await undo(session.meetingId)
-      check(back?.label === 'an utterance edit', 'undo names what it rolled back', back?.label ?? '—')
-      check(
-        back?.meeting.utterances.find((u) => u.id === target.id)?.text === wasText,
-        'the utterance text went back to the original'
-      )
-      check(historyState(session.meetingId).canRedo, 'what was undone can be redone')
-
-      const forward = await redo(session.meetingId)
-      check(
-        forward?.meeting.utterances.find((u) => u.id === target.id)?.text === 'replaced text',
-        'redo brings the edit back'
-      )
-
-      // The recording goes back to its original state: later steps check it too.
-      await undo(session.meetingId)
-      check(
-        (await readMeeting(session.meetingId))?.utterances.find((u) => u.id === target.id)?.text === wasText,
-        'the recording is left as it was'
-      )
-
-      // A new edit cuts the redo branch off.
-      await editWithHistory(session.meetingId, 'another edit', (m) => m)
-      check(!historyState(session.meetingId).canRedo, 'a new edit cuts the redo branch off')
-
-      // Cutting out a fragment changes the audio, and a snapshot will not bring it back, so history breaks.
-      forgetHistory(session.meetingId)
-      const empty = historyState(session.meetingId)
-      check(!empty.canUndo && !empty.canRedo, 'an irreversible action breaks history')
-      check((await undo(session.meetingId)) === null, 'on empty history undo does nothing')
-    }
-  }
-
   // --- simultaneous edits do not lose each other ---
   {
     // There was data loss here: renaming and changing a participant's name went

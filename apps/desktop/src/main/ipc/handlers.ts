@@ -28,7 +28,6 @@ import {
 } from '../audio/native.js'
 import { startCallDetector } from '../detect/calls.js'
 import { checkForUpdatesNow, openReleases } from '../updates.js'
-import { editWithHistory, forgetHistory, historyState, redo, undo } from '../store/history.js'
 import { SpeechChunker, encodeWav } from '../pipeline/live.js'
 import {
   LiveTranscriber,
@@ -756,34 +755,16 @@ export function registerIpc(): void {
     // Through the shared edit queue: this used to be a separate read and write,
     // and an edit arriving between them was lost, including one from the pipeline
     // that fills a recording in as processing goes.
-    const next = await editWithHistory(
-      id,
-      patch.title !== undefined ? t('переименование') : t('правку сведений'),
-      (meeting) => {
-        // The person named the recording themselves, so we stop renaming it.
-        const renamed = patch.title !== undefined && patch.title !== meeting.title
-        return { ...meeting, ...patch, id: meeting.id, titleAuto: renamed ? false : meeting.titleAuto }
-      }
-    )
+    const next = await updateMeeting(id, (meeting) => {
+      // The person named the recording themselves, so we stop renaming it.
+      const renamed = patch.title !== undefined && patch.title !== meeting.title
+      return { ...meeting, ...patch, id: meeting.id, titleAuto: renamed ? false : meeting.titleAuto }
+    })
     send('meetings:changed', { id })
     return next
   })
 
   handle('overlay:draft', (visible) => setOverlayDraft(visible))
-
-  handle('edit:history', (id) => historyState(id))
-
-  handle('edit:undo', async (id) => {
-    const done = await undo(id)
-    if (done) send('meetings:changed', { id })
-    return done
-  })
-
-  handle('edit:redo', async (id) => {
-    const done = await redo(id)
-    if (done) send('meetings:changed', { id })
-    return done
-  })
 
   /**
    * Cutting out a fragment.
@@ -794,7 +775,6 @@ export function registerIpc(): void {
    * same job, as the words are no longer there.
    */
   handle('meetings:removeRange', async (id, from, to) => {
-    forgetHistory(id)
     const [a, b] = from <= to ? [from, to] : [to, from]
 
     for (const track of ['mic', 'system'] as const) {

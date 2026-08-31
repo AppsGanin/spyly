@@ -126,7 +126,6 @@ Anthropic and OpenAI have no public OAuth for third-party apps, only API keys. T
 |---|---|
 | `⌘⇧R` | start or stop recording, from any application |
 | `⌘M` | mark an important moment while recording |
-| `⌘Z` / `⌘⇧Z` | undo or redo an edit to a recording |
 | `⌘F` | search |
 | `⌘,` | settings |
 

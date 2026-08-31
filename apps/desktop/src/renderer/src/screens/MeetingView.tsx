@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { t,
   accentFor,
   humanDuration,
@@ -9,7 +9,6 @@ import { t,
   type Utterance
 } from '@spyly/core'
 import { api, useAsync, useIpcEvent } from '../lib/api'
-import { useShortcuts } from '../lib/shortcuts'
 import { fullDateLabel, uiLocale } from '../lib/dates'
 import { IconAlert, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconChevron, IconContinueRecord, IconSearch, IconStop, IconTag, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
@@ -78,36 +77,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   const canSummarize = (providers ?? []).some((p) => p.kind === 'llm' && p.ready)
   const stage = progress[id]
 
-  /**
-   * Undo and redo of edits: ⌘Z and ⌘⇧Z.
-   *
-   * The shortcut layer does not fire while the focus is in an input field, so
-   * inside editable text the browser's own undo works, while this one undoes a
-   * saved edit whole.
-   */
-  const undoStep = useCallback(
-    async (direction: 'undo' | 'redo') => {
-      const done = await api.call(direction === 'undo' ? 'edit:undo' : 'edit:redo', id)
-      if (!done) {
-        notify('info', direction === 'undo' ? t('Отменять нечего') : t('Возвращать нечего'))
-        return
-      }
-      reload()
-      void reloadMeetings()
-      notify('success', t('{action}: {what}', { action: direction === 'undo' ? t('Отменено') : t('Возвращено'), what: done.label }))
-    },
-    [id, notify, reload, reloadMeetings]
-  )
-
-  useShortcuts(
-    useMemo(
-      () => [
-        { key: 'z', meta: true, run: () => void undoStep('undo') },
-        { key: 'z', meta: true, shift: true, run: () => void undoStep('redo') }
-      ],
-      [undoStep]
-    )
-  )
 
 
   // The summary really is being built: either the recording itself says so, or a
