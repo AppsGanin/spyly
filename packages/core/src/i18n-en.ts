@@ -355,8 +355,6 @@ export const EN: Record<string, string> = {
   'Теги': 'Tags',
   'Теги записи': 'Recording tags',
   'Теги собирают разговоры на одну тему. У записи их может быть несколько.': 'Tags gather conversations on one topic. A recording can have several.',
-  'Текст': 'Text',
-  'Текст появится, как только прозвучат первые слова. Точная расшифровка с именами участников соберётся после остановки записи.': 'Text appears as soon as the first words are spoken. The accurate transcript with names is built after you stop.',
   'Тема': 'Theme',
   'Только выбранные приложения': 'Selected applications only',
   'Только конспект': 'Summary only',
@@ -504,4 +502,8 @@ export const EN: Record<string, string> = {
   'Нужны живой расшифровке, чтобы отличать речь от тишины.': 'Needed by live transcription, to tell speech from silence.',
   'Нужна языковая модель. Подойдёт установленный Claude Code или Codex, либо локальная Ollama.': 'A language model is needed. An installed Claude Code or Codex will do, or a local Ollama.',
   'Так расшифровка выглядела во время записи: черновая, на лету.': 'This is how the transcript looked while recording: a draft, on the fly.',
+  'Расшифровка соберётся после остановки записи. Пока идёт разговор, текст виден на вкладке «Черновик».': 'The transcript is assembled once the recording stops. While the conversation runs, the text is on the "Draft" tab.',
+  'Черновик, на лету. Точный текст соберётся после остановки записи.': 'A draft, on the fly. The accurate text is assembled once the recording stops.',
+  'Потоковая модель не скачана, поэтому текст приходит кусками после пауз. С ней слова появляются почти сразу — скачать можно в настройках, в разделе «Расшифровка».': 'The streaming model is not downloaded, so the text arrives in lumps after pauses. With it, words appear almost at once; it can be downloaded in settings, under "Transcription".',
+  'Пока тихо — текст появится, как только прозвучат первые слова.': 'Quiet so far. The text will appear as soon as the first words are spoken.',
 }

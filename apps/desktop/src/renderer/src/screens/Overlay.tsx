@@ -34,7 +34,9 @@ export function Overlay() {
     .map((u) => u.text.trim())
     .filter(Boolean)
     .join(' ')
-    .slice(-220)
+    // Roughly what five lines hold: the clamp cuts from the end, and the newest
+    // words are the ones worth seeing.
+    .slice(-300)
 
   // The window is transparent but still catches clicks, so it grows only while
   // there is something to show.

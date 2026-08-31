@@ -14,7 +14,6 @@ import { IconAlert, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconC
 import { useStore } from '../lib/store'
 import { Button, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
 import { ExportBar } from '../components/ExportBar'
-import { LiveTranscript } from '../components/LiveTranscript'
 import { Player, type PlayerTrack } from '../components/Player'
 import { SummaryPanel } from '../components/SummaryPanel'
 import { Transcript, countMatches, type SpeakerFilter } from '../components/Transcript'
@@ -63,7 +62,19 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   // whole time processing ran, which is exactly when it is needed: there is no
   // transcript yet.
   const { data: draftLines } = useAsync(() => api.call('meetings:live', id), [id, isRecordingThis])
-  const draft = draftLines ?? []
+  // While recording the draft comes from the live stream, afterwards from disk.
+  // It used to be shown under "Transcript" during the recording and moved to a
+  // tab of its own once it stopped: the same text under two different names,
+  // depending on when you looked.
+  const draft = isRecordingThis
+    ? live.filter((u) => u.meetingId === id).map((u) => ({ track: u.track, text: u.text, start: u.start, end: u.end }))
+    : (draftLines ?? [])
+
+  // Instant text needs the streaming model. Without it speech is collected until
+  // a pause and handed over in one lump, which arrives seconds late — and
+  // nothing on this page said why.
+  const { data: models } = useAsync(() => api.call('models:list'), [])
+  const streamingReady = models?.some((m) => m.id === 'nemotron-3.5' && m.downloaded) ?? true
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [justAsked, setJustAsked] = useState(false)
   /** A retry was asked for, but the first pipeline event has not arrived yet. */
@@ -145,11 +156,12 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
     return () => window.removeEventListener('keydown', handler)
   }, [meeting, currentTime])
 
-  // While processing or recording is under way the transcript is shown: there it
-  // is visible how it fills in.
+  // While recording, the draft is what is open: that is where the words appear.
+  // Once processing is under way the transcript is shown, so it is visible how
+  // it fills in.
   useEffect(() => {
     if (initialTab === 'transcript' || initialTab === 'summary') setTab(initialTab)
-    else if (isRecordingThis) setTab('transcript')
+    else if (isRecordingThis) setTab('live')
     else if (meeting && !meeting.summary && meeting.utterances.length > 0) setTab('transcript')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meeting?.id, isRecordingThis])
@@ -350,7 +362,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
         {/* Черновик остаётся и после записи: по нему видно, что было на экране
             во время разговора. Точность у него ниже, зато он показывает
             происходившее так, как его видел человек. */}
-        {draft.length > 0 && (
+        {(isRecordingThis || draft.length > 0) && (
           <button className={`tab ${tab === 'live' ? 'tab--active' : ''}`} onClick={() => setTab('live')}>
             {t('Черновик')}
           </button>
@@ -359,7 +371,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
       <div className="main__scroll" style={{ paddingTop: 'var(--space-5)' }}>
         {tab === 'live' ? (
-          <LiveDraft lines={draft} />
+          <LiveDraft lines={draft} live={isRecordingThis} streamingReady={streamingReady} />
         ) : tab === 'summary' ? (
           <SummaryPanel
             meeting={meeting}
@@ -369,7 +381,9 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
             canSummarize={canSummarize}
           />
         ) : isRecordingThis ? (
-          <LiveTranscript utterances={live.filter((u) => u.meetingId === id)} />
+          <p className="dim" style={{ lineHeight: 'var(--leading-relaxed)', maxWidth: 640 }}>
+            {t('Расшифровка соберётся после остановки записи. Пока идёт разговор, текст виден на вкладке «Черновик».')}
+          </p>
         ) : (
           <div className="col" style={{ gap: 'var(--space-4)', maxWidth: 780 }}>
             {tracks.length > 0 && !isRecordingThis && (
@@ -606,19 +620,39 @@ function shortWhen(iso: string): string {
  * seeing the words arrive — was lost in the furniture.
  */
 function LiveDraft({
-  lines
+  lines,
+  live = false,
+  streamingReady = true
 }: {
   lines: { track: 'mic' | 'system'; text: string; start: number; end: number }[]
+  live?: boolean
+  streamingReady?: boolean
 }) {
+  const bottom = useRef<HTMLDivElement>(null)
   const text = lines
     .map((line) => line.text.trim())
     .filter(Boolean)
     .join(' ')
 
+  // The tail is followed rather than the number of lines: a phrase is extended
+  // in place, and its end slides past the bottom edge without the count changing.
+  useEffect(() => {
+    if (live) bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [live, text])
+
   return (
     <div className="col" style={{ gap: 'var(--space-4)', maxWidth: 780 }}>
-      <p className="field__hint">{t('Так расшифровка выглядела во время записи: черновая, на лету.')}</p>
-      <div className="summary__tldr">{text}</div>
+      <p className="field__hint">
+        {live
+          ? streamingReady
+            ? t('Черновик, на лету. Точный текст соберётся после остановки записи.')
+            : t('Потоковая модель не скачана, поэтому текст приходит кусками после пауз. С ней слова появляются почти сразу — скачать можно в настройках, в разделе «Расшифровка».')
+          : t('Так расшифровка выглядела во время записи: черновая, на лету.')}
+      </p>
+      <div className="summary__tldr">
+        {text || (live ? t('Пока тихо — текст появится, как только прозвучат первые слова.') : '')}
+      </div>
+      <div ref={bottom} />
     </div>
   )
 }

@@ -20,8 +20,8 @@ const HEIGHT = 44
  * window still swallows clicks, and an empty strip under the pill would sit on
  * top of whatever the person is actually working in.
  */
-const WIDE = 420
-const TALL = 92
+const WIDE = 460
+const TALL = 168
 
 export function showOverlay(dirname: string): void {
   if (overlay && !overlay.isDestroyed()) {
