@@ -684,7 +684,7 @@ export function registerIpc(): void {
 
   handle('calendar:create', async (meetingId) => {
     const meeting = await readMeeting(meetingId)
-    if (!meeting) return { error: t('Запись не найдена') }
+    if (!meeting) return { error: t('Запись не найдена.') }
 
     const { createEvent } = await import('../detect/calendar.js')
     const start = new Date(meeting.startedAt)
