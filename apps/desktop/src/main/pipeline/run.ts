@@ -246,29 +246,31 @@ async function transcribeTracks(
   const cleanedMic = await cleanMicrophone(meetingId)
 
   const out: AsrResult[] = []
-  for (const [index, track] of tracks.entries()) {
-    const file = track === 'mic' && cleanedMic ? cleanedMic : audioFile(meetingId, track)
+  try {
+    for (const [index, track] of tracks.entries()) {
+      const file = track === 'mic' && cleanedMic ? cleanedMic : audioFile(meetingId, track)
 
-    // An empty track is never handed to recognition: on silence Whisper produces
-    // subtitle credits out of its training data instead of admitting there is no speech.
-    const wave = await readWavPcm16(file).catch(() => null)
-    if (!wave || speechSeconds(wave.samples, wave.sampleRate) < 0.5) {
-      out.push({ track, language, segments: [] })
-      continue
+      // An empty track is never handed to recognition: on silence Whisper produces
+      // subtitle credits out of its training data instead of admitting there is no speech.
+      const wave = await readWavPcm16(file).catch(() => null)
+      if (!wave || speechSeconds(wave.samples, wave.sampleRate) < 0.5) {
+        out.push({ track, language, segments: [] })
+        continue
+      }
+
+      const result = await provider.transcribe(file, track, {
+        language,
+        onProgress: (p) => report(meetingId, 'transcribing', 'running', (index + p) / tracks.length)
+      })
+      out.push(result)
     }
 
-    const result = await provider.transcribe(file, track, {
-      language,
-      onProgress: (p) => report(meetingId, 'transcribing', 'running', (index + p) / tracks.length)
-    })
-    out.push(result)
+    return out
+  } finally {
+    // The cleaned copy has done its work, and it goes even if recognition threw:
+    // an hour of audio is a hundred megabytes, and nobody would ever find it.
+    if (cleanedMic) await rm(cleanedMic, { force: true }).catch(() => undefined)
   }
-
-  // The cleaned copy has done its work. The recording keeps what the microphone
-  // really heard, and this was only ever for recognition.
-  if (cleanedMic) await rm(cleanedMic, { force: true }).catch(() => undefined)
-
-  return out
 }
 
 /**

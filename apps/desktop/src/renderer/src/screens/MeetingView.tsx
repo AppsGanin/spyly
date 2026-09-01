@@ -180,8 +180,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
   if (!meeting) {
     return (
       <div className="empty">
-        {/* Причина важна: «не найдена» и «не удалось прочитать» — разные беды,
-            и во втором случае запись, скорее всего, цела. */}
+        {/* The reason matters: "not found" and "could not be read" are different
+            troubles, and in the second the recording is most likely intact. */}
         <p className="muted">{error ? t('Не удалось открыть запись: {error}', { error: error }) : t('Запись не найдена.')}</p>
         <Button onClick={() => setView({ kind: 'home' })}>{t('К списку записей')}</Button>
       </div>
@@ -231,9 +231,9 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
 
   return (
     <>
-      {/* Шапка в две строки: заголовок с действиями, под ними — сведения о
-          записи во всю ширину. Иначе список участников делит строку с
-          кнопками и обрезается там, где места ещё полно. */}
+      {/* The header is two rows: the title with its actions, and under them the
+          details of the recording across the full width. Otherwise the details
+          share a line with the buttons and are cut off with room to spare. */}
       <div className="main__header main__header--stacked">
         <div className="row" style={{ gap: 'var(--space-4)', alignItems: 'flex-start' }}>
           <div className="grow" style={{ minWidth: 0 }}>
@@ -274,8 +274,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
               <span>{humanDuration(meeting.durationSec)}</span>
             </>
           )}
-          {/* Чем расшифровано: через месяц по тексту не понять, лёгкой моделью
-              его делали или самой точной. */}
+          {/* What it was transcribed with: a month later the text alone does not say
+              whether it was done by a light model or by the most accurate one. */}
           {meeting.providers.asr && (
             <>
               <span>·</span>
@@ -325,8 +325,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
               })}
             </div>
             <div className="row" style={{ gap: 'var(--space-2)' }}>
-              {/* Пересобрать можно любой этап, а не только упавший: модель
-                  сменилась, конспект не понравился, звук переслушали. */}
+              {/* Any stage can be rebuilt, not only a failed one: the model changed,
+                  the summary was no good, the audio was listened to again. */}
               <Menu
                 align="start"
                 trigger={
@@ -357,9 +357,9 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
           {t('Расшифровка')}
           {meeting.utterances.length > 0 && <span className="dim"> {meeting.utterances.length}</span>}
         </button>
-        {/* Черновик остаётся и после записи: по нему видно, что было на экране
-            во время разговора. Точность у него ниже, зато он показывает
-            происходившее так, как его видел человек. */}
+        {/* The draft stays after the recording too: it shows what was on the screen
+            during the conversation. It is less accurate, but it shows what
+            happened the way the person saw it at the time. */}
         {(isRecordingThis || draft.length > 0) && (
           <button className={`tab ${tab === 'live' ? 'tab--active' : ''}`} onClick={() => setTab('live')}>
             {t('Черновик')}
@@ -445,8 +445,8 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
               </div>
             )}
 
-            {/* Фильтр по говорящим показываем, только когда есть кого
-                отфильтровывать: на монологе он бессмыслен. */}
+            {/* The speaker filter is shown only when there is somebody to filter out:
+                on a monologue it means nothing. */}
             {meeting.speakers.length > 1 && (
               <div
                 className="segmented"
@@ -1072,8 +1072,8 @@ function RecordingStrip({
           <IconStop />{t('Стоп')}</Button>
       </div>
 
-      {/* Тост уезжает через несколько секунд, а беда с источником никуда не
-          девается: пока она есть, ей место на глазах. */}
+      {/* A toast leaves after a few seconds, while trouble with a source does not
+          go anywhere: for as long as it is there, its place is in plain sight. */}
       {error && (
         <div className="recwarn" role="status">
           <IconAlert />

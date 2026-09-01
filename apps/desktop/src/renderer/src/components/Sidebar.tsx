@@ -155,8 +155,8 @@ export function Sidebar() {
           </button>
         )}
 
-        {/* Пока идёт запись, таймер виден с любого экрана: иначе про неё
-            легко забыть, уйдя в настройки. */}
+        {/* While a recording runs the timer is visible from any screen: it is
+            easy to forget about it after wandering into the settings. */}
         {isRecording && (
           <button
             className="recpill"
@@ -335,8 +335,8 @@ function MeetingItem({
         <span className="item__title">{meeting.title}</span>
         <span className="item__when mono">{timeLabel(meeting.startedAt)}</span>
       </span>
-      {/* Теги в списке: по ним запись узнаётся быстрее, чем по названию —
-          особенно когда названия у половины разговоров похожи. */}
+      {/* Tags in the list: a recording is recognised by them faster than by its
+          title, especially when half the titles look alike. */}
       {meeting.tags.length > 0 && (
         <span className="item__tags">
           {meeting.tags.map((tag) => (

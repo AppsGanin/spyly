@@ -12,7 +12,7 @@ function buildHeader(sampleRate: number, channels: number, bitsPerSample: number
   const byteRate = (sampleRate * channels * bitsPerSample) / 8
   const blockAlign = (channels * bitsPerSample) / 8
   header.write('RIFF', 0)
-  header.writeUInt32LE(0, 4) // размер файла минус 8 — патчится
+  header.writeUInt32LE(0, 4) // the file size minus 8, patched as it goes
   header.write('WAVE', 8)
   header.write('fmt ', 12)
   header.writeUInt32LE(16, 16)
@@ -23,7 +23,7 @@ function buildHeader(sampleRate: number, channels: number, bitsPerSample: number
   header.writeUInt16LE(blockAlign, 32)
   header.writeUInt16LE(bitsPerSample, 34)
   header.write('data', 36)
-  header.writeUInt32LE(0, 40) // размер данных — патчится
+  header.writeUInt32LE(0, 40) // the size of the data, patched as it goes
   return header
 }
 

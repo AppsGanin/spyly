@@ -513,9 +513,9 @@ function QualityOption({
       <span className={`option__mark ${selected ? 'option__mark--on' : ''}`} aria-hidden="true" />
 
       <div className="option__body">
-        {/* Заголовок — настоящее имя модели: по нему её можно найти и
-            сравнить с чужими замерами. Что она даёт на практике — строкой
-            ниже, там же, где остальные пояснения. */}
+        {/* The heading is the model's real name: it can be looked up by it and
+            compared with somebody else's measurements. What it gives in
+            practice goes a line below, where the other explanations are. */}
         <div className="option__title">
           {model.name}
           {model.recommended && !selected && <span className="badge badge--blue">{t('рекомендуем')}</span>}
@@ -896,8 +896,8 @@ function AgentsTab({
     <section className="settings__group">
       <p className="field__hint">{t('После подключения агент сам сможет искать по вашим записям — например, на вопрос «что мы решили про биллинг во вторник». Расшифровки при этом остаются на диске: агент читает их по запросу, никуда не выгружая.')}</p>
 
-      {/* Поиск установленных агентов занимает до секунды: пустой список без
-          объяснения выглядит как «ничего не нашлось». */}
+      {/* Finding the installed agents takes up to a second: an empty list with no
+          explanation reads as "nothing was found". */}
       {loading && agents.length === 0 && (
         <div className="check">
           <span className="check__icon"><Spinner /></span>
