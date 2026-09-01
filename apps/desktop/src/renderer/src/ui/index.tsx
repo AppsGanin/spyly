@@ -10,8 +10,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
-  type SelectHTMLAttributes,
-  type TextareaHTMLAttributes
+  type SelectHTMLAttributes
 } from 'react'
 
 type ButtonVariant = 'default' | 'primary' | 'danger' | 'ghost'
@@ -62,11 +61,6 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
     return <input ref={ref} className={`input ${className}`} {...rest} />
   }
 )
-
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const { className = '', ...rest } = props
-  return <textarea className={`textarea ${className}`} {...rest} />
-}
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   const { className = '', children, ...rest } = props

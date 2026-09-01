@@ -12,13 +12,14 @@ import {
   type MeetingMeta
 } from '@spyly/core'
 import { RecordingSession } from './recorder/session.js'
-import { SpeechChunker, encodeWav } from './pipeline/live.js'
+import { SpeechChunker } from './pipeline/live.js'
 import { LiveTranscriber, isLiveModelReady, warmLiveModel } from './pipeline/live-stream.js'
 import { startWhisperServer, stopWhisperServer, transcribeChunk } from './pipeline/whisper-server.js'
 import { processMeeting } from './pipeline/run.js'
 import { readMeeting, writeMeta } from './store/meetings.js'
 import { appendFile } from 'node:fs/promises'
-import { readWavPcm16 } from './audio/wav.js'
+import { encodeWavPcm16, readWavPcm16 } from './audio/wav.js'
+import { SAMPLE_RATE } from './audio/native.js'
 import { audioFile, meetingDir, meetingFile } from './store/paths.js'
 import { loadSettings } from './store/settings.js'
 
@@ -132,7 +133,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
       let chunker = chunkers.get(track)
       if (!chunker) {
         chunker = new SpeechChunker(track, (samples, startSec) => {
-          void transcribeChunk(encodeWav(samples), settings.language)
+          void transcribeChunk(encodeWavPcm16(samples, SAMPLE_RATE), settings.language)
             .then((text) => {
               if (!text) return
               noteLive(track, text, startSec, startSec + samples.length / 16000, true)

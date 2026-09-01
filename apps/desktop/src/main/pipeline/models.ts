@@ -138,11 +138,6 @@ interface Download {
 
 const inFlight = new Map<string, Download>()
 
-export function downloadState(id: string): { progress: number; paused: boolean } | null {
-  const active = inFlight.get(id)
-  return active ? { progress: active.progress, paused: false } : null
-}
-
 /** Whether there is a partial download, which shows the download can be resumed. */
 export function partialBytes(id: string): number {
   const spec = MODELS.find((m) => m.id === id)
@@ -296,18 +291,3 @@ async function extractTarBz2(archive: string, dest: string): Promise<void> {
   })
 }
 
-/** Recognition models, from the fast one to the accurate one. */
-export function asrModels(): string[] {
-  return [
-    'whisper-large-v3-turbo',
-    'whisper-large-v3',
-    'parakeet-tdt-v3'
-  ]
-}
-
-/** Nothing will be transcribed until the bare minimum has been downloaded. */
-export function missingRequiredModels(asrModelId: string): ModelSpec[] {
-  return MODELS.filter(
-    (m) => (m.id === asrModelId || m.purpose === 'vad') && !isDownloaded(m.id)
-  )
-}

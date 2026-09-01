@@ -13,7 +13,7 @@ import { fullDateLabel, uiLocale } from '../lib/dates'
 import { IconAlert, IconCalendar, IconCheck, IconFlag, IconPause, IconPlay, IconRefresh, IconChevron, IconContinueRecord, IconSearch, IconStop, IconTag, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
 import type { CalendarEventInfo } from '@shared/ipc'
-import { Button, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
+import { Badge, Button, IconButton, Input, LevelMeter, Menu, Modal, Spinner } from '../ui'
 import { ExportBar } from '../components/ExportBar'
 import { Player, type PlayerTrack } from '../components/Player'
 import { SummaryPanel } from '../components/SummaryPanel'
@@ -284,9 +284,7 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
           )}
 
           {meeting.tags.map((tag) => (
-            <span key={tag} className="badge badge--purple">
-              {tag}
-            </span>
+            <Badge key={tag} tone="purple">{tag}</Badge>
           ))}
         </div>
 

@@ -1,8 +1,7 @@
 import { t } from '@spyly/core'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import path from 'node:path'
-import { app } from 'electron'
+import { audioHelper } from '../bundled.js'
 
 /**
  * Calendar events around the current moment.
@@ -24,24 +23,14 @@ export interface CalendarEvent {
   isNow: boolean
 }
 
-function helperPath(): string {
-  const name = 'spyly-audiotap'
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'bin', name)]
-    : [
-        path.join(process.cwd(), 'native', 'macos-audio', '.build', 'release', name),
-        path.join(app.getAppPath(), '..', '..', 'native', 'macos-audio', '.build', 'release', name)
-      ]
-  return candidates.find(existsSync) ?? candidates[0]!
-}
 
 function run(args: string[], env: Record<string, string> = {}, timeoutMs = 8000): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    if (process.platform !== 'darwin' || !existsSync(helperPath())) {
+    if (process.platform !== 'darwin' || !existsSync(audioHelper())) {
       resolve({ code: -1, stdout: '', stderr: t('календарь доступен только на macOS') })
       return
     }
-    const child = spawn(helperPath(), args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } })
+    const child = spawn(audioHelper(), args, { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env } })
     let stdout = ''
     let stderr = ''
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs)

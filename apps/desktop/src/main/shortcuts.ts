@@ -25,6 +25,3 @@ export function unregisterGlobalShortcuts(): void {
   registered = false
 }
 
-export function isShortcutRegistered(): boolean {
-  return registered
-}

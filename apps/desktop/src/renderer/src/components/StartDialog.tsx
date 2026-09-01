@@ -4,7 +4,7 @@ import type { AudioApp, AudioDevice, CalendarEventInfo, ModelInfo, Permissions, 
 import { api, useIpcEvent } from '../lib/api'
 import { IconCalendar, IconMic, IconSpeaker } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Button, Meter, Modal, Select, Spinner, Switch } from '../ui'
+import { Badge, Button, Meter, Modal, Select, Spinner, Switch } from '../ui'
 
 /**
  * Choosing the sources before recording.
@@ -266,7 +266,7 @@ export function StartDialog({
                           onChange={() => toggleApp(app.key)}
                         />
                         <span className="grow truncate">{app.name}</span>
-                        {app.isPlaying && <span className="badge badge--green">{t('звучит')}</span>}
+                        {app.isPlaying && <Badge tone="green">{t('звучит')}</Badge>}
                       </label>
                     ))}
                   </div>

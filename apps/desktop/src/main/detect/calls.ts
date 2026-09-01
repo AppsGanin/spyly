@@ -108,7 +108,3 @@ export function stopCallDetector(): void {
   hits = 0
 }
 
-/** "Not now" means not asking again for a while. */
-export function snoozeDetection(minutes = 10): void {
-  snoozedUntil = Date.now() + minutes * 60_000
-}

@@ -8,7 +8,7 @@ import { t,
   type Utterance
 } from '@spyly/core'
 import { IconMore, IconUsers } from '../lib/icons'
-import { Button, EmptyState, IconButton, Menu } from '../ui'
+import { Badge, Button, EmptyState, IconButton, Menu } from '../ui'
 
 /** Who is speaking: a filter over the transcript, not over the audio. */
 export type SpeakerFilter = 'all' | 'me' | 'others'
@@ -218,7 +218,7 @@ export function Transcript({
                   <span style={{ color: `var(--ds-${accent}-900)` }}>
                     {speakerLabel(speaker, utterance.speakerId)}
                   </span>
-                  {marked && <span className="badge badge--amber">{t('важное')}</span>}
+                  {marked && <Badge tone="amber">{t('важное')}</Badge>}
                 </div>
               )}
               <div

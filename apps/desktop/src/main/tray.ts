@@ -7,7 +7,6 @@ import type { RecordingState } from '../shared/ipc.js'
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 let tray: Tray | null = null
-let lastState: RecordingState | null = null
 
 /** The handlers are installed by the IPC layer: the tray should know nothing extra about recording. */
 export const trayActions: {
@@ -52,7 +51,6 @@ export function createTray(): void {
 
 /** The icon turns solid while recording: the application must not be inconspicuous. */
 export function updateTray(state: RecordingState): void {
-  lastState = state
   if (!tray) return
   const recording = state.status === 'recording' || state.status === 'paused'
   const image = nativeImage.createFromPath(iconPath(recording))
@@ -65,9 +63,5 @@ export function updateTray(state: RecordingState): void {
 export function destroyTray(): void {
   tray?.destroy()
   tray = null
-  lastState = null
 }
 
-export function currentTrayState(): RecordingState | null {
-  return lastState
-}

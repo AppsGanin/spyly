@@ -24,9 +24,6 @@ export const ASR_PROVIDERS: AsrProvider[] = [whisperCppProvider, ...SHERPA_ASR_P
 export function providerForModel(modelId: string): AsrProvider {
   return sherpaProviderFor(modelId) ?? whisperCppProvider
 }
-export function getAsrProvider(id: string): AsrProvider {
-  return ASR_PROVIDERS.find((p) => p.id === id) ?? whisperCppProvider
-}
 
 export { getLlmProvider }
 

@@ -124,28 +124,3 @@ export class SpeechChunker {
   }
 }
 
-/** A WAV in memory: whisper-server takes a file, not raw samples. */
-export function encodeWav(samples: Float32Array, sampleRate = SAMPLE_RATE): Buffer {
-  const header = Buffer.alloc(44)
-  const dataBytes = samples.length * 2
-  header.write('RIFF', 0)
-  header.writeUInt32LE(36 + dataBytes, 4)
-  header.write('WAVE', 8)
-  header.write('fmt ', 12)
-  header.writeUInt32LE(16, 16)
-  header.writeUInt16LE(1, 20)
-  header.writeUInt16LE(1, 22)
-  header.writeUInt32LE(sampleRate, 24)
-  header.writeUInt32LE(sampleRate * 2, 28)
-  header.writeUInt16LE(2, 32)
-  header.writeUInt16LE(16, 34)
-  header.write('data', 36)
-  header.writeUInt32LE(dataBytes, 40)
-
-  const body = Buffer.alloc(dataBytes)
-  for (let i = 0; i < samples.length; i++) {
-    const value = Math.max(-1, Math.min(1, samples[i]!))
-    body.writeInt16LE(Math.round(value * 32767), i * 2)
-  }
-  return Buffer.concat([header, body])
-}

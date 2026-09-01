@@ -3,8 +3,7 @@ import { spawn, type ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
-import path from 'node:path'
-import { app } from 'electron'
+import { audioHelper } from '../bundled.js'
 import type { AudioApp, AudioDevice } from '../../shared/ipc.js'
 
 /**
@@ -19,27 +18,14 @@ import type { AudioApp, AudioDevice } from '../../shared/ipc.js'
 
 export const SAMPLE_RATE = 16000
 
-function helperPath(): string {
-  const name = 'spyly-audiotap'
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'bin', name)]
-    : [
-        path.join(app.getAppPath(), '..', '..', 'native', 'macos-audio', '.build', 'release', name),
-        path.join(process.cwd(), 'native', 'macos-audio', '.build', 'release', name)
-      ]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate
-  }
-  return candidates[0]!
-}
 
 export function isSupported(): boolean {
-  return process.platform === 'darwin' && existsSync(helperPath())
+  return process.platform === 'darwin' && existsSync(audioHelper())
 }
 
 function runOnce(args: string[], timeoutMs = 5000): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
-    const child = spawn(helperPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(audioHelper(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
     const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs)
@@ -110,16 +96,6 @@ export interface CaptureOptions {
   /** Application PIDs; empty means all system audio. */
   includePids?: number[]
   excludePids?: number[]
-}
-
-export interface CaptureEvents {
-  samples: (chunk: Float32Array) => void
-  level: (rms: number) => void
-  ready: () => void
-  /** Whether the system removed the speakers from the microphone. Microphone only. */
-  echoCancel: (on: boolean) => void
-  error: (message: string) => void
-  exit: (code: number | null) => void
 }
 
 /**
@@ -193,7 +169,7 @@ export class NativeCapture extends EventEmitter {
     for (const pid of this.options.includePids ?? []) args.push('--include-pid', String(pid))
     for (const pid of this.options.excludePids ?? []) args.push('--exclude-pid', String(pid))
 
-    const child = spawn(helperPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(audioHelper(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
     this.child = child
 
     child.stdout.on('data', (chunk: Buffer) => this.onAudio(chunk))

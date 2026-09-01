@@ -4,7 +4,7 @@ import type { AgentStatus, ModelInfo, Permissions, ProviderInfo, Settings } from
 import { api, useAsync, useIpcEvent } from '../lib/api'
 import { IconAlert, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
+import { Badge, Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
 
 type Tab = 'general' | 'transcription' | 'agents' | 'about'
 
@@ -284,7 +284,7 @@ function AccessRows() {
           inline
         >
           {item.state === 'granted' ? (
-            <span className="badge badge--green">{t('Есть')}</span>
+            <Badge tone="green">{t('Есть')}</Badge>
           ) : item.state === 'denied' ? (
             <Button size="sm" onClick={() => void api.call('app:openPrivacySettings', item.id)}>
               {t('Открыть настройки системы')}
@@ -518,7 +518,7 @@ function QualityOption({
             practice goes a line below, where the other explanations are. */}
         <div className="option__title">
           {model.name}
-          {model.recommended && !selected && <span className="badge badge--blue">{t('рекомендуем')}</span>}
+          {model.recommended && !selected && <Badge tone="blue">{t('рекомендуем')}</Badge>}
         </div>
         <div className="option__hint">{model.tradeoff ?? model.tier}</div>
         {(downloading || paused) && (

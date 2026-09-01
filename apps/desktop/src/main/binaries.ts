@@ -143,8 +143,3 @@ export async function enrichedPath(): Promise<string> {
   return [...new Set(dirs)].join(path.delimiter)
 }
 
-/** Forget what was found: after a command is installed it has to be looked for again. */
-export function forgetBinaries(): void {
-  cache.clear()
-  shellPath = null
-}

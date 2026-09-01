@@ -141,8 +141,7 @@ kbd,
 
 /* ── fields ───────────────────────────────────────────────────── */
 .input,
-.select,
-.textarea {
+.select {
   width: 100%;
   height: var(--control-md);
   padding: 0 var(--space-3);
@@ -153,19 +152,10 @@ kbd,
   box-shadow: var(--ds-shadow-border);
   transition: box-shadow var(--duration-fast) var(--ease-swift);
 }
-.input::placeholder,
-.textarea::placeholder { color: var(--ds-gray-700); }
+.input::placeholder { color: var(--ds-gray-700); }
 .input:hover,
-.select:hover,
-.textarea:hover { box-shadow: 0 0 0 1px var(--ds-gray-500); }
+.select:hover { box-shadow: 0 0 0 1px var(--ds-gray-500); }
 
-.textarea {
-  height: auto;
-  min-height: 76px;
-  padding: var(--space-2) var(--space-3);
-  line-height: var(--leading-relaxed);
-  resize: vertical;
-}
 
 .select {
   appearance: none;
@@ -186,17 +176,7 @@ kbd,
   border-radius: var(--radius-lg);
   box-shadow: var(--ds-shadow-border);
 }
-.card__header {
-  padding: var(--space-4) var(--space-5);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.card__body { padding: 0 var(--space-5) var(--space-5); }
-.card--inset { background: var(--ds-background-200); }
 
-.divider { height: 1px; background: var(--ds-gray-alpha-300); border: none; }
 
 /* ── badges ───────────────────────────────────────────────────── */
 .badge {
@@ -274,7 +254,6 @@ button.chip:hover { background: var(--ds-gray-200); }
    everyone who was overriding it. */
 .input:focus-visible,
 .select:focus-visible,
-.textarea:focus-visible,
 .btn:focus-visible,
 .card:focus-visible {
   outline: none;

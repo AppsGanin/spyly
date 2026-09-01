@@ -41,9 +41,3 @@ export function t(ru: string, vars?: Record<string, string | number>): string {
   )
 }
 
-/** Strings with no translation, so that there is a way to find them. */
-export function missingTranslations(strings: readonly string[]): string[] {
-  return strings.filter((s) => !(s in EN))
-}
-
-

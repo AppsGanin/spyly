@@ -73,12 +73,6 @@ export const IconChevron = (p: IconProps) => (
 export const IconSparkle = (p: IconProps) => (
   <Icon {...p}><path d="M8 2l1.4 3.6L13 7l-3.6 1.4L8 12l-1.4-3.6L3 7l3.6-1.4L8 2z" /></Icon>
 )
-/** The voice was recognised from a print, a caption next to the participant's name. */
-export const IconVoiceMatch = (p: IconProps) => (
-  <Icon {...p}>
-    <path d="M3 6.5v3M6 3.5v9M9 5.5v5M12 7v2" />
-  </Icon>
-)
 /**
  * Append to a recording.
  *
@@ -97,9 +91,6 @@ export const IconMore = (p: IconProps) => (
     <circle cx="8" cy="8" r="1.1" fill="currentColor" stroke="none" />
     <circle cx="12" cy="8" r="1.1" fill="currentColor" stroke="none" />
   </Icon>
-)
-export const IconPencil = (p: IconProps) => (
-  <Icon {...p}><path d="M11.5 2.5a1.4 1.4 0 0 1 2 2L6 12l-3 1 1-3z" /></Icon>
 )
 export const IconTag = (p: IconProps) => (
   <Icon {...p}><path d="M2.75 7.5V3.25a.5.5 0 0 1 .5-.5H7.5l5.75 5.75a1 1 0 0 1 0 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L2 8.25" /><circle cx="5.5" cy="5.5" r=".9" fill="currentColor" /></Icon>

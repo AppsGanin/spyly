@@ -3,8 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
-import path from 'node:path'
-import { app } from 'electron'
+import { whisperBinary } from '../bundled.js'
 import { modelPath } from './models.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
 
@@ -20,19 +19,9 @@ let child: ChildProcess | null = null
 let port = 0
 let ready: Promise<void> | null = null
 
-function serverPath(): string {
-  const name = 'whisper-server'
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'bin', name)]
-    : [
-        path.join(process.cwd(), 'native', 'whisper', 'build', 'bin', name),
-        path.join(app.getAppPath(), '..', '..', 'native', 'whisper', 'build', 'bin', name)
-      ]
-  return candidates.find(existsSync) ?? candidates[0]!
-}
 
 export function isServerAvailable(): boolean {
-  return existsSync(serverPath())
+  return existsSync(whisperBinary('whisper-server'))
 }
 
 async function freePort(): Promise<number> {
@@ -73,7 +62,7 @@ export async function startWhisperServer(language: string): Promise<void> {
   ready = (async () => {
     port = await freePort()
     child = spawn(
-      serverPath(),
+      whisperBinary('whisper-server'),
       [
         '-m', model,
         '--host', '127.0.0.1',

@@ -21,6 +21,7 @@ import type {
 } from '../../shared/ipc.js'
 import {
   NativeCapture,
+  SAMPLE_RATE,
   appUsesMicrophone,
   checkSystemAudioPermission,
   isSupported,
@@ -29,7 +30,7 @@ import {
 } from '../audio/native.js'
 import { startCallDetector } from '../detect/calls.js'
 import { checkForUpdatesNow, openReleases } from '../updates.js'
-import { SpeechChunker, encodeWav } from '../pipeline/live.js'
+import { SpeechChunker } from '../pipeline/live.js'
 import {
   LiveTranscriber,
   isLiveModelReady,
@@ -57,7 +58,7 @@ import {
   deliverSamples,
   rendererUsesMicrophone
 } from '../audio/renderer-capture.js'
-import { silenceRange } from '../audio/wav.js'
+import { encodeWavPcm16, silenceRange } from '../audio/wav.js'
 import { audioFile, meetingDir, meetingFile } from '../store/paths.js'
 import { loadSettings, saveSettings } from '../store/settings.js'
 import { encryptionAvailable, hasSecret, setSecret } from '../store/secrets.js'
@@ -327,7 +328,7 @@ async function attachLiveTranscription(active: RecordingSession, language: strin
       const item = pending.shift()!
       inFlight++
       const durationSec = item.samples.length / 16000
-      void transcribeChunk(encodeWav(item.samples), language)
+      void transcribeChunk(encodeWavPcm16(item.samples, SAMPLE_RATE), language)
         .then((text) => {
           if (!text) return
           publish(

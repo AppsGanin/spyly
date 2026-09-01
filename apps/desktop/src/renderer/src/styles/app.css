@@ -499,19 +499,8 @@
 .utterance__text { line-height: var(--leading-relaxed); white-space: pre-wrap; word-break: break-word; }
 .utterance--provisional .utterance__text { color: var(--ds-gray-900); font-style: italic; }
 
-/* The phrase is still being spoken: the text is being extended, and the cursor shows it. */
-.utterance__cursor {
-  display: inline-block;
-  width: 2px;
-  height: 1em;
-  margin-left: 2px;
-  vertical-align: text-bottom;
-  background: currentColor;
-  animation: utterance-cursor 1s steps(2, start) infinite;
-}
 @keyframes utterance-cursor { to { visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) {
-  .utterance__cursor { animation: none; opacity: 0.5; }
 }
 
 .speaker-dot {
@@ -888,15 +877,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 
 /* ── a split button: action plus choice ────────────────────────── */
 .split { display: inline-flex; }
-.split__main { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.split__more {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  width: var(--control-sm);
-  padding: 0;
-  margin-left: 1px;
-}
-
 /* A choice card: an engine can have several models. */
 .check--selected { box-shadow: 0 0 0 1px var(--ds-blue-700); }
 .check--selected:hover { box-shadow: 0 0 0 1px var(--ds-blue-700); }
@@ -1124,55 +1104,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .filter--tag { color: var(--ds-purple-900); }
 .filter--tag.filter--active { background: var(--ds-purple-100); color: var(--ds-purple-900); }
 
-/* ── prompt templates ──────────────────────────────────────────── */
-.tmpl-list { display: flex; flex-direction: column; gap: var(--space-2); }
-.tmpl {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  box-shadow: var(--ds-shadow-border);
-  background: var(--ds-background-100);
-}
-/* A template's text is long, so the start is shown; it is visible whole while editing. */
-.tmpl__text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.textarea {
-  height: auto;
-  padding: var(--space-2) var(--space-3);
-  line-height: 20px;
-  resize: vertical;
-  font-family: inherit;
-}
-
-.chip--toggle { cursor: pointer; border: none; font: inherit; opacity: 0.55; }
-.chip--toggle.chip--on { opacity: 1; background: var(--ds-blue-200); color: var(--ds-blue-900); }
-
-/* ── the list for picking one recording ────────────────────────── */
-.picklist { display: flex; flex-direction: column; gap: var(--space-1); max-height: 280px; overflow-y: auto; }
-.picklist__item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ds-gray-1000);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.picklist__item:hover { background: var(--ds-gray-100); }
-.picklist__item--on { background: var(--ds-blue-200); color: var(--ds-blue-900); }
-.picklist__item--on:hover { background: var(--ds-blue-200); }
-
 /* ── the action menu ───────────────────────────────────────────── */
 .menu { position: relative; display: inline-flex; }
 /* The list of items hangs over the window: in its own place it would be
@@ -1244,14 +1175,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   color: var(--ds-gray-900);
   text-align: right;
 }
-
-/* The "recognised by voice" icon: a caption in words repeated on every utterance. */
-.voicemark {
-  display: inline-flex;
-  align-items: center;
-  color: var(--ds-gray-700);
-}
-
 
 /* ── the floating panel above other windows ────────────────────── */
 /* The window is transparent, so the panel draws the background rather than body. */

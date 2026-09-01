@@ -78,10 +78,6 @@ export async function processMeeting(meetingId: string, from: Stage = 'transcrib
   }
 }
 
-export function isProcessing(meetingId: string): boolean {
-  return running.has(meetingId)
-}
-
 async function runStages(meetingId: string, from: Stage): Promise<void> {
   let meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))

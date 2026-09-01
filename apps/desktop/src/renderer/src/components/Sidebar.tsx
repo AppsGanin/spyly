@@ -5,7 +5,7 @@ import { api } from '../lib/api'
 import { dayLabel, timeLabel } from '../lib/dates'
 import { IconRecord, IconSearch, IconSettings, IconStop } from '../lib/icons'
 import { useStore } from '../lib/store'
-import { Input, LevelMeter, Spinner } from '../ui'
+import { Badge, Input, LevelMeter, Spinner } from '../ui'
 import { StartDialog } from './StartDialog'
 
 type Filter = 'all' | 'today' | 'week' | 'unprocessed'
@@ -340,9 +340,7 @@ function MeetingItem({
       {meeting.tags.length > 0 && (
         <span className="item__tags">
           {meeting.tags.map((tag) => (
-            <span key={tag} className="badge badge--purple">
-              {tag}
-            </span>
+            <Badge key={tag} tone="purple">{tag}</Badge>
           ))}
         </span>
       )}

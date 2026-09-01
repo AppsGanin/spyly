@@ -17,14 +17,6 @@ export function meetingsDir(): string {
   return path.join(storageRoot(), 'meetings')
 }
 
-export function speakersFile(): string {
-  return path.join(storageRoot(), 'speakers.json')
-}
-
-export function indexFile(): string {
-  return path.join(storageRoot(), 'index.json')
-}
-
 export function meetingDir(id: string): string {
   return path.join(meetingsDir(), id)
 }

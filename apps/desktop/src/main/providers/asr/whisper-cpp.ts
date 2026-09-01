@@ -4,23 +4,13 @@ import { existsSync } from 'node:fs'
 import { readFile, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { app } from 'electron'
+import { whisperBinary } from '../../bundled.js'
 import type { AsrResult, AsrSegment, Word } from '@spyly/core'
 import { splitOnSilence } from '../../audio/wav.js'
 import { isDownloaded, modelPath } from '../../pipeline/models.js'
 import { loadSettings } from '../../store/settings.js'
 import type { AsrProvider, TranscribeOptions } from '../types.js'
 
-function binaryPath(): string {
-  const name = 'whisper-cli'
-  const candidates = app.isPackaged
-    ? [path.join(process.resourcesPath, 'bin', name)]
-    : [
-        path.join(process.cwd(), 'native', 'whisper', 'build', 'bin', name),
-        path.join(app.getAppPath(), '..', '..', 'native', 'whisper', 'build', 'bin', name)
-      ]
-  return candidates.find(existsSync) ?? candidates[0]!
-}
 
 /** The `-oj -ojf` format: segments with tokens, each with its own timestamps. */
 interface WhisperJson {
@@ -90,7 +80,7 @@ export const whisperCppProvider: AsrProvider = {
   capabilities: { streaming: true, wordTimestamps: true },
 
   async ready() {
-    if (!existsSync(binaryPath())) {
+    if (!existsSync(whisperBinary('whisper-cli'))) {
       return { ready: false, hint: t('не найден движок whisper.cpp') }
     }
     const settings = await loadSettings()
@@ -177,7 +167,7 @@ async function runWhisper(
 
   let detected = ''
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(binaryPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(whisperBinary('whisper-cli'), args, { stdio: ['ignore', 'pipe', 'pipe'] })
     let stderr = ''
     options.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true })
 
