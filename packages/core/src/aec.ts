@@ -34,9 +34,6 @@ const FRAME = 512
  */
 const HOP = FRAME / 4
 
-/** What the squares of the windows add up to at this step, taken back out at the end. */
-const WINDOW_SUM = 1.5
-
 /**
  * How much of the estimated echo is taken out.
  *
@@ -141,6 +138,11 @@ export function removeSpeakers(
 ): Float32Array {
   const window = hann(FRAME)
   const out = new Float32Array(mic.length)
+  // What the squares of the windows add up to at each sample. In the middle it
+  // is a constant, and dividing by that constant would do — but at the very
+  // beginning and end fewer windows overlap, and there the same constant left
+  // the first and last tens of milliseconds quieter than they were recorded.
+  const weight = new Float32Array(mic.length)
   const bins = FRAME / 2 + 1
 
   // How much of each band the speakers put into the microphone. One number per
@@ -192,11 +194,17 @@ export function removeSpeakers(
     }
 
     ifft(micRe, micIm)
-    for (let i = 0; i < FRAME; i++) out[at + i] = out[at + i]! + micRe[i]! * window[i]!
+    for (let i = 0; i < FRAME; i++) {
+      out[at + i] = out[at + i]! + micRe[i]! * window[i]!
+      weight[at + i] = weight[at + i]! + window[i]! * window[i]!
+    }
   }
 
-  // The windows overlap and their squares add up to a known constant, so the
-  // whole thing comes out that much louder than it went in.
-  for (let i = 0; i < out.length; i++) out[i] = out[i]! / WINDOW_SUM
+  for (let i = 0; i < out.length; i++) {
+    // Where no window reached at all — the last samples, shorter than one frame
+    // — the recording is kept as it was. Cleaning it is not possible, and
+    // silence in its place would be a worse answer than the echo.
+    out[i] = weight[i]! > 1e-6 ? out[i]! / weight[i]! : mic[i]!
+  }
   return out
 }
