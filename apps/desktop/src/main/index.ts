@@ -10,7 +10,7 @@ import { mixTracks } from './audio/wav.js'
 import { audioFile, setStorageRoot } from './store/paths.js'
 import { findBinary } from './binaries.js'
 import { usesRendererCapture } from './audio/renderer-capture.js'
-import { hideOverlay, overlayWindow, showOverlay } from './overlay.js'
+import { hideOverlay, overlayDraftWindow, overlayWindow, setOverlayDraft, showOverlay } from './overlay.js'
 import { killOrphanServers, stopWhisperServer } from './pipeline/whisper-server.js'
 import { startUpdates, stopUpdates } from './updates.js'
 import { startReminders, stopReminders } from './reminders.js'
@@ -77,8 +77,12 @@ export function getMainWindow(): BrowserWindow | null {
 export function send(channel: string, payload: unknown): void {
   // The floating panel gets the same events: it shows the same recording state
   // as the main window.
-  for (const window of [mainWindow, overlayWindow()]) {
-    if (!window || window.isDestroyed()) continue
+  for (const window of [mainWindow, overlayWindow(), overlayDraftWindow()]) {
+    if (!window || window.isDestroyed() || window.webContents.isDestroyed()) continue
+    // A window still loading has no frame to deliver to, and Electron writes a
+    // page of complaint for every attempt. Nothing is lost by waiting: a screen
+    // asks for the state it needs when it comes up.
+    if (window.webContents.isLoadingMainFrame()) continue
     try {
       window.webContents.send(channel, payload)
     } catch {
@@ -103,6 +107,11 @@ export function sendStartView(): void {
 export function setOverlayVisible(visible: boolean): void {
   if (visible) showOverlay(dirname)
   else hideOverlay()
+}
+
+/** The draft window needs the same directory the panel was built from. */
+export function showOverlayDraft(visible: boolean): void {
+  setOverlayDraft(visible, dirname)
 }
 
 /**
@@ -256,11 +265,16 @@ function createWindow(): void {
         await writeFile(shotPath, image.toPNG())
         process.stderr.write(`[screenshot saved] ${shotPath}\n`)
 
-        // The floating panel lives in its own window and does not appear in a shot of the main one.
-        const panel = overlayWindow()
-        if (panel) {
-          const shot = await panel.webContents.capturePage()
-          const target = shotPath.replace(/\.png$/, '-overlay.png')
+        // The floating panel lives in windows of its own and does not appear in a
+        // shot of the main one. The pill and the draft are separate windows, so
+        // both are taken.
+        for (const [name, win] of [
+          ['overlay', overlayWindow()],
+          ['draft', overlayDraftWindow()]
+        ] as const) {
+          if (!win) continue
+          const shot = await win.webContents.capturePage()
+          const target = shotPath.replace(/\.png$/, `-${name}.png`)
           await writeFile(target, shot.toPNG())
           process.stderr.write(`[panel screenshot] ${target}\n`)
         }

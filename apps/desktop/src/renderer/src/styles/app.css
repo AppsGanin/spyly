@@ -1289,20 +1289,10 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   height: 100%;
 }
 
-/* The pill and the draft under it. The window is transparent, so the empty part
-   of it is not seen; both blocks are pressed to the right edge, where the panel
-   lives. */
-.overlay__stack {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-2);
-}
+/* The draft has a window of its own and fills it: the size is settled by the
+   window, not by how much has been said. */
 .overlay__draft {
-  /* The full width from the first word: sized by its content, the box grew
-     sideways as one was reading it. */
-  align-self: stretch;
+  height: 100vh;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--ds-gray-100);
@@ -1310,15 +1300,12 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   font-size: var(--text-sm);
   line-height: var(--leading-base);
   color: var(--ds-gray-900);
-  /* Five lines pressed to the bottom: new words arrive at the bottom and what
-     has been read stays where it was. Clipped at the top, as in a terminal. */
-  height: calc(5 * var(--leading-base));
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  overflow: hidden;
-  -webkit-app-region: drag;
-  user-select: none;
+  /* Scrolled rather than clipped: read something said a minute ago by scrolling
+     up, and the box stays there instead of jumping back to the newest word. */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  -webkit-app-region: no-drag;
+  user-select: text;
 }
 /* The waiting line is quieter than the text it will be replaced by. */
 .overlay__draft-wait { color: var(--ds-gray-700); }

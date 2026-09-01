@@ -62,8 +62,8 @@ import { findRelated, forgetRelated } from '../store/related.js'
 import { audioFile, meetingDir, meetingFile } from '../store/paths.js'
 import { loadSettings, saveSettings } from '../store/settings.js'
 import { encryptionAvailable, hasSecret, setSecret } from '../store/secrets.js'
-import { send, sendStartView, setOverlayVisible, showMainWindow } from '../index.js'
-import { setOverlayDraft } from '../overlay.js'
+import { send, sendStartView, setOverlayVisible, showMainWindow, showOverlayDraft } from '../index.js'
+
 import { trayActions, updateTray } from '../tray.js'
 import { processMeeting } from '../pipeline/run.js'
 import { listProviders } from '../providers/registry.js'
@@ -844,7 +844,7 @@ export function registerIpc(): void {
     return next
   })
 
-  handle('overlay:draft', (visible) => setOverlayDraft(visible))
+  handle('overlay:draft', (visible) => showOverlayDraft(visible))
 
   /**
    * Cutting out a fragment.

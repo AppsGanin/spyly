@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { t, timecode } from '@spyly/core'
 import { api } from '../lib/api'
 import { IconCheck, IconFlag, IconPause, IconPlay, IconStop } from '../lib/icons'
@@ -16,7 +16,7 @@ import { LevelMeter } from '../ui'
  * silently writing nothing.
  */
 export function Overlay() {
-  const { recording, levels, live, settings } = useStore()
+  const { recording, levels, settings } = useStore()
   const [marked, setMarked] = useState<'ok' | 'fail' | null>(null)
   const paused = recording.status === 'paused'
 
@@ -27,20 +27,6 @@ export function Overlay() {
     const timer = setTimeout(() => setMarked(null), 1400)
     return () => clearTimeout(timer)
   }, [marked])
-
-  /*
-   * Everything said so far, as one running line.
-   *
-   * Not the last N characters: that window slid forward with every new word, so
-   * the visible text started at a different place each time, rewrapped, and
-   * lines a person was in the middle of reading jumped. The whole text is kept
-   * instead and the box shows its end, which leaves earlier lines exactly where
-   * they were.
-   */
-  const draft = live
-    .map((u) => u.text.trim())
-    .filter(Boolean)
-    .join(' ')
 
   /*
    * The box is there from the first second, empty.
@@ -67,8 +53,7 @@ export function Overlay() {
   }
 
   return (
-    <div className="overlay__stack">
-      <div className={`overlay ${paused ? 'overlay--paused' : ''}`}>
+    <div className={`overlay ${paused ? 'overlay--paused' : ''}`}>
       <span className={`overlay__dot ${paused ? 'overlay__dot--paused' : ''}`} />
       <span className="overlay__time mono">{timecode(recording.elapsedSec)}</span>
 
@@ -97,13 +82,56 @@ export function Overlay() {
       >
         <IconStop />
       </button>
-      </div>
+    </div>
+  )
+}
 
-      {showDraft && (
-        <div className="overlay__draft">
-          {draft || <span className="overlay__draft-wait">{t('Слушаю…')}</span>}
-        </div>
-      )}
+/**
+ * The live text under the pill, in a window of its own.
+ *
+ * Apart from the pill because the pill is small and the text is wide: in one
+ * window the space beside the pill would be ours, invisible, and would take the
+ * clicks meant for whatever is underneath.
+ */
+export function OverlayDraft() {
+  const { live } = useStore()
+  const box = useRef<HTMLDivElement>(null)
+  const [pinned, setPinned] = useState(true)
+
+  /*
+   * Everything said so far, as one running line.
+   *
+   * Not the last N characters: that window slid forward with every new word, so
+   * the visible text started at a different place each time, rewrapped, and
+   * lines a person was in the middle of reading jumped.
+   */
+  const draft = live
+    .map((u) => u.text.trim())
+    .filter(Boolean)
+    .join(' ')
+
+  /*
+   * New words scroll into view, but only for someone already at the end.
+   *
+   * Scrolled up to read something said a minute ago, a person was thrown back
+   * down by the next word and could not finish the sentence. So the box follows
+   * the text only while it is standing at the bottom, and lets go the moment
+   * one scrolls away from it.
+   */
+  const onScroll = (): void => {
+    const el = box.current
+    if (!el) return
+    setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 24)
+  }
+
+  useEffect(() => {
+    const el = box.current
+    if (el && pinned) el.scrollTop = el.scrollHeight
+  }, [draft, pinned])
+
+  return (
+    <div className="overlay__draft" ref={box} onScroll={onScroll}>
+      {draft || <span className="overlay__draft-wait">{t('Слушаю…')}</span>}
     </div>
   )
 }

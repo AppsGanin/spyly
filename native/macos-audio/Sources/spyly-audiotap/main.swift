@@ -32,8 +32,18 @@ func fail(_ message: String, reason: String? = nil, code: Int32 = 1) -> Never {
 struct Options {
     var mode = "capture"
     var micDevice: String?
-    /// Remove what is playing through the speakers from the microphone. Switched off by a flag.
-    var cancelEcho = true
+    /**
+     * Ask the system to remove the speakers from the microphone.
+     *
+     * Off by default, and that is a decision rather than an oversight. On the
+     * machine this was measured on the system node either refused to start at
+     * all (-10875) or started and handed over digital silence for the whole
+     * conversation — a lost recording, found out about afterwards. The
+     * application removes the speakers itself, from the recording, against the
+     * exact signal that was sent to them; that is predictable, and it cannot
+     * take the microphone away.
+     */
+    var cancelEcho = false
     var sampleRate: Double = 16000
     var excludePIDs: [pid_t] = []
     var includePIDs: [pid_t] = []
@@ -60,6 +70,8 @@ func parseArguments() -> Options {
             if i < args.count, let v = Int32(args[i]) { o.includePIDs.append(v) }
         case "--no-echo-cancel":
             o.cancelEcho = false
+        case "--echo-cancel":
+            o.cancelEcho = true
         case "--mic-device":
             i += 1
             if i < args.count { o.micDevice = args[i] }

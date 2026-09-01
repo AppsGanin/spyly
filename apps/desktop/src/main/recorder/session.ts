@@ -124,8 +124,6 @@ interface Track {
   judgeAt: number
   /** Consecutive checks this track has been behind the clock. */
   behindChecks: number
-  /** Told already that the speakers cannot be removed from the microphone. */
-  warnedEcho: boolean
 }
 
 /**
@@ -280,14 +278,13 @@ export class RecordingSession extends EventEmitter {
         if (!track.gotAudio) continue
         if (Date.now() < track.judgeAt) continue
 
-        // The microphone gets a second attempt without echo cancellation before
-        // it is declared broken: that is the one thing that turns a working
-        // input into a stream of zeros, and it is the difference between this
-        // and the level meter in the source picker, which never had it on.
+        // The microphone gets one restart before it is declared broken: an
+        // input can come up wrong — taken by another application, switched
+        // mid-call — and opening it again is often all it takes.
         if (track.id === 'mic' && !track.retriedPlain) {
           track.retriedPlain = true
           track.judgeAt = Date.now() + DEAD_SOURCE_TIMEOUT_MS
-          this.restartWithoutEchoCancel(track)
+          this.restartMicrophone(track)
           continue
         }
 
@@ -319,8 +316,7 @@ export class RecordingSession extends EventEmitter {
       // The microphone is judged sooner: it has a second attempt ahead of it,
       // and waiting the full time twice would cost half a minute of the call.
       judgeAt: Date.now() + (id === 'mic' ? MIC_RETRY_TIMEOUT_MS : DEAD_SOURCE_TIMEOUT_MS),
-      behindChecks: 0,
-      warnedEcho: false
+      behindChecks: 0
     }
 
     this.wireCapture(track, capture)
@@ -361,23 +357,6 @@ export class RecordingSession extends EventEmitter {
       track.ready = true
       this.emitState()
     })
-
-    /*
-     * The system could not take the speakers out of the microphone.
-     *
-     * It needs the same device for input and output; with an external
-     * microphone, or speakers separate from it, the node simply does not start.
-     * Recording carries on — echo is better than nothing — but the other side
-     * will be audible through the microphone and will land in the transcript
-     * twice. That is worth saying while it can still be fixed by putting
-     * headphones on, not afterwards.
-     */
-    capture.on('echoCancel', (on: boolean) => {
-      if (id !== 'mic' || on || track.warnedEcho) return
-      track.warnedEcho = true
-      this.error = t('Эхоподавление недоступно: собеседник будет слышен и через ваш микрофон. Наденьте наушники.')
-      this.emitState()
-    })
     capture.on('level', () => this.emit('levels', this.levels()))
     capture.on('error', (message: string) => {
       track.error = message
@@ -403,29 +382,20 @@ export class RecordingSession extends EventEmitter {
   }
 
   /**
-   * Start the microphone again, this time without echo cancellation.
-   *
-   * The system node that removes the other side from the microphone is the one
-   * thing that turns a working input into exact zeros — with another
-   * application holding the microphone for a call, for instance. Echo in the
-   * recording is a nuisance; a silent recording is a lost conversation, so the
-   * nuisance wins.
+   * Open the microphone again after it has handed over nothing but silence.
    *
    * The writer is not touched: the file goes on, and the gap left while the
-   * capture comes back up is filled with silence by the drift compensation.
+   * capture comes back up is filled with silence by the drift compensation. A
+   * silent recording is a lost conversation, and one restart costs a second.
    */
-  private restartWithoutEchoCancel(track: Track): void {
+  private restartMicrophone(track: Track): void {
     if (track.id !== 'mic' || usesRendererCapture()) return
 
-    process.stderr.write('[recorder] the microphone is writing silence, restarting without echo cancellation\n')
+    process.stderr.write('[recorder] the microphone is writing silence, opening it again\n')
     track.capture.removeAllListeners()
     track.capture.stop()
 
-    const capture = new NativeCapture({
-      source: 'mic',
-      micDeviceId: this.options.micDeviceId,
-      noEchoCancel: true
-    })
+    const capture = new NativeCapture({ source: 'mic', micDeviceId: this.options.micDeviceId })
     track.capture = capture
     track.ready = false
     track.gotAudio = false

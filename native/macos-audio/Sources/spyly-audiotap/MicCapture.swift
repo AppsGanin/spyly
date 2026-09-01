@@ -21,6 +21,18 @@ final class MicCapture {
         self.onSamples = onSamples
     }
 
+    /// The microphone the system would pick on its own.
+    static func defaultInputDevice() -> AudioDeviceID {
+        var id = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &id)
+        return id
+    }
+
     /// The available input devices, for the drop-down in settings.
     static func inputDevices() -> [[String: Any]] {
         let session = AVCaptureDevice.DiscoverySession(
@@ -44,7 +56,7 @@ final class MicCapture {
      * simply will not start. We then fall back to ordinary capture: echo is
      * unpleasant, whereas losing the recording entirely is unacceptable.
      */
-    func start(deviceUID: String?, cancelEcho: Bool = true) throws {
+    func start(deviceUID: String?, cancelEcho: Bool = false) throws {
         if cancelEcho {
             do {
                 try startEngine(deviceUID: deviceUID, voiceProcessing: true)
@@ -78,19 +90,23 @@ final class MicCapture {
     private func startEngine(deviceUID: String?, voiceProcessing: Bool) throws {
         let input = engine.inputNode
 
-        // The order matters: the input format depends on whether the
-        // cancellation node is on, so it is read only after switching.
-        if voiceProcessing {
-            // One node serves input and output: both ends have to be switched
-            // on, or the engine fails to initialise the output node and dies
-            // with -10875.
-            try input.setVoiceProcessingEnabled(true)
-            try engine.outputNode.setVoiceProcessingEnabled(true)
-        }
-
-        // Choosing a particular microphone goes around AVAudioEngine, through
-        // the underlying AudioUnit, or the engine always takes the default device.
-        if let uid = deviceUID, let deviceID = MicCapture.deviceID(forUID: uid) {
+        /*
+         * Choosing a particular microphone goes around AVAudioEngine, through
+         * the underlying AudioUnit, or the engine always takes the default one.
+         *
+         * It has to happen before the cancellation node is switched on. The
+         * other way round the node is already built around one device and being
+         * moved to another throws it, and echo cancellation was quietly lost on
+         * every recording — the application always names a device, even when it
+         * is the default one anyway.
+         *
+         * And when it is the default one, we do not touch it at all: there is
+         * nothing to change, and the untouched path is the one the cancellation
+         * node is happiest with.
+         */
+        if let uid = deviceUID,
+           let deviceID = MicCapture.deviceID(forUID: uid),
+           deviceID != MicCapture.defaultInputDevice() {
             var id = deviceID
             if let unit = input.audioUnit {
                 AudioUnitSetProperty(unit,
@@ -100,6 +116,21 @@ final class MicCapture {
                                      &id,
                                      UInt32(MemoryLayout<AudioDeviceID>.size))
             }
+        }
+
+        /*
+         * The input format depends on whether the cancellation node is on, so it
+         * is read only after switching.
+         *
+         * Only the input is switched. Switching the output as well used to look
+         * like the careful thing to do — one node serves both directions — but
+         * at this point the graph has no connections in it, and the output node
+         * refuses with -10875, "no connection". The whole attempt then failed
+         * and every recording quietly went without echo cancellation. Turning it
+         * on at the input turns the shared node on for both ends anyway.
+         */
+        if voiceProcessing {
+            try input.setVoiceProcessingEnabled(true)
         }
 
         let inFormat = input.outputFormat(forBus: 0)

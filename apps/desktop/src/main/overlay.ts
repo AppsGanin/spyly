@@ -1,56 +1,38 @@
 import path from 'node:path'
 import { BrowserWindow, screen } from 'electron'
-import { PILL_HEIGHT, pointIsOnPanel } from './overlay-hit.js'
 
 /**
- * The floating panel window.
+ * The floating panel above every window.
  *
  * It only lives while recording. Frameless, above every window and on every
  * desktop: otherwise, switching to the browser with the call in it, a person
  * would lose the panel, and that is exactly where it is needed.
- */
-let overlay: BrowserWindow | null = null
-
-/**
- * The window is as wide as the draft from the outset.
  *
- * It used to be as narrow as the pill and widen leftwards when the text
- * appeared. That cost twice over: the box for the text visibly grew as one
- * read, and after the resize macOS went on hit-testing the buttons at their old
- * places, so the stop button stopped responding. The window keeps one width
- * now, and the empty part of it is let through to whatever is underneath.
+ * It is two windows, not one. A single window wide enough for the draft is
+ * mostly empty next to the pill, and a transparent window still swallows
+ * clicks — so the empty part had to be let through, and deciding where the
+ * cursor was left the stop button dead more than once. Two windows, each the
+ * size of what it draws, need none of that: the pill takes clicks always,
+ * because there is no empty space in it to take them by mistake.
  */
-const WIDTH = 460
-const HEIGHT = PILL_HEIGHT
+let pill: BrowserWindow | null = null
+let draft: BrowserWindow | null = null
 
-/** Only the height changes: the pill stays at the top and does not move. */
-const TALL = 168
+const PILL_WIDTH = 236
+const PILL_HEIGHT = 44
 
-/** How often the cursor is checked against what the panel actually draws. */
-const CURSOR_CHECK_MS = 100
+/** The draft is wider than the pill and hangs under it, aligned to the same right edge. */
+const DRAFT_WIDTH = 460
+const DRAFT_HEIGHT = 124
+const GAP = 8
 
-let cursorTimer: NodeJS.Timeout | null = null
-let takingMouse = false
+const MARGIN = 20
 
-export function showOverlay(dirname: string): void {
-  if (overlay && !overlay.isDestroyed()) {
-    overlay.showInactive()
-    return
-  }
-
-  const { workArea } = screen.getPrimaryDisplay()
-  overlay = new BrowserWindow({
-    width: WIDTH,
-    height: HEIGHT,
-    // Top right corner: it is least in the way there, and it matches the usual
-    // place for a recording indicator in the system. The content inside is
-    // pressed to the right edge, so the pill lands there whatever the width.
-    x: workArea.x + workArea.width - WIDTH - 20,
-    y: workArea.y + 20,
+function common(dirname: string): Electron.BrowserWindowConstructorOptions {
+  return {
     frame: false,
     transparent: true,
     resizable: false,
-    movable: true,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -70,83 +52,108 @@ export function showOverlay(dirname: string): void {
       // they only make the text harder to read.
       spellcheck: false
     }
+  }
+}
+
+function load(win: BrowserWindow, dirname: string, hash: string): void {
+  const url = process.env.ELECTRON_RENDERER_URL
+  if (url) void win.loadURL(`${url}#${hash}`)
+  else void win.loadFile(path.join(dirname, '../renderer/index.html'), { hash })
+}
+
+export function showOverlay(dirname: string): void {
+  if (pill && !pill.isDestroyed()) {
+    pill.showInactive()
+    return
+  }
+
+  const { workArea } = screen.getPrimaryDisplay()
+  pill = new BrowserWindow({
+    ...common(dirname),
+    width: PILL_WIDTH,
+    height: PILL_HEIGHT,
+    // Top right corner: it is least in the way there, and it matches the usual
+    // place for a recording indicator in the system.
+    x: workArea.x + workArea.width - PILL_WIDTH - MARGIN,
+    y: workArea.y + MARGIN,
+    movable: true
   })
 
-  overlay.setAlwaysOnTop(true, 'screen-saver')
-  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  pill.setAlwaysOnTop(true, 'screen-saver')
+  pill.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  load(pill, dirname, 'overlay')
 
-  const url = process.env.ELECTRON_RENDERER_URL
-  if (url) void overlay.loadURL(`${url}#overlay`)
-  else void overlay.loadFile(path.join(dirname, '../renderer/index.html'), { hash: 'overlay' })
-
-  // Clicks pass through until the cursor comes to rest on something of ours.
-  overlay.setIgnoreMouseEvents(true)
-  watchCursor()
-
-  overlay.once('ready-to-show', () => overlay?.showInactive())
-  overlay.on('closed', () => {
-    overlay = null
-    stopWatchingCursor()
+  pill.once('ready-to-show', () => pill?.showInactive())
+  // The draft hangs off the pill, so it goes wherever the pill is dragged.
+  pill.on('move', () => placeDraft())
+  pill.on('closed', () => {
+    pill = null
+    closeDraft()
   })
 }
 
 export function hideOverlay(): void {
-  stopWatchingCursor()
-  if (overlay && !overlay.isDestroyed()) overlay.close()
-  overlay = null
+  closeDraft()
+  if (pill && !pill.isDestroyed()) pill.close()
+  pill = null
 }
 
 /** The panel receives events just like the main window. */
 export function overlayWindow(): BrowserWindow | null {
-  return overlay && !overlay.isDestroyed() ? overlay : null
+  return pill && !pill.isDestroyed() ? pill : null
+}
+
+/** The draft window, when it is up: events for the live text go to it. */
+export function overlayDraftWindow(): BrowserWindow | null {
+  return draft && !draft.isDestroyed() ? draft : null
 }
 
 /**
- * Make room for the draft, keeping the pill where it was.
+ * Show or hide the box with the live text under the pill.
  *
- * The panel is anchored to the right edge, so the window grows to the left and
- * downwards: the buttons stay under the cursor that was already reaching for them.
+ * Its own window, so that the space beside the pill stays free: there is
+ * nothing of ours there and a click belongs to whatever is underneath.
  */
-export function setOverlayDraft(visible: boolean): void {
-  const win = overlayWindow()
-  if (!win) return
-  const height = visible ? TALL : HEIGHT
-  const bounds = win.getBounds()
-  if (bounds.height === height) return
-  win.setBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height })
+export function setOverlayDraft(visible: boolean, dirname?: string): void {
+  if (!visible) return closeDraft()
+  if (draft && !draft.isDestroyed()) return placeDraft()
+  const owner = overlayWindow()
+  if (!owner || !dirname) return
+
+  draft = new BrowserWindow({
+    ...common(dirname),
+    width: DRAFT_WIDTH,
+    height: DRAFT_HEIGHT,
+    movable: false
+  })
+  draft.setAlwaysOnTop(true, 'screen-saver')
+  draft.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  // Nothing in it is pressed, and it lies over somebody's call: every click
+  // goes straight through to what is underneath.
+  draft.setIgnoreMouseEvents(true)
+  load(draft, dirname, 'overlay-draft')
+  placeDraft()
+  draft.once('ready-to-show', () => draft?.showInactive())
+  draft.on('closed', () => {
+    draft = null
+  })
 }
 
-/**
- * Whether the panel takes the mouse or lets it through.
- *
- * Most of the window is empty and transparent, and an invisible pane over
- * somebody's call would be worse than no panel at all. So clicks pass through
- * by default, and the panel takes them only while the cursor is over the pill
- * or over the text.
- *
- * Where the cursor is we work out ourselves rather than ask the window: a
- * window that ignores the mouse is not reliably told the mouse moved, and
- * getting that wrong would leave the stop button dead — which is the very thing
- * being fixed here.
- */
-function watchCursor(): void {
-  if (cursorTimer) return
-  cursorTimer = setInterval(() => {
-    const win = overlayWindow()
-    if (!win) return stopWatchingCursor()
-    const point = screen.getCursorScreenPoint()
-    const over = pointIsOnPanel(win.getBounds(), point)
-    if (over === takingMouse) return
-    takingMouse = over
-    win.setIgnoreMouseEvents(!over)
-  }, CURSOR_CHECK_MS)
-  cursorTimer.unref?.()
+function placeDraft(): void {
+  const owner = overlayWindow()
+  const win = overlayDraftWindow()
+  if (!owner || !win) return
+  const at = owner.getBounds()
+  win.setBounds({
+    // The same right edge as the pill: the two read as one panel.
+    x: at.x + at.width - DRAFT_WIDTH,
+    y: at.y + at.height + GAP,
+    width: DRAFT_WIDTH,
+    height: DRAFT_HEIGHT
+  })
 }
 
-function stopWatchingCursor(): void {
-  if (cursorTimer) clearInterval(cursorTimer)
-  cursorTimer = null
-  takingMouse = false
+function closeDraft(): void {
+  if (draft && !draft.isDestroyed()) draft.close()
+  draft = null
 }
-
-
