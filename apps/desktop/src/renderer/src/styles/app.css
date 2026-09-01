@@ -497,11 +497,6 @@
   gap: 6px;
 }
 .utterance__text { line-height: var(--leading-relaxed); white-space: pre-wrap; word-break: break-word; }
-.utterance__text[contenteditable='true']:focus {
-  outline: none;
-  box-shadow: var(--ds-focus-ring);
-  border-radius: var(--radius-sm);
-}
 .utterance--provisional .utterance__text { color: var(--ds-gray-900); font-style: italic; }
 
 /* The phrase is still being spoken: the text is being extended, and the cursor shows it. */
@@ -1228,15 +1223,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
 .utterance--open .utterance__actions,
 .utterance__actions:focus-within { opacity: 1; }
 
-/* The words the model was unsure about. An underline rather than colour:
-   colour already marks the speakers, and a second meaning cannot hang on the
-   same paint. */
-.doubt {
-  text-decoration: underline wavy var(--ds-amber-700);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
-}
-
 /* The current search match is distinguished from the rest, or moving between
    them is invisible. */
 .hl--current {
@@ -1265,19 +1251,6 @@ dialog.modal[open] { animation: modal-in var(--duration-overlay) var(--ease-swif
   align-items: center;
   color: var(--ds-gray-700);
 }
-
-/* ── related recordings ────────────────────────────────────────── */
-/* One line in the header: as a block in the middle of the transcript they
-   pushed down the very thing the page was opened for. */
-.related {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin-top: 6px;
-  font-size: var(--text-sm);
-}
-.related__item { white-space: nowrap; }
 
 
 /* ── the floating panel above other windows ────────────────────── */

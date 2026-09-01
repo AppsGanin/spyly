@@ -58,7 +58,6 @@ import {
   rendererUsesMicrophone
 } from '../audio/renderer-capture.js'
 import { silenceRange } from '../audio/wav.js'
-import { findRelated, forgetRelated } from '../store/related.js'
 import { audioFile, meetingDir, meetingFile } from '../store/paths.js'
 import { loadSettings, saveSettings } from '../store/settings.js'
 import { encryptionAvailable, hasSecret, setSecret } from '../store/secrets.js'
@@ -827,7 +826,6 @@ export function registerIpc(): void {
 
   handle('meetings:delete', async (id) => {
     await deleteMeeting(id)
-    forgetRelated(id)
     send('meetings:changed', { id })
   })
 
@@ -877,7 +875,6 @@ export function registerIpc(): void {
     return { meeting: next, removed }
   })
 
-  handle('meetings:related', (id) => findRelated(id))
 
   /**
    * The draft from live transcription.

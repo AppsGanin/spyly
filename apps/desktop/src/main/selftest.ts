@@ -726,25 +726,10 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
   }
 
   // ── speed on a large archive ──────────────────────────────────────────
-  // Similar recordings are looked for every time a page is opened: if that costs
-  // seconds, the window will freeze on every click.
+  // A digest reads every recording of the period: on a quarter that can be the
+  // whole archive, and it must not turn into a minute of waiting.
   {
-    const { findRelated } = await import('./store/related.js')
     const { listMeetings: all } = await import('./store/meetings.js')
-    const total = (await all()).length
-
-    const coldAt = Date.now()
-    await findRelated(session.meetingId)
-    const cold = Date.now() - coldAt
-
-    const warmAt = Date.now()
-    await findRelated(session.meetingId)
-    const warm = Date.now() - warmAt
-
-    check(cold < 3000, 'finding similar ones cold keeps within three seconds', `${cold} ms over ${total} recordings`)
-    check(warm < 300, 'opening it again is instant', `${warm} ms`)
-
-    // Digests read the whole period, which for a quarter can be the entire archive.
     const { buildDigest: build, lastDays: period } = await import('@spyly/core')
     const { readMeeting: read } = await import('./store/meetings.js')
     const digestAt = Date.now()

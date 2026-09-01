@@ -1,7 +1,6 @@
 import type {
   Meeting,
-  MeetingMeta,
-  Related
+  MeetingMeta
 } from '@spyly/core'
 
 /** What the level meter and the recording pill show. */
@@ -192,8 +191,6 @@ export interface IpcRequests {
   'meetings:update': (id: string, patch: Partial<MeetingMeta>) => MeetingMeta
   /** The draft transcript that was visible during the recording. */
   'meetings:live': (id: string) => { track: 'mic' | 'system'; text: string; start: number; end: number }[]
-  /** Recordings on the same subject, by shared words and calendar participants. */
-  'meetings:related': (id: string) => Related[]
   /** Silence a stretch and remove the utterances that fall inside it. */
   'meetings:removeRange': (id: string, from: number, to: number) => { meeting: Meeting; removed: number }
   'meetings:reprocess': (id: string, from: 'transcribing' | 'summarizing') => void

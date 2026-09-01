@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { t,
   accentFor,
-  doubtThreshold,
-  doubtfulWords,
   speakerLabel,
   timecode,
   type Mark,
@@ -35,31 +33,6 @@ function highlight(text: string, needle: string, activeAt: number | null): React
   }
   parts.push(text.slice(from))
   return parts
-}
-
-/**
- * Text marked where the model was unsure.
- *
- * Editing the transcript is the most common manual work, and hunting by eye
- * for what was recognised wrongly takes longer than fixing it. Whisper returns
- * a confidence for every word, so underlining the doubtful ones costs nothing.
- */
-function withDoubts(utterance: Utterance, threshold: number): ReactNode {
-  const doubts = doubtfulWords(utterance, threshold)
-  if (doubts.size === 0) return utterance.text
-
-  // The text of an utterance is its words joined by spaces; if that has stopped
-  // being true (after a manual edit, for instance), no highlighting is drawn, so
-  // as not to underline the wrong places.
-  const joined = utterance.words.map((w) => w.text).join(' ')
-  if (joined !== utterance.text) return utterance.text
-
-  return utterance.words.map((word, index) => (
-    <span key={index} className={doubts.has(index) ? 'doubt' : undefined}>
-      {word.text}
-      {index < utterance.words.length - 1 ? ' ' : ''}
-    </span>
-  ))
 }
 
 
@@ -106,10 +79,6 @@ export function Transcript({
   const matchRef = useRef<HTMLElement>(null)
   const [menuFor, setMenuFor] = useState<string | null>(null)
 
-  // The threshold is measured over the whole recording rather than a single
-  // utterance: otherwise everything in a quiet utterance gets underlined and
-  // nothing in a loud one.
-  const threshold = useMemo(() => doubtThreshold(meeting), [meeting.utterances])
 
   const speakers = useMemo(() => new Map(meeting.speakers.map((s) => [s.id, s])), [meeting.speakers])
   const accents = useMemo(() => {
@@ -256,9 +225,7 @@ export function Transcript({
                 ref={isCurrentMatch ? (matchRef as React.RefObject<HTMLDivElement>) : undefined}
                 className="utterance__text"
               >
-                {needle
-                  ? highlight(utterance.text, query, isCurrentMatch ? current.at : null)
-                  : withDoubts(utterance, threshold)}
+                {needle ? highlight(utterance.text, query, isCurrentMatch ? current.at : null) : utterance.text}
               </div>
             </div>
 

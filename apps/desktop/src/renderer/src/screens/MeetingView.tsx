@@ -290,7 +290,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
           ))}
         </div>
 
-        {!isRecordingThis && <RelatedMeetings meetingId={id} />}
       </div>
 
       {isRecordingThis && <RecordingStrip levels={levels} error={recording.error} />}
@@ -547,45 +546,6 @@ export function MeetingView({ id, initialTab }: { id: string; initialTab?: strin
  * to be the one to fix that, in a couple of clicks and without listening to the
  * whole recording again.
  */
-/**
- * Conversations on the same subject.
- *
- * A subject almost never fits into one meeting: billing gets revisited three
- * times a month. The link is shown right here, so nobody has to search by hand.
- */
-function RelatedMeetings({ meetingId }: { meetingId: string }) {
-  const { setView } = useStore()
-  const { data } = useAsync(() => api.call('meetings:related', meetingId), [meetingId])
-  const related = data ?? []
-  if (related.length === 0) return null
-
-  return (
-    <div className="related">
-      <span className="dim">{t('Об этом же говорили:')}</span>
-      {/* Разделитель — часть предыдущего элемента: иначе при переносе строка
-          начинается с запятой. */}
-      {related.map((item) => (
-        <span key={item.meeting.id} className="related__item">
-          <button
-            className="linklike"
-            onClick={() => setView({ kind: 'meeting', id: item.meeting.id })}
-            title={[
-              t('Совпали слова: {words}', { words: item.sharedTerms.join(', ') }),
-              item.sharedPeople.length > 0 ? t('Общие участники: {people}', { people: item.sharedPeople.join(', ') }) : ''
-            ]
-              .filter(Boolean)
-              .join('\n')}
-          >
-            {item.meeting.title}
-          </button>
-          {/* Названия у записей часто одинаковые — без даты их не различить. */}
-          <span className="dim"> · {shortWhen(item.meeting.startedAt)}</span>
-        </span>
-      ))}
-    </div>
-  )
-}
-
 /** "Today at 14:05" for fresh recordings, a date for older ones. */
 function shortWhen(iso: string): string {
   const at = new Date(iso)
