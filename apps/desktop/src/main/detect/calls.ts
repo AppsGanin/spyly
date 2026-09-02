@@ -85,7 +85,12 @@ async function probe(options: CallDetectorOptions): Promise<void> {
     if (Notification.isSupported()) {
       const notification = new Notification({
         title: t('Похоже, начался созвон'),
-        body: t('{label} слушает микрофон. Записать разговор?', { label: label }),
+        // Not every microphone can be traced to an application: a virtual machine
+        // or a driver holds it without belonging to anything on screen. Naming
+        // nothing at all is better than a sentence that starts with a gap.
+        body: label
+          ? t('{label} слушает микрофон. Записать разговор?', { label: label })
+          : t('Микрофон занят другим приложением. Записать разговор?'),
         actions: [{ type: 'button', text: t('Записать') }]
       })
       notification.on('action', () => options.onDetected({ app: label, auto: false }))

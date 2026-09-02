@@ -9,15 +9,24 @@ enum Sel {
         for c in s.utf8 { r = (r << 8) + UInt32(c) }
         return r
     }
-    static let tapUID = fourCC("tuid")
-    static let tapFormat = fourCC("tfmt")
-    static let processBundleID = fourCC("pbid")
-    static let processPID = fourCC("ppid")
-    static let processIsRunningOutput = fourCC("pado")
-    static let processObjectList = fourCC("prs#")
-    static let translatePIDToProcessObject = fourCC("id2p")
-    static let deviceIsRunningSomewhere = fourCC("gone")
-    static let processIsRunningInput = fourCC("padi")
+    /*
+     * The system's own constants, not four-letter codes written out by hand.
+     *
+     * Two of the nine were wrong: input was `padi` and output `pado`, while the
+     * system calls them `piri` and `piro`. Reading such a property fails
+     * silently — it simply returns nothing — so the microphone was never known
+     * to be held by anyone, the notification named no application, and the list
+     * of applications reported every one of them as making no sound.
+     */
+    static let tapUID = kAudioTapPropertyUID
+    static let tapFormat = kAudioTapPropertyFormat
+    static let processBundleID = kAudioProcessPropertyBundleID
+    static let processPID = kAudioProcessPropertyPID
+    static let processIsRunningOutput = kAudioProcessPropertyIsRunningOutput
+    static let processObjectList = kAudioHardwarePropertyProcessObjectList
+    static let translatePIDToProcessObject = kAudioHardwarePropertyTranslatePIDToProcessObject
+    static let deviceIsRunningSomewhere = kAudioDevicePropertyDeviceIsRunningSomewhere
+    static let processIsRunningInput = kAudioProcessPropertyIsRunningInput
 }
 
 func address(_ selector: AudioObjectPropertySelector,
@@ -164,6 +173,31 @@ func listAudioApps() -> [AudioApp] {
 /// (Meet, Telemost in Chrome), where the process name says nothing.
 /// A caveat: Bluetooth headsets on macOS reliably report that they are not in
 /// use, so this sign alone is not enough.
+/**
+ * The application a process belongs to.
+ *
+ * The microphone is almost never held by the application itself: a browser
+ * gives it to a helper process, and a call app to an audio service. Such a
+ * process is not a `NSRunningApplication` and used to be dropped, which is why
+ * the notification said that something unnamed was listening. So we walk up to
+ * the parent until an application turns up.
+ */
+private func owningApplication(of pid: pid_t, depth: Int = 4) -> String? {
+    var current = pid
+    for _ in 0...depth {
+        if let name = NSRunningApplication(processIdentifier: current)?.localizedName { return name }
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, current]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        let parent = info.kp_eproc.e_ppid
+        // launchd is everyone's parent and names nothing.
+        guard parent > 1, parent != current else { return nil }
+        current = parent
+    }
+    return nil
+}
+
 func microphoneInUse() -> (busy: Bool, apps: [String]) {
     var apps: [String] = []
     let objects = objectList(AudioObjectID(kAudioObjectSystemObject), Sel.processObjectList)
@@ -174,11 +208,12 @@ func microphoneInUse() -> (busy: Bool, apps: [String]) {
         guard (objectUInt32(object, Sel.processIsRunningInput) ?? 0) != 0 else { continue }
         guard let rawPID = objectUInt32(object, Sel.processPID) else { continue }
         let pid = Int32(bitPattern: rawPID)
-        let name = NSRunningApplication(processIdentifier: pid)?.localizedName
-        let bundle = objectString(object, Sel.processBundleID)
-        let base = bundle.map { $0.split(separator: ".").prefix(3).joined(separator: ".") }
         // We leave ourselves out of the list: we record from the microphone too.
         if pid == ProcessInfo.processInfo.processIdentifier { continue }
+
+        let bundle = objectString(object, Sel.processBundleID)
+        let base = bundle.map { $0.split(separator: ".").prefix(3).joined(separator: ".") }
+        let name = owningApplication(of: pid)
         let belongsToUserApp = (base.map(userAppBundles.contains) ?? false) || name != nil
         if belongsToUserApp, let display = name ?? bundle {
             if !apps.contains(display) { apps.append(display) }

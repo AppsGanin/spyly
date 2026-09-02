@@ -152,6 +152,8 @@ export const EN: Record<string, string> = {
   'Максимальная точность': 'Most accurate',
   'Микрофон': 'Microphone',
   'Микрофон {n}': 'Microphone {n}',
+  'Микрофон занят другим приложением. Записать разговор?':
+    'Another application is using the microphone. Record the conversation?',
   'Микрофон занят другим приложением. Обычно так начинается разговор.': 'Another app has taken the microphone. That is usually how a call starts.',
   'Микрофон не отдаёт звук — выберите другой в списке источников': 'The microphone gives no audio; pick another one in the source list',
   'Микрофон: {message}': 'Microphone: {message}',
