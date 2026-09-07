@@ -26,7 +26,6 @@
 * ask about the microphone in the start dialog, and show access in settings ([2528446](https://github.com/AppsGanin/spyly/commit/2528446629734c4a4fb03d675225ca2c58227da9))
 * ask for the microphone before a recording, not after it ([3ad7c87](https://github.com/AppsGanin/spyly/commit/3ad7c877941355c73b1f0414a51c749457edb2fd))
 * bring back the focus ring on fields and controls ([6334543](https://github.com/AppsGanin/spyly/commit/63345439ef725f02fbb40cc89ba93e9c86174053))
-* drop our own words when the far side plays them back, and no spell checker over speech ([3fb766e](https://github.com/AppsGanin/spyly/commit/3fb766e44661f2fb835459f2ef68206565301286))
 * give every dialog a visible way out ([273cb35](https://github.com/AppsGanin/spyly/commit/273cb3509d1566991ce0ef1726301b1776d8875a))
 * keep the dropdown inside the window, and show where you are ([99cfb01](https://github.com/AppsGanin/spyly/commit/99cfb01773af4986e7bd541fd07607c899c826a5))
 * keep the tracks in step, and say when echo cannot be cancelled ([2d633fe](https://github.com/AppsGanin/spyly/commit/2d633fe79065ac5859a872dc28232bd7b3cfef62))
