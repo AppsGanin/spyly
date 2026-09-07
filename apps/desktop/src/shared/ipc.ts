@@ -255,6 +255,8 @@ export interface IpcEvents {
   'meetings:changed': { id: string }
   'stage:progress': StageProgress
   'models:progress': ModelInfo
+  /** How far the update has downloaded; null when nothing is downloading. */
+  'update:progress': { percent: number | null }
   'call:detected': { app: string; at: number }
   'toast': { kind: 'info' | 'success' | 'error'; text: string }
   /** Open a particular recording, on a click on a notification for instance. */

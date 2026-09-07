@@ -354,12 +354,17 @@ function Updates() {
   const { notify } = useStore()
   const { data: version } = useAsync(() => api.call('app:version'), [])
   const [busy, setBusy] = useState(false)
+  // How far the download has got, once one is running. The dialog asking about
+  // it belongs to the main process; this is the only sign of it on the screen.
+  const [percent, setPercent] = useState<number | null>(null)
+
+  useIpcEvent('update:progress', (progress) => setPercent(progress.percent))
 
   const check = async () => {
     setBusy(true)
     try {
       const found = await api.call('app:checkUpdates')
-      if (found.state === 'found') notify('success', t('Есть обновление: {found_version}. Скачиваю', { found_version: found.version }))
+      if (found.state === 'found') notify('success', t('Есть обновление: {found_version}', { found_version: found.version }))
       else if (found.state === 'current') notify('info', t('У вас последняя версия'))
       // Nothing has gone wrong here: this copy was simply installed by hand and
       // has no updater in it. The button beside this one leads where to look.
@@ -378,8 +383,12 @@ function Updates() {
     >
       <div className="row" style={{ gap: 'var(--space-2)' }}>
         <Button size="sm" onClick={() => void api.call('app:openReleases')}>{t('Все версии')}</Button>
-        <Button size="sm" disabled={busy} onClick={() => void check()}>
-          {busy ? t('Проверяю…') : t('Проверить обновления')}
+        <Button size="sm" disabled={busy || percent !== null} onClick={() => void check()}>
+          {percent !== null
+            ? t('Скачиваю… {percent}%', { percent: String(percent) })
+            : busy
+              ? t('Проверяю…')
+              : t('Проверить обновления')}
         </Button>
       </div>
     </Row>
