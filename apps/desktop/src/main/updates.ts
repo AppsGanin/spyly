@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import path from 'node:path'
 import { t } from '@spyly/core'
 import { app, dialog, shell } from 'electron'
 import electronUpdater from 'electron-updater'
@@ -23,12 +25,27 @@ const CHECK_EVERY_MS = 6 * 60 * 60_000
 
 const RELEASES_URL = 'https://github.com/AppsGanin/spyly/releases/latest'
 
+/**
+ * Whether this copy knows where its updates come from.
+ *
+ * electron-builder writes `app-update.yml` into the bundle only for a real
+ * installer — a `--dir` build, the kind made to try something out quickly, does
+ * not get one. Without the file electron-updater throws a plain ENOENT with the
+ * full path in it, and that is what a person saw instead of an answer. The file
+ * is looked for directly rather than the error read afterwards: the question
+ * "can this build update itself" has an answer before anything is attempted.
+ */
+function canUpdate(): boolean {
+  return app.isPackaged && existsSync(path.join(process.resourcesPath, 'app-update.yml'))
+}
+
 let timer: ReturnType<typeof setInterval> | null = null
 let asked = false
 
 export function startUpdates(isRecording: () => boolean): void {
-  // In development there is nowhere to update from, and extra requests to GitHub only get in the way.
-  if (!app.isPackaged) return
+  // In development, and in a build made without an installer, there is nowhere
+  // to update from; extra requests to GitHub only get in the way.
+  if (!canUpdate()) return
 
   autoUpdater.autoDownload = true
   // Installed only once a person has agreed: a silent restart in the middle of
@@ -77,9 +94,13 @@ export function stopUpdates(): void {
 
 /** Check at a person's request and report what was found. */
 export async function checkForUpdatesNow(): Promise<
-  { state: 'current'; version: string } | { state: 'found'; version: string } | { state: 'failed'; hint: string }
+  | { state: 'current'; version: string }
+  | { state: 'found'; version: string }
+  | { state: 'unsupported' }
+  | { state: 'failed'; hint: string }
 > {
   if (!app.isPackaged) return { state: 'current', version: app.getVersion() }
+  if (!canUpdate()) return { state: 'unsupported' }
   try {
     const found = await autoUpdater.checkForUpdates()
     const version = found?.updateInfo.version

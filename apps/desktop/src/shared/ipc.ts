@@ -154,6 +154,8 @@ export interface IpcRequests {
   'app:checkUpdates': () =>
     | { state: 'current'; version: string }
     | { state: 'found'; version: string }
+    /** The build carries no update settings and can only be replaced by hand. */
+    | { state: 'unsupported' }
     | { state: 'failed'; hint: string }
   'app:openReleases': () => void
 

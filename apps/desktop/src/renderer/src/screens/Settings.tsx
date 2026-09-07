@@ -361,6 +361,9 @@ function Updates() {
       const found = await api.call('app:checkUpdates')
       if (found.state === 'found') notify('success', t('Есть обновление: {found_version}. Скачиваю', { found_version: found.version }))
       else if (found.state === 'current') notify('info', t('У вас последняя версия'))
+      // Nothing has gone wrong here: this copy was simply installed by hand and
+      // has no updater in it. The button beside this one leads where to look.
+      else if (found.state === 'unsupported') notify('info', t('Эта сборка не обновляется сама — новую версию можно скачать в «Все версии»'))
       else notify('error', t('Не удалось проверить: {found_hint}', { found_hint: found.hint }))
     } finally {
       setBusy(false)

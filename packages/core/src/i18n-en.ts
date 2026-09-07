@@ -344,6 +344,8 @@ export const EN: Record<string, string> = {
   'Точнее на плохом звуке и в именах, но считает примерно вдвое дольше': 'More accurate on poor audio and on names, but takes about twice as long',
   'Тёмная': 'Dark',
   'У вас последняя версия': 'You are on the latest version',
+  'Эта сборка не обновляется сама — новую версию можно скачать в «Все версии»':
+    'This build does not update itself — a new version can be downloaded under “All versions”',
   'Убрать {tag}': 'Remove {tag}',
   'Удалить': 'Delete',
   'Удалить {what}': 'Delete {what}',
