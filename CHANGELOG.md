@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/AppsGanin/spyly/compare/v1.1.0...v1.2.0) (2026-09-07)
+
+
+### Features
+
+* install updates without a developer certificate ([2f10bb5](https://github.com/AppsGanin/spyly/commit/2f10bb54a59e5fe5fcea49be4be047e97f9e51d3))
+
+
+### Fixes
+
+* say plainly when a build cannot update itself ([4fd88f2](https://github.com/AppsGanin/spyly/commit/4fd88f20ffaf0afc14c5084bce78fcace0c87198))
+
 ## [1.1.0](https://github.com/AppsGanin/spyly/compare/v1.0.0...v1.1.0) (2026-09-07)
 
 
