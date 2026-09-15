@@ -23,6 +23,7 @@ function defaults(): Settings {
     autoSummarize: true,
     autoDetectCalls: 'notify',
     recordShortcut: defaultRecordShortcut(process.platform === 'darwin'),
+    llmModels: {},
     storageDir: storageRoot(),
     onboardingDone: false,
     preferredApps: []

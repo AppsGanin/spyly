@@ -1,4 +1,5 @@
 import type { AsrResult } from '@spyly/core'
+import type { LlmModelChoices } from '../../shared/ipc.js'
 
 export interface AsrCapabilities {
   streaming: boolean
@@ -27,10 +28,28 @@ export interface LlmMessage {
   content: string
 }
 
+export interface LlmOptions {
+  maxTokens?: number
+  temperature?: number
+  /** Which model to ask. Absent or empty: whatever the agent itself would use. */
+  model?: string
+}
+
+export interface LlmReply {
+  text: string
+  /**
+   * The model that actually answered, when that can be learned. "Whatever the
+   * agent would use" says nothing a month later, when the default has changed.
+   */
+  model?: string
+}
+
 export interface LlmProvider {
   id: string
   name: string
   local: boolean
   ready(): Promise<{ ready: boolean; hint?: string }>
-  complete(messages: LlmMessage[], options?: { maxTokens?: number; temperature?: number }): Promise<string>
+  complete(messages: LlmMessage[], options?: LlmOptions): Promise<LlmReply>
+  /** What settings offer for the model. Absent: the provider has no such choice here. */
+  modelChoices?(): Promise<LlmModelChoices>
 }

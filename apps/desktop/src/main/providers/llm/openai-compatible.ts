@@ -13,6 +13,8 @@ import type { LlmMessage, LlmProvider } from '../types.js'
 export const OPENAI_KEY = 'openai-compatible.key'
 
 interface ChatResponse {
+  /** OpenRouter and the like answer with the exact model behind an alias such as "openrouter/auto". */
+  model?: string
   choices?: { message?: { content?: string } }[]
   error?: { message?: string }
 }
@@ -93,6 +95,6 @@ export const openAiCompatibleProvider: LlmProvider = {
     const data = (await response.json()) as ChatResponse
     const text = data.choices?.[0]?.message?.content?.trim()
     if (!text) throw new Error(t('сервис вернул пустой ответ'))
-    return text
+    return { text, model: data.model || model }
   }
 }

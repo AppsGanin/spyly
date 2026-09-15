@@ -10,6 +10,23 @@ function formatDue(due: string): string {
   return /^(до|к|by|until)\s/i.test(trimmed) ? trimmed : t('до {trimmed}', { trimmed: trimmed })
 }
 
+/**
+ * What a summary was built with, in words.
+ *
+ * Newer summaries carry the model itself, "claude-opus-5". Older ones carry only
+ * the provider, and an agent over MCP signs its own as "agent".
+ */
+function modelLabel(model: string): string {
+  const providers: Record<string, string> = {
+    'claude-cli': 'Claude Code',
+    'codex-cli': 'Codex',
+    ollama: 'Ollama',
+    'openai-compatible': t('OpenAI-совместимый'),
+    agent: t('агент по MCP')
+  }
+  return t('Собрано: {model}', { model: providers[model] ?? model })
+}
+
 /** A list from the summary. Empty sections are not shown at all. */
 function ListSection({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null
@@ -116,11 +133,14 @@ export function SummaryPanel({
 
       <ListSection title={t('Осталось решить')} items={summary.questions} />
 
-      {canSummarize && (
-        <div className="row" style={{ gap: 'var(--space-2)' }}>
-          <Button size="sm" onClick={onGenerate} disabled={generating}>
-            {generating ? t('Пересобираю…') : t('Пересобрать конспект')}
-          </Button>
+      {(canSummarize || summary.model) && (
+        <div className="row" style={{ gap: 'var(--space-3)' }}>
+          {canSummarize && (
+            <Button size="sm" onClick={onGenerate} disabled={generating}>
+              {generating ? t('Пересобираю…') : t('Пересобрать конспект')}
+            </Button>
+          )}
+          {summary.model && <span className="dim">{modelLabel(summary.model)}</span>}
         </div>
       )}
     </div>

@@ -635,6 +635,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
         const provider = LLM_PROVIDERS.find((p) => p.id === id)!
         const answer = await provider
           .complete([{ role: 'user', content: 'Answer in one word: working' }], {})
+          .then((reply) => reply.text)
           .catch((error: unknown) => `ERROR: ${error instanceof Error ? error.message : String(error)}`)
         check(!answer.startsWith('ERROR:'), `${id} answers`, answer.replace(/\s+/g, ' ').slice(0, 70))
       }
@@ -680,7 +681,7 @@ export async function runSelfTest(fixture: string, seconds: number): Promise<num
     const ready = await openAiCompatibleProvider.ready()
     check(ready.ready, 'a configured service counts as ready', ready.hint ?? '')
 
-    const answer = await openAiCompatibleProvider.complete(
+    const { text: answer } = await openAiCompatibleProvider.complete(
       [
         { role: 'system', content: 'you make summaries' },
         { role: 'user', content: 'here is the transcript' }

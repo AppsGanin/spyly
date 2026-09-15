@@ -106,6 +106,19 @@ export interface Settings {
   preferredApps: string[]
   /** The global shortcut for starting and stopping a recording, as an Electron accelerator. */
   recordShortcut: string
+  /**
+   * The summary model, per provider: a model name means nothing to another one.
+   * Empty means whatever the agent itself uses.
+   */
+  llmModels: Record<string, string>
+}
+
+/** What settings offer as the summary model for one provider. */
+export interface LlmModelChoices {
+  /** Models to pick from; null when a name is typed by hand, as nobody keeps a list of them. */
+  options: { id: string; label: string }[] | null
+  /** What the agent uses when nothing is picked, if it can be learned. */
+  fallback: string | null
 }
 
 export interface ModelInfo {
@@ -210,6 +223,8 @@ export interface IpcRequests {
   'settings:get': () => Settings
   'settings:set': (patch: Partial<Settings>) => Settings
   'settings:providers': () => ProviderInfo[]
+  /** The model choice for a summary provider; null when it has none to offer. */
+  'settings:llmModels': (providerId: string) => LlmModelChoices | null
   /** An API key: only the fact that one exists is handed out, never the value. */
   'settings:hasKey': (id: string) => { present: boolean; encrypted: boolean }
   'settings:setKey': (id: string, value: string) => void

@@ -347,6 +347,55 @@ function AboutTab({ settings }: { settings: Settings }) {
 }
 
 /**
+ * Which model the summary is built with.
+ *
+ * Kept per provider: "opus" means nothing to Codex, and switching back and
+ * forth should not lose what was picked for each. Where the agent keeps no
+ * list of its models the name is typed, and saved when the field is left.
+ */
+function SummaryModel({ providerId }: { providerId: string }) {
+  const { settings, saveSettings } = useStore()
+  const { data: choices } = useAsync(() => api.call('settings:llmModels', providerId), [providerId])
+  if (!settings || !choices) return null
+
+  const value = settings.llmModels[providerId] ?? ''
+  const save = (model: string) => {
+    if (model.trim() === value) return
+    void saveSettings({ llmModels: { ...settings.llmModels, [providerId]: model.trim() } })
+  }
+
+  return (
+    <Row title={t('Модель')} hint={t('По умолчанию — та, что выбрана в самом агенте')}>
+      {choices.options ? (
+        <Select value={value} onChange={(e) => save(e.target.value)}>
+          <option value="">
+            {choices.fallback ? t('По умолчанию ({model})', { model: choices.fallback }) : t('По умолчанию')}
+          </option>
+          {choices.options.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+          {/* A model that has since gone from the list stays visible rather than
+              silently turning into the default. */}
+          {value && !choices.options.some((option) => option.id === value) && <option value={value}>{value}</option>}
+        </Select>
+      ) : (
+        <Input
+          defaultValue={value}
+          placeholder={choices.fallback ? t('По умолчанию: {model}', { model: choices.fallback }) : t('По умолчанию')}
+          className="mono"
+          onBlur={(e) => save(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+        />
+      )}
+    </Row>
+  )
+}
+
+/**
  * The recording shortcut, and a way to put your own in its place.
  *
  * The combination is typed rather than picked from a list: whatever is free
@@ -926,6 +975,10 @@ function AgentsTab({
 }) {
   const { notify, settings, saveSettings } = useStore()
   const readyLlm = providers.filter((p) => p.kind === 'llm' && p.ready)
+  // The same one the summary is built with: the saved choice if it is ready, otherwise the first that is.
+  const summaryProvider = readyLlm.some((p) => p.id === settings?.llmProvider)
+    ? settings!.llmProvider
+    : (readyLlm[0]?.id ?? '')
   const [agents, setAgents] = useState<AgentStatus[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
@@ -971,25 +1024,21 @@ function AgentsTab({
       <section className="settings__group">
         <div className="settings__groupTitle">{t('Конспект')}</div>
         {readyLlm.length > 0 ? (
-          <Row
-            title={t('Чем собирать')}
-            hint={t('В списке только готовое к работе: свой сервис появится, когда вы его настроите')}
-          >
-            <Select
-              value={
-                readyLlm.some((p) => p.id === settings?.llmProvider)
-                  ? settings!.llmProvider
-                  : readyLlm[0]!.id
-              }
-              onChange={(e) => void saveSettings({ llmProvider: e.target.value })}
+          <>
+            <Row
+              title={t('Чем собирать')}
+              hint={t('В списке только готовое к работе: свой сервис появится, когда вы его настроите')}
             >
-              {readyLlm.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.name}
-                </option>
-              ))}
-            </Select>
-          </Row>
+              <Select value={summaryProvider} onChange={(e) => void saveSettings({ llmProvider: e.target.value })}>
+                {readyLlm.map((provider) => (
+                  <option key={provider.id} value={provider.id}>
+                    {provider.name}
+                  </option>
+                ))}
+              </Select>
+            </Row>
+            <SummaryModel key={summaryProvider} providerId={summaryProvider} />
+          </>
         ) : (
           <SummarySetup onCopy={onCopy} />
         )}

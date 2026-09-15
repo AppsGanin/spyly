@@ -67,7 +67,7 @@ import { send, sendStartView, setOverlayVisible, showMainWindow, showOverlayDraf
 
 import { trayActions, updateTray } from '../tray.js'
 import { processMeeting } from '../pipeline/run.js'
-import { listProviders } from '../providers/registry.js'
+import { getLlmProvider, listProviders } from '../providers/registry.js'
 import { listModels, downloadModel, pauseDownload, cancelDownload, removeModel } from '../pipeline/models.js'
 
 let session: RecordingSession | null = null
@@ -963,6 +963,10 @@ export function registerIpc(): void {
     return next
   })
   handle('settings:providers', () => listProviders())
+  handle('settings:llmModels', async (providerId) => {
+    const provider = getLlmProvider(providerId)
+    return provider?.modelChoices ? provider.modelChoices() : null
+  })
 
   handle('settings:hasKey', async (id) => ({
     // The value itself is never handed out: the interface only needs to know the

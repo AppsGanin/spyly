@@ -25,6 +25,13 @@ async function postJson(url: string, body: unknown): Promise<unknown> {
   return response.json()
 }
 
+/** The models installed in Ollama, in the order it lists them. */
+async function ollamaModels(): Promise<string[]> {
+  const response = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(1200) })
+  const data = (await response.json()) as { models?: { name: string }[] }
+  return (data.models ?? []).map((m) => m.name)
+}
+
 /** A local model through Ollama, with no account and without sending a recording anywhere. */
 const ollamaProvider: LlmProvider = {
   id: 'ollama',
@@ -42,10 +49,9 @@ const ollamaProvider: LlmProvider = {
     }
   },
   async complete(messages, options = {}) {
-    const tags = (await (await fetch('http://127.0.0.1:11434/api/tags')).json()) as {
-      models?: { name: string }[]
-    }
-    const model = tags.models?.[0]?.name
+    // The chosen model if there is one, otherwise the first installed: which one
+    // that is was never up to the person, so it can at least be picked in settings.
+    const model = options.model?.trim() || (await ollamaModels())[0]
     if (!model) throw new Error(t('в Ollama нет ни одной модели'))
     const data = (await postJson('http://127.0.0.1:11434/api/chat', {
       model,
@@ -53,7 +59,11 @@ const ollamaProvider: LlmProvider = {
       stream: false,
       options: { temperature: options.temperature ?? 0.2 }
     })) as { message?: { content?: string } }
-    return data.message?.content ?? ''
+    return { text: data.message?.content ?? '', model }
+  },
+  async modelChoices() {
+    const names = await ollamaModels().catch(() => [])
+    return { options: names.map((name) => ({ id: name, label: name })), fallback: names[0] ?? null }
   }
 }
 

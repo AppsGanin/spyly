@@ -130,8 +130,9 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
         // A summary is optional. If no model is configured, that is not a transcription
         // failure but simply a step not taken: no reason to alarm anyone in red.
         const provider = await readyLlmProvider(settings.llmProvider)
+        const model = provider ? settings.llmModels[provider.id] : undefined
         if (provider && settings.autoSummarize) {
-          meeting = await summarize(meetingId, provider)
+          meeting = await summarize(meetingId, provider, model)
           meeting = await save(meeting, {
             providers: { ...meeting.providers, llm: provider.name }
           })
@@ -139,7 +140,7 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
           // No summary was asked for, but naming the recording by its meaning is still
           // worth it: that is one short request, and a list of a dozen "Recording, 28
           // August" makes the conversation you want impossible to find.
-          if (provider) meeting = await nameMeeting(meetingId, provider)
+          if (provider) meeting = await nameMeeting(meetingId, provider, model)
           await save(meeting, { stages: { summarizing: 'skipped' } })
           report(meetingId, stage, 'done', 1)
           send('meetings:changed', { id: meetingId })
@@ -533,18 +534,18 @@ async function buildTranscript(
   return next
 }
 
-async function summarize(meetingId: string, provider: LlmProvider): Promise<Meeting> {
+async function summarize(meetingId: string, provider: LlmProvider, model?: string): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
   if (meeting.utterances.length === 0) return meeting
 
   report(meetingId, 'summarizing', 'running', 0.2)
-  const raw = await provider.complete([{ role: 'user', content: buildSummaryPrompt(meeting) }], { maxTokens: 3000 })
-  const summary = parseSummary(raw, provider.id)
+  const reply = await provider.complete([{ role: 'user', content: buildSummaryPrompt(meeting) }], { maxTokens: 3000, model })
+  const summary = parseSummary(reply.text, reply.model ?? provider.id)
 
   report(meetingId, 'summarizing', 'running', 0.8)
   await writeMeeting({ ...meeting, summary })
-  return nameMeeting(meetingId, provider)
+  return nameMeeting(meetingId, provider, model)
 }
 
 /**
@@ -554,14 +555,15 @@ async function summarize(meetingId: string, provider: LlmProvider): Promise<Meet
  * itself: "Recording, 28 August, 14:27" says nothing about the conversation,
  * and in a list of a dozen like it the one you want cannot be found.
  */
-async function nameMeeting(meetingId: string, provider: LlmProvider): Promise<Meeting> {
+async function nameMeeting(meetingId: string, provider: LlmProvider, model?: string): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
   if (!meeting.titleAuto && !isAutoTitle(meeting.title)) return meeting
   if (meeting.utterances.length === 0) return meeting
 
   const suggested = await provider
-    .complete([{ role: 'user', content: buildTitlePrompt(meeting) }], { maxTokens: 60 })
+    .complete([{ role: 'user', content: buildTitlePrompt(meeting) }], { maxTokens: 60, model })
+    .then((reply) => reply.text)
     .catch(() => '')
   const title = cleanTitle(suggested)
   if (!title) return meeting
