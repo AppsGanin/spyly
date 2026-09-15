@@ -30,6 +30,7 @@ import {
 } from '../audio/native.js'
 import { startCallDetector } from '../detect/calls.js'
 import { checkForUpdatesNow, openReleases } from '../updates.js'
+import { changeRecordShortcut, pauseRecordShortcut } from '../shortcuts.js'
 import { SpeechChunker } from '../pipeline/live.js'
 import {
   LiveTranscriber,
@@ -973,6 +974,9 @@ export function registerIpc(): void {
   handle('settings:setKey', async (id, value) => {
     await setSecret(id, value.trim())
   })
+
+  handle('shortcuts:setRecord', (accelerator) => changeRecordShortcut(accelerator))
+  handle('shortcuts:pause', (paused) => pauseRecordShortcut(paused))
 
   handle('models:list', () => listModels())
   handle('models:download', (id) => {

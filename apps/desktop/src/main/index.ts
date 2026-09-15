@@ -596,7 +596,7 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     registerAudioProtocol()
     registerIpc()
     registerDisplayMediaHandler()
-    registerGlobalShortcuts(toggleRecordingFromShortcut)
+    registerGlobalShortcuts(settings.recordShortcut, toggleRecordingFromShortcut)
     createWindow()
     createTray()
 

@@ -104,6 +104,8 @@ export interface Settings {
   onboardingDone: boolean
   /** Record system audio from the chosen applications only, by default. */
   preferredApps: string[]
+  /** The global shortcut for starting and stopping a recording, as an Electron accelerator. */
+  recordShortcut: string
 }
 
 export interface ModelInfo {
@@ -211,6 +213,14 @@ export interface IpcRequests {
   /** An API key: only the fact that one exists is handed out, never the value. */
   'settings:hasKey': (id: string) => { present: boolean; encrypted: boolean }
   'settings:setKey': (id: string, value: string) => void
+  /**
+   * Take another recording shortcut in place of the current one. False when the
+   * system would not give it, and then the old one stays; the window saves the
+   * setting only after a yes.
+   */
+  'shortcuts:setRecord': (accelerator: string) => boolean
+  /** Let go of the shortcut while a new one is being typed, and take it back after. */
+  'shortcuts:pause': (paused: boolean) => void
 
   'models:list': () => ModelInfo[]
   'models:download': (id: string) => void

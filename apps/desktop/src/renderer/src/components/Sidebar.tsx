@@ -5,6 +5,8 @@ import { api } from '../lib/api'
 import { dayLabel, timeLabel } from '../lib/dates'
 import { IconRecord, IconSearch, IconSettings, IconStop } from '../lib/icons'
 import { useStore } from '../lib/store'
+import { IS_MAC } from '../lib/shortcuts'
+import { defaultRecordShortcut, shortcutLabel } from '@shared/shortcut'
 import { Badge, Input, LevelMeter, Spinner } from '../ui'
 import { StartDialog } from './StartDialog'
 
@@ -42,7 +44,7 @@ function passes(meeting: MeetingMeta, filter: Filter): boolean {
  * the screen reads wrongly.
  */
 export function Sidebar() {
-  const { meetings, view, setView, recording, progress, notify, levels } = useStore()
+  const { meetings, view, setView, recording, progress, notify, levels, settings } = useStore()
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [results, setResults] = useState<{ meeting: MeetingMeta; snippet: string }[] | null>(null)
@@ -146,7 +148,9 @@ export function Sidebar() {
         ) : (
           <button
             className="sidebar__action"
-            title={t('Начать запись (⌘⇧R работает и когда окно спрятано)')}
+            title={t('Начать запись ({shortcut} работает и когда окно спрятано)', {
+              shortcut: shortcutLabel(settings?.recordShortcut ?? defaultRecordShortcut(IS_MAC), IS_MAC)
+            })}
             onClick={() => setStartOpen(true)}
             disabled={recording.status === 'starting'}
           >

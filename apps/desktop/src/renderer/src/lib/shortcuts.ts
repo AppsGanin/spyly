@@ -1,5 +1,8 @@
 import { useEffect } from 'react'
 
+/** Captions and recorded shortcuts differ on a Mac: ⌘ there, Ctrl and Win elsewhere. */
+export const IS_MAC = /Mac/.test(navigator.userAgent)
+
 /** Whether the user is typing right now, in which case space and letters are not ours. */
 function isTyping(target: EventTarget | null): boolean {
   const element = target as HTMLElement | null

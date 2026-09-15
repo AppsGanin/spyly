@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import type { Settings } from '../../shared/ipc.js'
+import { defaultRecordShortcut } from '../../shared/shortcut.js'
 import { storageRoot } from './paths.js'
 
 function settingsFile(): string {
@@ -21,6 +22,7 @@ function defaults(): Settings {
     autoTranscribe: true,
     autoSummarize: true,
     autoDetectCalls: 'notify',
+    recordShortcut: defaultRecordShortcut(process.platform === 'darwin'),
     storageDir: storageRoot(),
     onboardingDone: false,
     preferredApps: []

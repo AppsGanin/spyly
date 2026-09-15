@@ -4,6 +4,8 @@ import type { AgentStatus, ModelInfo, Permissions, ProviderInfo, Settings } from
 import { api, useAsync, useIpcEvent } from '../lib/api'
 import { IconAlert, IconCheck, IconClose, IconCopy, IconPause, IconSparkle, IconTerminal, IconTrash } from '../lib/icons'
 import { useStore } from '../lib/store'
+import { IS_MAC } from '../lib/shortcuts'
+import { acceleratorFromKey, defaultRecordShortcut, shortcutLabel } from '@shared/shortcut'
 import { Badge, Button, Field, IconButton, Input, Modal, Select, Spinner, Switch } from '../ui'
 
 type Tab = 'general' | 'transcription' | 'agents' | 'about'
@@ -316,8 +318,8 @@ function AboutTab({ settings }: { settings: Settings }) {
           <div style={{ fontWeight: 500 }}>{t('Горячие клавиши')}</div>
           <div className="field__hint">{t('Первое сочетание работает даже когда окно спрятано за приложением для звонков.')}</div>
           <div className="keys">
+            <RecordShortcut />
             {[
-              ['\u2318\u21E7R', t('Начать или остановить запись из любого приложения')],
               ['\u2318M', t('Отметить важное место во время записи')],
               ['\u2318F', t('Поиск по записям')],
               ['\u2318R', t('Запись, когда окно активно')],
@@ -341,6 +343,98 @@ function AboutTab({ settings }: { settings: Settings }) {
 
       <Updates />
     </section>
+  )
+}
+
+/**
+ * The recording shortcut, and a way to put your own in its place.
+ *
+ * The combination is typed rather than picked from a list: whatever is free
+ * depends on what else a person has installed, and only they know that.
+ */
+function RecordShortcut() {
+  const { settings, saveSettings, notify } = useStore()
+  const [capturing, setCapturing] = useState(false)
+  // What is held so far, so the keys answer before the combination is complete.
+  const [held, setHeld] = useState('')
+  const [hint, setHint] = useState<string | null>(null)
+  const fallback = defaultRecordShortcut(IS_MAC)
+  const current = settings?.recordShortcut ?? fallback
+
+  const apply = async (accelerator: string) => {
+    const label = shortcutLabel(accelerator, IS_MAC)
+    if (await api.call('shortcuts:setRecord', accelerator)) {
+      await saveSettings({ recordShortcut: accelerator })
+      notify('success', t('Запись теперь по {shortcut}', { shortcut: label }))
+    } else {
+      notify('error', t('Не получилось занять {shortcut}: похоже, оно уже у другого приложения', { shortcut: label }))
+    }
+  }
+
+  useEffect(() => {
+    if (!capturing) return
+    // The current shortcut is let go meanwhile: pressed again, it would start a
+    // recording rather than reach this window.
+    void api.call('shortcuts:pause', true)
+
+    const modifiers = (event: KeyboardEvent) =>
+      shortcutLabel(
+        [event.ctrlKey && 'Control', event.altKey && 'Alt', event.shiftKey && 'Shift', event.metaKey && 'Command']
+          .filter(Boolean)
+          .join('+'),
+        IS_MAC
+      )
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Captured before the window's own shortcuts, so ⌘F does not open search mid-way.
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.code === 'Escape') {
+        setCapturing(false)
+        return
+      }
+      const accelerator = acceleratorFromKey(event, IS_MAC)
+      if (accelerator) {
+        setCapturing(false)
+        void apply(accelerator)
+        return
+      }
+      setHeld(modifiers(event))
+      if (!['Meta', 'Control', 'Alt', 'Shift'].includes(event.key)) {
+        setHint(IS_MAC ? t('Добавьте ⌘, ⌃ или ⌥: без них сочетание мешало бы печатать') : t('Добавьте Ctrl или Alt: без них сочетание мешало бы печатать'))
+      }
+    }
+    const onKeyUp = (event: KeyboardEvent) => setHeld(modifiers(event))
+
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
+      setHeld('')
+      setHint(null)
+      void api.call('shortcuts:pause', false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturing])
+
+  return (
+    <div className="keys__row">
+      <kbd>{capturing ? held || '…' : shortcutLabel(current, IS_MAC)}</kbd>
+      <span className="dim grow">
+        {capturing
+          ? (hint ?? t('Нажмите новое сочетание. Esc — отмена'))
+          : t('Начать или остановить запись из любого приложения')}
+      </span>
+      <Button size="sm" onClick={() => setCapturing(!capturing)}>
+        {capturing ? t('Отмена') : t('Изменить')}
+      </Button>
+      {!capturing && current !== fallback && (
+        <Button size="sm" onClick={() => void apply(fallback)}>
+          {t('Вернуть {shortcut}', { shortcut: shortcutLabel(fallback, IS_MAC) })}
+        </Button>
+      )}
+    </div>
   )
 }
 
