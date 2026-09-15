@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.0](https://github.com/AppsGanin/spyly/compare/v1.2.0...v1.3.0) (2026-09-15)
+
+
+### Features
+
+* a recording shortcut that does not reload the page, and your own in its place ([485a897](https://github.com/AppsGanin/spyly/commit/485a8973b5e74b4152d7493a7914345dc6ed4cad))
+* choose the model a summary is built with, and see which one built it ([829f514](https://github.com/AppsGanin/spyly/commit/829f514a7ab30dea84eaad409fc675494a1210ac))
+
+
+### Fixes
+
+* a fresh install builds summaries instead of quietly skipping them ([8eebcc8](https://github.com/AppsGanin/spyly/commit/8eebcc860281cdf8e3b8a5721fcb1e077ac9d41b))
+
 ## [1.2.0](https://github.com/AppsGanin/spyly/compare/v1.1.0...v1.2.0) (2026-09-07)
 
 
