@@ -66,3 +66,24 @@ export const LLM_PROVIDERS: LlmProvider[] = [
 export function getLlmProvider(id: string): LlmProvider | null {
   return LLM_PROVIDERS.find((p) => p.id === id) ?? null
 }
+
+/**
+ * The model a summary is actually built with.
+ *
+ * The chosen one if it is ready, otherwise the first one that is, in the same
+ * order settings list them. Settings show exactly that as the choice, and a
+ * choice that is only shown is never saved: on a fresh install the setting
+ * held a provider that does not exist, the screen said "Claude Code", and
+ * every summary was quietly skipped.
+ */
+export async function readyLlmProvider(preferred: string): Promise<LlmProvider | null> {
+  const isReady = (provider: LlmProvider) =>
+    provider.ready().then((status) => status.ready, () => false)
+
+  const chosen = getLlmProvider(preferred)
+  if (chosen && (await isReady(chosen))) return chosen
+  for (const provider of LLM_PROVIDERS) {
+    if (provider !== chosen && (await isReady(provider))) return provider
+  }
+  return null
+}

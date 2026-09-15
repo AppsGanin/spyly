@@ -32,7 +32,7 @@ import { t,
 } from '@spyly/core'
 import { Notification } from 'electron'
 import { send, showMainWindow } from '../index.js'
-import { getLlmProvider, providerForModel } from '../providers/registry.js'
+import { providerForModel, readyLlmProvider } from '../providers/registry.js'
 import type { LlmProvider } from '../providers/types.js'
 import { preferredModel } from '../providers/asr/whisper-cpp.js'
 import { levelWindows, readWavPcm16, speechSeconds, writeWavPcm16 } from '../audio/wav.js'
@@ -129,21 +129,17 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
       } else if (stage === 'summarizing') {
         // A summary is optional. If no model is configured, that is not a transcription
         // failure but simply a step not taken: no reason to alarm anyone in red.
-        const provider = settings.autoSummarize ? getLlmProvider(settings.llmProvider) : null
-        const status = provider ? await provider.ready().catch(() => ({ ready: false })) : { ready: false }
-        if (status.ready) {
-          meeting = await summarize(meetingId, settings.llmProvider)
+        const provider = await readyLlmProvider(settings.llmProvider)
+        if (provider && settings.autoSummarize) {
+          meeting = await summarize(meetingId, provider)
           meeting = await save(meeting, {
-            providers: { ...meeting.providers, llm: provider?.name ?? settings.llmProvider }
+            providers: { ...meeting.providers, llm: provider.name }
           })
         } else {
           // No summary was asked for, but naming the recording by its meaning is still
           // worth it: that is one short request, and a list of a dozen "Recording, 28
           // August" makes the conversation you want impossible to find.
-          const namer = getLlmProvider(settings.llmProvider)
-          if (namer && (await namer.ready().catch(() => ({ ready: false }))).ready) {
-            meeting = await nameMeeting(meetingId, namer)
-          }
+          if (provider) meeting = await nameMeeting(meetingId, provider)
           await save(meeting, { stages: { summarizing: 'skipped' } })
           report(meetingId, stage, 'done', 1)
           send('meetings:changed', { id: meetingId })
@@ -537,15 +533,10 @@ async function buildTranscript(
   return next
 }
 
-async function summarize(meetingId: string, providerId: string): Promise<Meeting> {
+async function summarize(meetingId: string, provider: LlmProvider): Promise<Meeting> {
   const meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
   if (meeting.utterances.length === 0) return meeting
-
-  const provider = getLlmProvider(providerId)
-  if (!provider) throw new Error(t('неизвестный провайдер: {providerId}', { providerId: providerId }))
-  const status = await provider.ready()
-  if (!status.ready) throw new Error(t('конспект недоступен: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
 
   report(meetingId, 'summarizing', 'running', 0.2)
   const raw = await provider.complete([{ role: 'user', content: buildSummaryPrompt(meeting) }], { maxTokens: 3000 })

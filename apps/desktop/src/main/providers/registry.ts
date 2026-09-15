@@ -2,7 +2,7 @@ import { t } from '@spyly/core'
 import type { ProviderInfo } from '../../shared/ipc.js'
 import { whisperCppProvider } from './asr/whisper-cpp.js'
 import { SHERPA_ASR_PROVIDERS, sherpaProviderFor } from './asr/sherpa-asr.js'
-import { LLM_PROVIDERS, getLlmProvider } from './llm/index.js'
+import { LLM_PROVIDERS, getLlmProvider, readyLlmProvider } from './llm/index.js'
 import type { AsrProvider, LlmProvider } from './types.js'
 
 /**
@@ -25,7 +25,7 @@ export function providerForModel(modelId: string): AsrProvider {
   return sherpaProviderFor(modelId) ?? whisperCppProvider
 }
 
-export { getLlmProvider }
+export { getLlmProvider, readyLlmProvider }
 
 /** The list for settings: what is available and what is missing for it to be ready. */
 export async function listProviders(): Promise<ProviderInfo[]> {

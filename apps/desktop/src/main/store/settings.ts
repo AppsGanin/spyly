@@ -15,7 +15,7 @@ function defaults(): Settings {
     theme: 'dark',
     uiLang: 'ru',
     asrModel: '',
-    llmProvider: 'anthropic',
+    llmProvider: 'claude-cli',
     openAiCompatible: { baseUrl: '', model: '' },
     liveTranscription: true,
     autoTranscribe: true,
