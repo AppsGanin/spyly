@@ -171,7 +171,8 @@ export interface IpcRequests {
     | { state: 'found'; version: string }
     /** The build carries no update settings and can only be replaced by hand. */
     | { state: 'unsupported' }
-    | { state: 'failed'; hint: string }
+    /** Already in words for a person; the raw error goes to the log. Info when it will pass by itself. */
+    | { state: 'failed'; hint: string; tone: 'info' | 'error' }
   'app:openReleases': () => void
 
   'calendar:status': () => { supported: boolean; granted: boolean }

@@ -5,6 +5,7 @@ import { app, dialog, shell } from 'electron'
 import electronUpdater from 'electron-updater'
 import { send } from './index.js'
 import { applyUpdate, discardUpdate, fetchUpdate } from './update-install.js'
+import { describeUpdateError } from './update-error.js'
 
 /**
  * Updating from GitHub releases.
@@ -129,7 +130,7 @@ export async function checkForUpdatesNow(): Promise<
   | { state: 'current'; version: string }
   | { state: 'found'; version: string }
   | { state: 'unsupported' }
-  | { state: 'failed'; hint: string }
+  | { state: 'failed'; hint: string; tone: 'info' | 'error' }
 > {
   if (!app.isPackaged) return { state: 'current', version: app.getVersion() }
   if (!canUpdate()) return { state: 'unsupported' }
@@ -143,7 +144,8 @@ export async function checkForUpdatesNow(): Promise<
     }
     return { state: 'current', version: app.getVersion() }
   } catch (error) {
-    return { state: 'failed', hint: error instanceof Error ? error.message : String(error) }
+    const problem = describeUpdateError(error)
+    return { state: 'failed', hint: problem.text, tone: problem.tone }
   }
 }
 

@@ -12,3 +12,4 @@ coverage/
 # separate project with its own history and licence.
 native/whisper/
 native/macos-audio/.build/
+.copilot-specs-cache/
