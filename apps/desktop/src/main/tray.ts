@@ -46,7 +46,11 @@ export function createTray(): void {
   tray = new Tray(image)
   tray.setToolTip('Spyly')
   tray.setContextMenu(buildMenu(null))
-  tray.on('click', () => trayActions.onShowWindow?.())
+  // On a Mac a click already opens the menu, and the window is one of its items:
+  // bringing the window up on the same click did both at once, and Spyly jumped
+  // out before anything was chosen. Elsewhere a click opening the app is the
+  // convention, with the menu on the right button.
+  if (process.platform !== 'darwin') tray.on('click', () => trayActions.onShowWindow?.())
 }
 
 /** The icon turns solid while recording: the application must not be inconspicuous. */
