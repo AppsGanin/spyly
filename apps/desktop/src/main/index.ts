@@ -260,6 +260,16 @@ function createWindow(): void {
             .catch(() => undefined)
           await new Promise((r) => setTimeout(r, 600))
         }
+        // The text of a part of the screen. A shot of a window other windows cover
+        // can come back stale — macOS stops painting it — while what the page
+        // holds is always current.
+        const textOf = process.env.SPYLY_SCREENSHOT_TEXT
+        if (textOf) {
+          await mainWindow!.webContents
+            .executeJavaScript(`document.querySelector(${JSON.stringify(textOf)})?.innerText ?? 'not found'`)
+            .then((text: string) => process.stderr.write(`[screen text] ${text}\n`))
+            .catch(() => undefined)
+        }
         const image = await mainWindow!.webContents.capturePage()
         const { writeFile } = await import('node:fs/promises')
         await writeFile(shotPath, image.toPNG())
@@ -533,7 +543,8 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
     if (process.env.SPYLY_CHECK_ASR) {
       const { providerForModel } = await import('./providers/registry.js')
       const model = process.env.SPYLY_ASR_MODEL ?? 'parakeet-tdt-v3'
-      const provider = providerForModel(model)
+      const language = process.env.SPYLY_ASR_LANGUAGE ?? 'ru'
+      const provider = providerForModel(model, language)
       const state = await provider.ready()
       if (!state.ready) {
         process.stdout.write(`[transcription] ${provider.name} is not ready: ${state.hint}\n`)
@@ -542,15 +553,28 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       }
       process.stdout.write('[transcription] the engine is ready, reading the file\n')
       const started = Date.now()
-      const result = await provider.transcribe(process.env.SPYLY_CHECK_ASR, 'system', {
-        language: 'ru',
-        onProgress: (p) => process.stdout.write(`[transcription] ${(p * 100).toFixed(0)}%\n`)
-      })
+      const result = await provider
+        .transcribe(process.env.SPYLY_CHECK_ASR, 'system', {
+          language,
+          onProgress: (p) => process.stdout.write(`[transcription] ${(p * 100).toFixed(0)}%\n`)
+        })
+        .catch((error: unknown) => {
+          // A failed check has to end the run, not leave it hanging with nothing to say.
+          process.stdout.write(`[transcription] failed: ${error instanceof Error ? error.message : String(error)}\n`)
+          setTimeout(() => app.exit(1), 200)
+          return null
+        })
+      if (!result) return
       const text = result.segments.map((x) => x.text).join(' ')
       process.stdout.write(
         `[transcription] ${provider.name}: ${text.length} characters in ${((Date.now() - started) / 1000).toFixed(1)} s\n` +
           `${text.slice(0, 400)}\n`
       )
+      // The whole result with every word's time, for comparing one model against another.
+      if (process.env.SPYLY_CHECK_ASR_OUT) {
+        const { writeFile } = await import('node:fs/promises')
+        await writeFile(process.env.SPYLY_CHECK_ASR_OUT, JSON.stringify(result))
+      }
       setTimeout(() => app.exit(0), 200)
       return
     }
@@ -562,7 +586,9 @@ if (!isCheckRun && !app.requestSingleInstanceLock()) {
       // From the very beginning by default, but checking the summary on its own is
       // far quicker than waiting for transcription every time.
       const from = (process.env.SPYLY_REPROCESS_FROM ?? 'transcribing') as 'transcribing' | 'summarizing'
-      await processMeeting(process.env.SPYLY_REPROCESS, from)
+      // Stopping after transcription keeps a check of recognition away from any language model.
+      const until = (process.env.SPYLY_REPROCESS_UNTIL ?? 'summarizing') as 'transcribing' | 'summarizing'
+      await processMeeting(process.env.SPYLY_REPROCESS, from, until)
       const meeting = await readMeeting(process.env.SPYLY_REPROCESS)
       process.stdout.write(
         `[reprocess] "${meeting?.title ?? '—'}", sides ${meeting?.speakers.length ?? 0}, ` +

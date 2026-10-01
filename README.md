@@ -98,8 +98,10 @@ Downloaded on first run into `~/Library/Application Support/Spyly/models`.
 |---|---|---|
 | Whisper large-v3-turbo | default: accuracy and speed, 99 languages | 574 MB |
 | Whisper large-v3 | more accurate on poor audio, about twice as slow | 1.0 GB |
+| GigaAM v3 | Russian only: more accurate than Whisper on Russian speech and several times faster, runs on the CPU | 163 MB |
 | Parakeet TDT v3 | much faster than Whisper, 25 languages | 638 MB |
 | Nemotron Speech 3.5 | streaming — this is what live text runs on | 475 MB |
+| Silero VAD | finds the pauses GigaAM is cut at; comes down with it | 0.6 MB |
 
 
 ### Made-up text
@@ -139,7 +141,7 @@ You may use, study, change and share this program. Anything built on it must be 
 
 For use without those obligations, a commercial licence is available: open an issue or write to [@AppsGanin](https://github.com/AppsGanin).
 
-Third-party parts keep their own licences: whisper.cpp is MIT, sherpa-onnx is Apache-2.0, the Geist fonts are under the SIL Open Font License. Recognition models are downloaded at runtime and carry their own terms.
+Third-party parts keep their own licences: whisper.cpp is MIT, sherpa-onnx is Apache-2.0, the Geist fonts are under the SIL Open Font License. Recognition models are downloaded at runtime and carry their own terms; GigaAM v3, for one, is MIT.
 
 ## Development
 

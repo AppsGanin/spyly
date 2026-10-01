@@ -21,6 +21,8 @@ interface ModelSpec {
   tradeoff?: string
   /** A sensible default for its engine. */
   recommended?: boolean
+  /** Models this one cannot work without; they come down with it. */
+  requires?: string[]
 }
 
 /**
@@ -51,6 +53,19 @@ export const MODELS: ModelSpec[] = [
     tradeoff: t('Точнее на плохом звуке и в именах, но считает примерно вдвое дольше')
   },
   {
+    id: 'gigaam-v3-ru',
+    name: 'GigaAM v3',
+    purpose: 'asr',
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-punct-giga-am-v3-russian-2025-12-16.tar.bz2',
+    file: 'sherpa-onnx-nemo-ctc-punct-giga-am-v3-russian-2025-12-16',
+    sizeBytes: 163_000_000,
+    archive: 'tar.bz2',
+    tier: t('Для русского'),
+    tradeoff: t('На русской речи точнее Whisper и в разы быстрее. Английские слова и термины распознаёт хуже'),
+    // It hears phrases, not hours: the recording is cut at the pauses first.
+    requires: ['vad']
+  },
+  {
     id: 'parakeet-tdt-v3',
     name: 'Parakeet TDT v3',
     purpose: 'asr',
@@ -79,7 +94,7 @@ export const MODELS: ModelSpec[] = [
     purpose: 'vad',
     url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx',
     file: 'silero_vad.onnx',
-    sizeBytes: 2_300_000
+    sizeBytes: 644_000
   }
 ]
 
@@ -186,6 +201,13 @@ export async function downloadModel(id: string): Promise<void> {
   inFlight.set(id, entry)
 
   try {
+    // What the model needs to run comes down first. Inside the guard rather than
+    // before it: a second press during this wait would otherwise start a second
+    // download into the same file.
+    for (const need of spec.requires ?? []) {
+      if (!isDownloaded(need)) await downloadModel(need)
+    }
+
     const already = existsSync(tmp) ? statSync(tmp).size : 0
     const response = await fetch(spec.url, {
       signal: controller.signal,

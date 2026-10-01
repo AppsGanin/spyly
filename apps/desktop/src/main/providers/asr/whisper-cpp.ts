@@ -224,8 +224,15 @@ export function setPreferredModel(id: string): void {
   chosenModel = id
 }
 
+/**
+ * The Whisper model to run.
+ *
+ * Only ever a Whisper one, whatever was chosen. With GigaAM chosen, the live
+ * draft and an English call still go through Whisper, and handing whisper.cpp
+ * GigaAM's folder for a model file would bring it down before it said a word.
+ */
 export function preferredModel(): string {
-  if (chosenModel && isDownloaded(chosenModel)) return chosenModel
+  if (WHISPER_MODELS.includes(chosenModel) && isDownloaded(chosenModel)) return chosenModel
   for (const id of WHISPER_MODELS) {
     if (isDownloaded(id)) return id
   }

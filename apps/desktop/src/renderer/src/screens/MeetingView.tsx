@@ -25,6 +25,7 @@ import { TranscriptSelection } from '../components/TranscriptSelection'
 const MODEL_LABELS: Record<string, string> = {
   'whisper-large-v3-turbo': 'Whisper large-v3-turbo',
   'whisper-large-v3': 'Whisper large-v3',
+  'gigaam-v3-ru': 'GigaAM v3',
   'parakeet-tdt-v3': 'Parakeet TDT v3',
   'nemotron-3.5': 'Nemotron Speech 3.5',
 }

@@ -2,7 +2,7 @@ import { t } from '@spyly/core'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import type { AsrResult, AsrSegment, Word } from '@spyly/core'
-import { isDownloaded, modelsDir } from '../../pipeline/models.js'
+import { isDownloaded, modelPath, modelsDir } from '../../pipeline/models.js'
 import { SPECS, SHERPA_MODEL_IDS, type SherpaSpec } from './sherpa-specs.js'
 import type { AsrJob, AsrReply } from './sherpa-worker.js'
 import type { AsrProvider, TranscribeOptions } from '../types.js'
@@ -64,12 +64,14 @@ function sherpaProvider(spec: SherpaSpec): AsrProvider {
     id: spec.id,
     name: spec.name,
     local: true,
-    capabilities: { streaming: false, wordTimestamps: false },
+    capabilities: { streaming: false, wordTimestamps: spec.cut.by === 'voice' },
 
     async ready() {
       if (!isDownloaded(spec.id)) return { ready: false, hint: t('модель не скачана') }
       const first = 'model' in spec.files ? spec.files.model : spec.files.encoder
       if (!existsSync(fileIn(spec, first))) return { ready: false, hint: t('файлы модели не найдены') }
+      // Downloaded along with the model, but it can be deleted on its own.
+      if (spec.cut.by === 'voice' && !isDownloaded('vad')) return { ready: false, hint: t('детектор речи не скачан') }
       return { ready: true }
     },
 
@@ -77,7 +79,7 @@ function sherpaProvider(spec: SherpaSpec): AsrProvider {
       if (!existsSync(wavPath)) throw new Error(t('нет файла записи: {wavPath}', { wavPath: wavPath }))
 
       const words = await transcribeInWorker(
-        { specId: spec.id, wavPath, modelsDir: modelsDir() },
+        { specId: spec.id, wavPath, modelsDir: modelsDir(), vadPath: modelPath('vad') ?? undefined },
         options
       )
       if (words.length === 0) return { track, language: spec.language, segments: [] }

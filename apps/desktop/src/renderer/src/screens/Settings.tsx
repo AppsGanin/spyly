@@ -541,10 +541,11 @@ function Updates() {
 
 // ── transcription ─────────────────────────────────────────────────────────
 
-/** Recognition models, from the fast one to the accurate one. One engine: Whisper. */
+/** Recognition models a person chooses between. The engine behind each is not their concern. */
 const ASR_MODELS = [
   'whisper-large-v3-turbo',
   'whisper-large-v3',
+  'gigaam-v3-ru',
   'parakeet-tdt-v3'
 ]
 

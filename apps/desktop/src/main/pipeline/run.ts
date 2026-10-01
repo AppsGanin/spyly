@@ -32,9 +32,9 @@ import { t,
 } from '@spyly/core'
 import { Notification } from 'electron'
 import { send, showMainWindow } from '../index.js'
-import { providerForModel, readyLlmProvider } from '../providers/registry.js'
+import { sherpaProviderFor } from '../providers/asr/sherpa-asr.js'
+import { modelUsed, providerForModel, readyLlmProvider } from '../providers/registry.js'
 import type { LlmProvider } from '../providers/types.js'
-import { preferredModel } from '../providers/asr/whisper-cpp.js'
 import { levelWindows, readWavPcm16, speechSeconds, writeWavPcm16 } from '../audio/wav.js'
 import { readMeeting, updateMeeting, writeMeeting } from '../store/meetings.js'
 import { rm } from 'node:fs/promises'
@@ -67,24 +67,32 @@ function report(meetingId: string, stage: string, state: 'running' | 'done' | 'f
  * The stages are independent and recorded in meta.json, so a failed
  * transcription can be restarted without touching anything else, and certainly
  * without recording the call again.
+ *
+ * `until` stops after the given stage. Only checks use it: a test of
+ * recognition must not go on to hand the conversation to a language model.
  */
-export async function processMeeting(meetingId: string, from: Stage = 'transcribing'): Promise<void> {
+export async function processMeeting(
+  meetingId: string,
+  from: Stage = 'transcribing',
+  until: Stage = 'summarizing'
+): Promise<void> {
   if (running.has(meetingId)) return
   running.add(meetingId)
   try {
-    await runStages(meetingId, from)
+    await runStages(meetingId, from, until)
   } finally {
     running.delete(meetingId)
   }
 }
 
-async function runStages(meetingId: string, from: Stage): Promise<void> {
+async function runStages(meetingId: string, from: Stage, until: Stage): Promise<void> {
   let meeting = await readMeeting(meetingId)
   if (!meeting) throw new Error(t('встреча не найдена'))
 
   const settings = await loadSettings()
   const order: Stage[] = ['transcribing', 'summarizing']
   const startAt = Math.max(0, order.indexOf(from))
+  const endAt = order.includes(until) ? order.indexOf(until) : order.length - 1
 
   // An earlier error has nothing to do with a new run: leaving it on screen means
   // showing a red "interrupted" next to work that is under way.
@@ -111,7 +119,7 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
   // the question "how many people were speaking".
   let asrResults: AsrResult[] = startAt > order.indexOf('transcribing') ? asrFromUtterances(meeting.utterances, meeting.language) : []
 
-  for (let i = startAt; i < order.length; i++) {
+  for (let i = startAt; i <= endAt; i++) {
     const stage = order[i]!
     try {
       meeting = (await readMeeting(meetingId)) ?? meeting
@@ -119,11 +127,12 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
       await save(meeting, { stages: { [stage]: 'running' } })
 
       if (stage === 'transcribing') {
-        asrResults = await transcribeTracks(meetingId, tracks, settings.asrModel, settings.language)
+        const transcribed = await transcribeTracks(meetingId, tracks, settings.asrModel, settings.language)
+        asrResults = transcribed.results
         // We record what it was transcribed with: a month later a transcript gives no
         // clue whether it was done with the light model or the most accurate one.
         meeting = await save(meeting, {
-          providers: { ...meeting.providers, asr: settings.asrModel || preferredModel() }
+          providers: { ...meeting.providers, asr: transcribed.model }
         })
         meeting = await buildTranscript(meetingId, asrResults)
       } else if (stage === 'summarizing') {
@@ -165,6 +174,10 @@ async function runStages(meetingId: string, from: Stage): Promise<void> {
       return
     }
   }
+
+  // Stopped short on purpose: the recording is not finished, and there is
+  // nothing to announce.
+  if (endAt < order.length - 1) return
 
   meeting = await save(meeting, { stages: { done: 'done' } })
   send('meetings:changed', { id: meetingId })
@@ -224,12 +237,20 @@ async function transcribeTracks(
   tracks: TrackId[],
   modelId: string,
   language: string
-): Promise<AsrResult[]> {
+): Promise<{ results: AsrResult[]; model: string }> {
   // The engine follows from the chosen model: a person chooses quality, not an
   // engine, since comparing engines by eye is not possible anyway.
-  const provider = providerForModel(modelId)
+  const provider = providerForModel(modelId, language)
   const status = await provider.ready()
-  if (!status.ready) throw new Error(t('расшифровка недоступна: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
+  if (!status.ready) {
+    // The chosen model is there, but the conversation is in a language it does
+    // not know: "model not downloaded" would point at the wrong model.
+    const chosen = sherpaProviderFor(modelId)
+    if (chosen && chosen !== provider) {
+      throw new Error(t('{model} распознаёт только русскую речь. Для разговора на другом языке скачайте Whisper во вкладке «Расшифровка»', { model: chosen.name }))
+    }
+    throw new Error(t('расшифровка недоступна: {hint}', { hint: status.hint ?? t('провайдер не готов') }))
+  }
 
   // The other side is taken out of the microphone before recognition rather
   // than after it. Sorting it out in the transcript works, but only whole
@@ -258,7 +279,7 @@ async function transcribeTracks(
       out.push(result)
     }
 
-    return out
+    return { results: out, model: modelUsed(provider, modelId) }
   } finally {
     // The cleaned copy has done its work, and it goes even if recognition threw:
     // an hour of audio is a hundred megabytes, and nobody would ever find it.

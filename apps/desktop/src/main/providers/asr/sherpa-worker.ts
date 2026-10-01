@@ -4,11 +4,12 @@ import { createRequire } from 'node:module'
 import type { Word } from '@spyly/core'
 import { readWavPcm16 } from '../../audio/wav.js'
 import { specById, type SherpaSpec } from './sherpa-specs.js'
+import { WINDOW_MAX_SEC, joinWindows, windowsFromSpeech, wordsFromTokens, type Span } from './voice-windows.js'
 
 /**
  * Transcription with sherpa-onnx models in a separate process.
  *
- * The library computes synchronously, in chunks of 30 to 120 seconds of audio.
+ * The library computes synchronously, one stretch of audio at a time.
  * In the main process every such chunk froze the application for seconds on
  * end, and that same process takes in audio if a new recording is running
  * alongside. Yielding the thread between chunks makes no difference: at 0.1x
@@ -22,6 +23,8 @@ export interface AsrJob {
   wavPath: string
   /** The models folder: `app.getPath` is not available in a child process. */
   modelsDir: string
+  /** The speech detector, for the models that are cut at the pauses. */
+  vadPath?: string
 }
 
 export type AsrReply =
@@ -83,10 +86,17 @@ function getEngine(spec: SherpaSpec): unknown {
   return engine
 }
 
+/** What a model says about one stretch: the text, and for some models the pieces it is made of. */
+interface Decoded {
+  text?: string
+  tokens?: string[]
+  timestamps?: number[]
+}
+
 interface OfflineEngine {
   createStream(): { acceptWaveform(input: { sampleRate: number; samples: Float32Array }): void }
   decode(stream: unknown): void
-  getResult(stream: unknown): { text?: string }
+  getResult(stream: unknown): Decoded
 }
 
 interface OnlineEngine {
@@ -100,7 +110,7 @@ interface OnlineEngine {
 }
 
 /** Recognise one chunk, with a streaming model or an ordinary one. */
-function decodeChunk(spec: SherpaSpec, samples: Float32Array, sampleRate: number): string {
+function decodeChunk(spec: SherpaSpec, samples: Float32Array, sampleRate: number): Decoded {
   const engine = getEngine(spec)
   if (spec.streaming) {
     const online = engine as OnlineEngine
@@ -109,23 +119,24 @@ function decodeChunk(spec: SherpaSpec, samples: Float32Array, sampleRate: number
     // There is nothing left to say: the chunk has ended, so the remainder can be collected.
     stream.inputFinished()
     while (online.isReady(stream)) online.decode(stream)
-    return (online.getResult(stream).text ?? '').trim()
+    return { text: (online.getResult(stream).text ?? '').trim() }
   }
 
   const offline = engine as OfflineEngine
   const stream = offline.createStream()
   stream.acceptWaveform({ sampleRate, samples })
   offline.decode(stream)
-  return (offline.getResult(stream).text ?? '').trim()
+  return offline.getResult(stream)
 }
 
 /**
  * Words with evenly spread timestamps.
  *
- * The model returns text with no timing, and further down the pipeline words
- * have to be laid out by speaker. They are spread over the length of the chunk
- * in proportion to their character count: more accurate than dividing equally,
- * and good enough to match against the voice separation segments.
+ * Parakeet and Nemotron return text with no timing here, and further down the
+ * pipeline words have to be laid out by speaker. They are spread over the
+ * length of the chunk in proportion to their character count: more accurate
+ * than dividing equally, and good enough to match against the voice separation
+ * segments.
  */
 function spreadWords(text: string, start: number, end: number): Word[] {
   const parts = text.split(/\s+/).filter(Boolean)
@@ -190,6 +201,104 @@ function chunkSamples(
 }
 
 
+interface VadEngine {
+  acceptWaveform(samples: Float32Array): void
+  flush(): void
+  isEmpty(): boolean
+  front(enableExternalBuffer?: boolean): { samples: Float32Array; start: number }
+  pop(): void
+}
+
+/**
+ * Where in the recording someone is speaking.
+ *
+ * A pause shorter than 0.6 seconds does not end a phrase. Measured on a real
+ * recording against 0.3: the shorter one cut "Мише" off from its sentence so
+ * that it came back as "Миша", and lost "скажем так" altogether.
+ */
+function speechPhrases(samples: Float32Array, sampleRate: number, vadPath: string): Span[] {
+  const { Vad } = require('sherpa-onnx-node') as { Vad: new (config: unknown, bufferSeconds: number) => VadEngine }
+  const windowSize = 512
+  const vad = new Vad(
+    {
+      sileroVad: {
+        model: vadPath,
+        threshold: 0.5,
+        minSpeechDuration: 0.25,
+        minSilenceDuration: 0.6,
+        windowSize,
+        // No phrase longer than a window: the detector cuts a monologue at its
+        // quietest point, which is better than us cutting it at a wall clock.
+        maxSpeechDuration: WINDOW_MAX_SEC
+      },
+      sampleRate,
+      numThreads: 1,
+      debug: false
+    },
+    WINDOW_MAX_SEC * 3
+  )
+
+  const phrases: Span[] = []
+  const collect = (): void => {
+    while (!vad.isEmpty()) {
+      // A copy: by default the phrase points straight into the library's own
+      // memory, and Electron refuses such a buffer with "External buffers are
+      // not allowed" — plain Node takes it, so only the application fails.
+      const phrase = vad.front(false)
+      // Only where it is: the sound itself is cut from the recording later, so
+      // an hour of speech is not held in memory twice.
+      phrases.push({ start: phrase.start / sampleRate, end: (phrase.start + phrase.samples.length) / sampleRate })
+      vad.pop()
+    }
+  }
+  for (let at = 0; at + windowSize <= samples.length; at += windowSize) {
+    vad.acceptWaveform(samples.subarray(at, at + windowSize))
+    collect()
+  }
+  vad.flush()
+  collect()
+  return phrases
+}
+
+/** A model that only hears phrases: windows cut at the pauses, words timed by the model. */
+function recogniseByVoice(spec: SherpaSpec, job: AsrJob, samples: Float32Array, sampleRate: number): Word[] {
+  if (!job.vadPath) throw new Error(t('нет детектора речи для {model}', { model: spec.name }))
+  const windows = windowsFromSpeech(speechPhrases(samples, sampleRate, job.vadPath))
+
+  const recognised: Word[][] = []
+  for (const [index, window] of windows.entries()) {
+    const from = Math.floor(window.start * sampleRate)
+    const to = Math.min(samples.length, Math.ceil(window.end * sampleRate))
+    // A copy rather than a subarray: the native layer must not see someone else's buffer.
+    const result = decodeChunk(spec, samples.slice(from, to), sampleRate)
+    const text = (result.text ?? '').trim()
+    if (text) {
+      const start = from / sampleRate
+      const end = to / sampleRate
+      recognised.push(
+        wordsFromTokens(result.tokens ?? [], result.timestamps ?? [], start, end) ?? spreadWords(text, start, end)
+      )
+    }
+    process.parentPort?.postMessage({ type: 'progress', value: (index + 1) / windows.length })
+  }
+  return joinWindows(recognised)
+}
+
+/** A model that takes long stretches: fixed chunks, words spread over each. */
+function recogniseByTime(spec: SherpaSpec, seconds: number, samples: Float32Array, sampleRate: number): Word[] {
+  const pieces = chunkSamples(samples, sampleRate, seconds)
+  const words: Word[] = []
+  for (const [index, piece] of pieces.entries()) {
+    // A copy rather than a subarray: the native layer must not see someone else's buffer.
+    const slice = samples.slice(piece.from, piece.to)
+    if (slice.length === 0) continue
+    const text = (decodeChunk(spec, slice, sampleRate).text ?? '').trim()
+    if (text) words.push(...spreadWords(text, piece.from / sampleRate, piece.to / sampleRate))
+    process.parentPort?.postMessage({ type: 'progress', value: (index + 1) / pieces.length })
+  }
+  return words
+}
+
 async function run(job: AsrJob): Promise<AsrReply> {
   const spec = specById(job.specId)
   if (!spec) return { type: 'error', message: t('неизвестная модель: {job_specId}', { job_specId: job.specId }) }
@@ -198,16 +307,10 @@ async function run(job: AsrJob): Promise<AsrReply> {
   const { samples, sampleRate } = await readWavPcm16(job.wavPath)
   if (samples.length === 0) return { type: 'done', words: [] }
 
-  const pieces = chunkSamples(samples, sampleRate, spec.chunkSeconds)
-  const words: Word[] = []
-  for (const [index, piece] of pieces.entries()) {
-    // A copy rather than a subarray: the native layer must not see someone else's buffer.
-    const slice = samples.slice(piece.from, piece.to)
-    if (slice.length === 0) continue
-    const text = decodeChunk(spec, slice, sampleRate)
-    if (text) words.push(...spreadWords(text, piece.from / sampleRate, piece.to / sampleRate))
-    process.parentPort?.postMessage({ type: 'progress', value: (index + 1) / pieces.length })
-  }
+  const words =
+    spec.cut.by === 'voice'
+      ? recogniseByVoice(spec, job, samples, sampleRate)
+      : recogniseByTime(spec, spec.cut.seconds, samples, sampleRate)
   return { type: 'done', words }
 }
 

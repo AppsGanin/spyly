@@ -1,7 +1,8 @@
 import { t } from '@spyly/core'
 import type { ProviderInfo } from '../../shared/ipc.js'
-import { whisperCppProvider } from './asr/whisper-cpp.js'
+import { preferredModel, whisperCppProvider } from './asr/whisper-cpp.js'
 import { SHERPA_ASR_PROVIDERS, sherpaProviderFor } from './asr/sherpa-asr.js'
+import { specById } from './asr/sherpa-specs.js'
 import { LLM_PROVIDERS, getLlmProvider, readyLlmProvider } from './llm/index.js'
 import type { AsrProvider, LlmProvider } from './types.js'
 
@@ -20,9 +21,24 @@ export const ASR_PROVIDERS: AsrProvider[] = [whisperCppProvider, ...SHERPA_ASR_P
  *
  * A person chooses quality, not an engine: the engine is an implementation
  * detail, and comparing them by eye is not possible anyway.
+ *
+ * A model that knows one language is not handed a conversation in another:
+ * GigaAM given an English call turns "release" into "relice" and "Friday" into
+ * "Fride". Such a call goes to Whisper, which knows every language; "detect
+ * automatically" stays with the chosen model, as a person who chose GigaAM
+ * speaks Russian.
  */
-export function providerForModel(modelId: string): AsrProvider {
+export function providerForModel(modelId: string, language = 'auto'): AsrProvider {
+  const spec = specById(modelId)
+  if (spec && spec.language !== 'multi' && language !== 'auto' && language !== spec.language) {
+    return whisperCppProvider
+  }
   return sherpaProviderFor(modelId) ?? whisperCppProvider
+}
+
+/** The model a transcript is actually made with, to be written into the recording. */
+export function modelUsed(provider: AsrProvider, modelId: string): string {
+  return provider === whisperCppProvider ? preferredModel() : modelId
 }
 
 export { getLlmProvider, readyLlmProvider }
