@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0](https://github.com/AppsGanin/spyly/compare/v1.3.0...v1.4.0) (2026-10-01)
+
+
+### Features
+
+* GigaAM v3 for Russian, cut at the pauses and timed by the model ([e7025de](https://github.com/AppsGanin/spyly/commit/e7025de566ec04026f7f932921bfe5843a93aa68))
+* **updates:** surface friendly update check errors with tone ([9fa629e](https://github.com/AppsGanin/spyly/commit/9fa629ea8f4e316dcc83b1610694553072d62e53))
+
+
+### Fixes
+
+* **desktop:** stop tray click from showing window on macOS ([65684ce](https://github.com/AppsGanin/spyly/commit/65684ce43156b37094946079c7bc8b257a5760f0))
+
 ## [1.3.0](https://github.com/AppsGanin/spyly/compare/v1.2.0...v1.3.0) (2026-09-15)
 
 
